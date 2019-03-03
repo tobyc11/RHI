@@ -6,6 +6,7 @@ namespace Nome::RHI
 
 using tc::sp;
 
+//The header file is named RHIInstance to avoid name conflict with windows sdk
 //There is only one global instance shared across all threads
 class CInstance
 {

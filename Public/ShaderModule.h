@@ -47,6 +47,7 @@ struct CPixelShaderOutputDesc
     std::string Name;
 };
 
+//Arguments supplied for the shaders within a pipeline
 struct CPipelineArguments
 {
     using CArgType = std::variant<sp<CBuffer>, sp<CImageView>, sp<CSampler>>;
@@ -59,14 +60,20 @@ struct CPipelineArguments
     }
 };
 
-//A shader for a single stage, containing input/output signatures
+struct HLSLSrc{};
+
 class CShaderModule : public tc::CVirtualLightRefBase
 {
 public:
     CShaderModule() = default;
+    CShaderModule(const std::string& sourcePath, const std::string& target, const std::string& entryPoint, HLSLSrc);
 
-    virtual const CVertexShaderInputSignature& GetVSInputSignature() const = 0;
-    virtual const std::vector<CPixelShaderOutputDesc>& GetPSOutputSignature() const = 0;
+private:
+    friend class CShaderD3D11;
+
+    std::string SourcePath;
+    std::string Target;
+    std::string EntryPoint;
 };
 
 } /* namespace Nome::RHI */

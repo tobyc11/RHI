@@ -7,6 +7,12 @@ namespace Nome::RHI
 {
 
 template<typename TDerived>
+CBufferBase<TDerived>::CBufferBase(uint32_t size, EBufferUsageFlags usage, void* initialData)
+    : Size(size), Usage(usage)
+{
+}
+
+template<typename TDerived>
 void* CBufferBase<TDerived>::Map(size_t offset, size_t size)
 {
     return static_cast<TDerived*>(this)->Map(offset, size);
@@ -16,12 +22,6 @@ template<typename TDerived>
 void CBufferBase<TDerived>::Unmap()
 {
     return static_cast<TDerived*>(this)->Unmap();
-}
-
-template<typename TDerived>
-CBufferBase<TDerived>::CBufferBase(uint32_t size, EBufferUsageFlags usage, void* initialData)
-    : Size(size), Usage(usage)
-{
 }
 
 //Explicitly instanciate the wrapper for the chosen implementation

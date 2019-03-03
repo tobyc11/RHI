@@ -19,11 +19,11 @@ enum class ESamplerMipmapMode
 
 enum class ESamplerAddressMode
 {
-    Wrap = 0,
-    Mirror = 1,
-    Clamp = 2,
-    Border = 3,
-    MirrorOnce = 4,
+    Wrap = 1,
+    Mirror = 2,
+    Clamp = 3,
+    Border = 4,
+    MirrorOnce = 5,
 };
 
 struct CSamplerDesc
@@ -44,9 +44,10 @@ struct CSamplerDesc
     float BorderColor[4];
 };
 
-class CSampler : public tc::TLightRefBase<CSampler>
+class CSampler : public tc::CVirtualLightRefBase
 {
 public:
+    //We've got a virtual destructor, that for sure...
 };
 
 } /* namespace Nome::RHI */

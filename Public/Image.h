@@ -1,6 +1,7 @@
 #pragma once
 #include "RHIChooseImpl.h"
 #include "Format.h"
+#include <EnumClass.h>
 #include <RefBase.h>
 
 namespace Nome::RHI
@@ -15,8 +16,11 @@ enum class EImageType
 
 enum class EImageUsageFlags
 {
-    Sampled
+    Sampled,
+    DepthStencil
 };
+
+DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EImageUsageFlags);
 
 template <typename TDerived>
 class CImageBase : public tc::TLightRefBase<CImageBase<TDerived>>

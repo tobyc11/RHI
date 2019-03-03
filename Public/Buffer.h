@@ -7,13 +7,15 @@
 namespace Nome::RHI
 {
 
-enum class EBufferUsageFlagsFlags
+enum class EBufferUsageFlags
 {
     VertexBuffer,
     IndexBuffer,
     ConstantBuffer,
     Streaming,
 };
+
+DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EBufferUsageFlags);
 
 template <typename TDerived>
 class CBufferBase : public tc::TLightRefBase<CBufferBase<TDerived>>
