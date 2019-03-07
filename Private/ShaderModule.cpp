@@ -8,4 +8,15 @@ CShaderModule::CShaderModule(const std::string& sourcePath, const std::string& t
 {
 }
 
+bool CShaderModule::operator=(const CShaderModule & rhs) const
+{
+    return SourcePath == rhs.SourcePath && Target == rhs.Target && EntryPoint == rhs.EntryPoint;
+}
+
+size_t CShaderModule::GetShaderCacheKey() const
+{
+    std::hash<std::string> hasher;
+    return hasher(SourcePath) ^ hasher(Target) ^ hasher(EntryPoint);
+}
+
 } /* namespace Nome::RHI */

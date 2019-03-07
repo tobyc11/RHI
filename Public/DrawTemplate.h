@@ -24,6 +24,15 @@ public:
     const CBlendDesc& GetBlendDesc() const { return Blend; }
     void SetBlendDesc(CBlendDesc value) { Blend = value; }
 
+    const CVertexShaderInputBinding& GetVertexInputBinding() const { return VertexShaderInputBinding; }
+    CVertexShaderInputBinding& GetVertexInputBinding() { return VertexShaderInputBinding; }
+
+    sp<CShaderModule> GetVertexShader() const { return VertexShader; }
+    void SetVertexShader(CShaderModule* value) { VertexShader = value; }
+
+    sp<CShaderModule> GetPixelShader() const { return PixelShader; }
+    void SetPixelShader(CShaderModule* value) { PixelShader = value; }
+
 private:
     std::vector<CViewportDesc> Viewports;
     std::vector<CRectDesc> Scissors;

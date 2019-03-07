@@ -3,6 +3,8 @@
 #include "BufferD3D11.h"
 #include "SamplerD3D11.h"
 #include "SwapChainD3D11.h"
+#include "CommandListD3D11.h"
+#include "StateCacheD3D11.h"
 #include "ConstantConverter.h"
 #include "RHIException.h"
 
@@ -55,6 +57,8 @@ CDeviceD3D11::CDeviceD3D11(EDeviceCreateHints hints)
     }
     if (FAILED(hr))
         throw CRHIException("Device creation failed");
+
+    StateCache.reset(new CStateCacheD3D11(this));
 }
 
 sp<CBuffer> CDeviceD3D11::CreateBuffer(uint32_t size, EBufferUsageFlags usage, void* initialData)
@@ -91,13 +95,73 @@ sp<CImage> CDeviceD3D11::CreateImage2D(EFormat format, EImageUsageFlags usage, u
     if (!SUCCEEDED(hr))
         throw CRHIRuntimeError("Could not create texture.");
 
-    sp<CImage> image = new CImageD3D11(result, 2);
+    sp<CImage> image = new CImageD3D11(this, descDepth);
     return image;
 }
 
 sp<CImage> CDeviceD3D11::CreateImage3D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels, uint32_t arrayLayers)
 {
     throw std::runtime_error("unimplemented");
+}
+
+sp<CImageView> CDeviceD3D11::CreateImageView(const CImageViewDesc& desc, CImage* image)
+{
+    ID3D11ShaderResourceView* srv;
+    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
+    srvDesc.Format = Convert(desc.Format);
+    switch (desc.Type)
+    {
+    case EImageViewType::View1D:
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1D;
+        srvDesc.Texture1D.MostDetailedMip = desc.Range.BaseMipLevel;
+        srvDesc.Texture1D.MipLevels = desc.Range.LevelCount;
+        break;
+    case EImageViewType::View1DArray:
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1DARRAY;
+        srvDesc.Texture1DArray.MostDetailedMip = desc.Range.BaseMipLevel;
+        srvDesc.Texture1DArray.MipLevels = desc.Range.LevelCount;
+        srvDesc.Texture1DArray.FirstArraySlice = desc.Range.BaseArrayLayer;
+        srvDesc.Texture1DArray.ArraySize = desc.Range.LayerCount;
+        break;
+    case EImageViewType::View2D:
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        srvDesc.Texture2D.MostDetailedMip = desc.Range.BaseMipLevel;
+        srvDesc.Texture2D.MipLevels = desc.Range.LevelCount;
+        break;
+    case EImageViewType::View2DArray:
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+        srvDesc.Texture2DArray.MostDetailedMip = desc.Range.BaseMipLevel;
+        srvDesc.Texture2DArray.MipLevels = desc.Range.LevelCount;
+        srvDesc.Texture2DArray.FirstArraySlice = desc.Range.BaseArrayLayer;
+        srvDesc.Texture2DArray.ArraySize = desc.Range.LayerCount;
+        break;
+    case EImageViewType::View3D:
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
+        srvDesc.Texture3D.MostDetailedMip = desc.Range.BaseMipLevel;
+        srvDesc.Texture3D.MipLevels = desc.Range.LevelCount;
+        break;
+    case EImageViewType::Cube:
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+        srvDesc.TextureCube.MostDetailedMip = desc.Range.BaseMipLevel;
+        srvDesc.TextureCube.MipLevels = desc.Range.LevelCount;
+        break;
+    case EImageViewType::CubeArray:
+        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBEARRAY;
+        srvDesc.TextureCubeArray.MostDetailedMip = desc.Range.BaseMipLevel;
+        srvDesc.TextureCubeArray.MipLevels = desc.Range.LevelCount;
+        srvDesc.TextureCubeArray.First2DArrayFace = desc.Range.BaseArrayLayer;
+        srvDesc.TextureCubeArray.NumCubes = desc.Range.LayerCount / 6; //TODO: confirm this
+        break;
+    default:
+        break;
+    }
+
+    auto* imageImpl = static_cast<CImageD3D11*>(image);
+    HRESULT hr = D3dDevice->CreateShaderResourceView(static_cast<ID3D11Resource*>(imageImpl->AsVoidPtr()), &srvDesc, &srv);
+    if (!SUCCEEDED(hr))
+        throw CRHIRuntimeError("Could not CreateImageView");
+
+    return new CImageViewD3D11(srv);
 }
 
 sp<CSampler> CDeviceD3D11::CreateSampler(const CSamplerDesc& desc)
@@ -224,6 +288,11 @@ sp<CSwapChain> CDeviceD3D11::CreateSwapChain(const CSwapChainCreateInfo& info)
         throw CRHIException("CreateSwapChain failed");
 
     return new CSwapChainD3D11(pSwapChain);
+}
+
+CCommandListD3D11* CDeviceD3D11::CreateCommandList()
+{
+    return new CCommandListD3D11(this);
 }
 
 } /* namespace Nome::RHI */

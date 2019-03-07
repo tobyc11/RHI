@@ -29,14 +29,18 @@ struct CVertexShaderInputSignature
 
 struct CVertexShaderInputBinding
 {
-    //                 buffer       offset    stride
-    typedef std::tuple<sp<CBuffer>, uint32_t, uint32_t> Accessor;
+    struct CAccessor
+    {
+        sp<CBuffer> Buffer;
+        uint32_t Offset;
+        uint32_t Stride;
+    };
 
-    std::map<uint32_t, Accessor> LocationToAccessor;
+    std::map<uint32_t, CAccessor> LocationToAccessor;
 
     void AddAccessor(uint32_t location, sp<CBuffer> buffer, uint32_t offset, uint32_t stride)
     {
-        LocationToAccessor.insert(std::make_pair(location, Accessor(buffer, offset, stride)));
+        LocationToAccessor.insert(std::make_pair(location, CAccessor{ buffer, offset, stride }));
     }
 };
 
@@ -67,6 +71,9 @@ class CShaderModule : public tc::CVirtualLightRefBase
 public:
     CShaderModule() = default;
     CShaderModule(const std::string& sourcePath, const std::string& target, const std::string& entryPoint, HLSLSrc);
+
+    bool operator=(const CShaderModule& rhs) const;
+    size_t GetShaderCacheKey() const;
 
 private:
     friend class CShaderD3D11;

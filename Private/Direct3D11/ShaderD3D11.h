@@ -31,4 +31,9 @@ private:
     CPipelineParamMappingD3D11 Mappings;
 };
 
+class CShaderCacheD3D11
+{
+public:
+};
+
 } /* namespace Nome::RHI */

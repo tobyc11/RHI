@@ -11,6 +11,12 @@ CImageBase<TDerived>::CImageBase()
 {
 }
 
+template<typename TDerived>
+void CImageBase<TDerived>::CopyFrom(void* mem)
+{
+    static_cast<TDerived*>(this)->CopyFrom(mem);
+}
+
 //Explicitly instanciate the wrapper for the chosen implementation
 template class RHI_API CImageBase<TChooseImpl<CImageBase>::TDerived>;
 

@@ -205,4 +205,126 @@ D3D11_TEXTURE_ADDRESS_MODE Convert(ESamplerAddressMode mode)
     return static_cast<D3D11_TEXTURE_ADDRESS_MODE>(mode);
 }
 
+D3D11_FILL_MODE Convert(EPolygonMode mode)
+{
+    switch (mode)
+    {
+    case EPolygonMode::Fill:
+        return D3D11_FILL_SOLID;
+    case EPolygonMode::Wireframe:
+        return D3D11_FILL_WIREFRAME;
+    }
+    return D3D11_FILL_SOLID;
+}
+
+D3D11_CULL_MODE Convert(ECullModeFlags cull)
+{
+    D3D11_CULL_MODE result = D3D11_CULL_NONE;
+    if (Any(cull, ECullModeFlags::Front))
+        result = D3D11_CULL_FRONT;
+    if (Any(cull, ECullModeFlags::Back))
+        result = D3D11_CULL_BACK;
+    return result;
+}
+
+D3D11_COMPARISON_FUNC Convert(ECompareOp op)
+{
+    switch (op)
+    {
+    case ECompareOp::Never:
+        return D3D11_COMPARISON_NEVER;
+    case ECompareOp::Less:
+        return D3D11_COMPARISON_LESS;
+    case ECompareOp::Equal:
+        return D3D11_COMPARISON_EQUAL;
+    case ECompareOp::LessEqual:
+        return D3D11_COMPARISON_LESS_EQUAL;
+    case ECompareOp::Greater:
+        return D3D11_COMPARISON_GREATER;
+    case ECompareOp::NotEqual:
+        return D3D11_COMPARISON_NOT_EQUAL;
+    case ECompareOp::GreaterEqual:
+        return D3D11_COMPARISON_GREATER_EQUAL;
+    case ECompareOp::Always:
+        return D3D11_COMPARISON_ALWAYS;
+    default:
+        return D3D11_COMPARISON_ALWAYS;
+    }
+}
+
+D3D11_STENCIL_OP Convert(EStencilOp op)
+{
+    switch (op)
+    {
+    case EStencilOp::Keep:
+        return D3D11_STENCIL_OP_KEEP;
+    case EStencilOp::Zero:
+        return D3D11_STENCIL_OP_ZERO;
+    case EStencilOp::Replace:
+        return D3D11_STENCIL_OP_REPLACE;
+    case EStencilOp::IncrementAndClamp:
+        return D3D11_STENCIL_OP_INCR_SAT;
+    case EStencilOp::DecrementAndClamp:
+        return D3D11_STENCIL_OP_DECR_SAT;
+    case EStencilOp::Invert:
+        return D3D11_STENCIL_OP_INVERT;
+    case EStencilOp::IncrementAndWrap:
+        return D3D11_STENCIL_OP_INCR;
+    case EStencilOp::DecrementAndWrap:
+        return D3D11_STENCIL_OP_DECR;
+    default:
+        return D3D11_STENCIL_OP_KEEP;
+    }
+}
+
+D3D11_BLEND Convert(EBlendMode mode)
+{
+    switch (mode)
+    {
+    case EBlendMode::Zero:
+        return D3D11_BLEND_ZERO;
+    case EBlendMode::One:
+        return D3D11_BLEND_ONE;
+    case EBlendMode::SrcColor:
+        return D3D11_BLEND_SRC_COLOR;
+    case EBlendMode::OneMinusSrcColor:
+        return D3D11_BLEND_INV_SRC_COLOR;
+    case EBlendMode::SrcAlpha:
+        return D3D11_BLEND_SRC_ALPHA;
+    case EBlendMode::OneMinusSrcAlpha:
+        return D3D11_BLEND_INV_SRC_ALPHA;
+    case EBlendMode::DstAlpha:
+        return D3D11_BLEND_DEST_ALPHA;
+    case EBlendMode::OneMinusDstAlpha:
+        return D3D11_BLEND_INV_DEST_ALPHA;
+    case EBlendMode::DstColor:
+        return D3D11_BLEND_DEST_COLOR;
+    case EBlendMode::OneMinusDstColor:
+        return D3D11_BLEND_INV_DEST_COLOR;
+    case EBlendMode::SrcAlphaSaturate:
+        return D3D11_BLEND_SRC_ALPHA_SAT;
+    default:
+        return D3D11_BLEND_ZERO;
+    }
+}
+
+D3D11_BLEND_OP Convert(EBlendOp op)
+{
+    switch (op)
+    {
+    case EBlendOp::Add:
+        return D3D11_BLEND_OP_ADD;
+    case EBlendOp::Subtract:
+        return D3D11_BLEND_OP_SUBTRACT;
+    case EBlendOp::ReverseSubtract:
+        return D3D11_BLEND_OP_REV_SUBTRACT;
+    case EBlendOp::Min:
+        return D3D11_BLEND_OP_MIN;
+    case EBlendOp::Max:
+        return D3D11_BLEND_OP_MAX;
+    default:
+        return D3D11_BLEND_OP_ADD;
+    }
+}
+
 } /* namespace Nome::RHI */

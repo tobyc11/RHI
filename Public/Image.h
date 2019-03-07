@@ -30,6 +30,7 @@ protected:
 
 public:
     virtual ~CImageBase() = default;
+    void CopyFrom(void* mem);
 };
 
 using CImage = CImageBase<TChooseImpl<CImageBase>::TDerived>;

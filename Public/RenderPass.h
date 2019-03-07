@@ -5,6 +5,8 @@
 namespace Nome::RHI
 {
 
+//We use an integer type to uniquely identify graph nodes and other sorts objects
+//  __hash should be used to convert a string literal into an integer id.
 using CNodeId = uint32_t;
 
 class CRenderGraph;
@@ -12,9 +14,10 @@ class CRenderGraph;
 class CRenderTargetRef
 {
 public:
+    CRenderTargetRef(CSwapChain* swapChain);
 
 private:
-    bool bIsSwapChain;
+    bool bIsSwapChain = false;
     sp<CSwapChain> SwapChain;
 };
 

@@ -23,6 +23,7 @@ private:
     //Sole ownership
     std::map<CNodeId, CRenderPass*> RenderPasses;
 
+    uint32_t RenderTargetCount = 0;
     std::map<CNodeId, CRenderTargetRef> RenderTargets;
 };
 
