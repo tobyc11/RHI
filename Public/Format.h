@@ -1,6 +1,6 @@
 #pragma once
 
-namespace Nome::RHI
+namespace RHI
 {
 
 //Blatantly plagiarized from Vulkan.
@@ -194,4 +194,4 @@ enum class EFormat
     ASTC_12x12_SRGB_BLOCK = 184,
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

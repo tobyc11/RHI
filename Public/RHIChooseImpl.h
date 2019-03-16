@@ -1,7 +1,7 @@
 #pragma once
 #include "RHIModuleAPI.h"
 
-namespace Nome::RHI
+namespace RHI
 {
 
 /* This file is used by the RHI object classes as a compile
@@ -32,4 +32,4 @@ DEFINE_IMPL(CImageBase, CImageD3D11)
 static_assert(false, "No RHI implementation chosen.");
 #endif
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

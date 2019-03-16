@@ -1,6 +1,7 @@
 #include "ConstantConverter.h"
+#include "RHIException.h"
 
-namespace Nome::RHI
+namespace RHI
 {
 
 static DXGI_FORMAT FormatMappingTable[] =
@@ -327,4 +328,127 @@ D3D11_BLEND_OP Convert(EBlendOp op)
     }
 }
 
-} /* namespace Nome::RHI */
+D3D11_SHADER_RESOURCE_VIEW_DESC ConvertDescToSRV(const CImageViewDesc & desc)
+{
+    D3D11_SHADER_RESOURCE_VIEW_DESC d;
+    d.Format = Convert(desc.Format);
+    switch (desc.Type)
+    {
+    case EImageViewType::View1D:
+        d.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1D;
+        d.Texture1D.MostDetailedMip = desc.Range.BaseMipLevel;
+        d.Texture1D.MipLevels = desc.Range.LevelCount;
+        break;
+    case EImageViewType::View1DArray:
+        d.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1DARRAY;
+        d.Texture1DArray.MostDetailedMip = desc.Range.BaseMipLevel;
+        d.Texture1DArray.MipLevels = desc.Range.LevelCount;
+        d.Texture1DArray.FirstArraySlice = desc.Range.BaseArrayLayer;
+        d.Texture1DArray.ArraySize = desc.Range.LayerCount;
+        break;
+    case EImageViewType::View2D:
+        d.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+        d.Texture2D.MostDetailedMip = desc.Range.BaseMipLevel;
+        d.Texture2D.MipLevels = desc.Range.LevelCount;
+        break;
+    case EImageViewType::View2DArray:
+        d.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+        d.Texture2DArray.MostDetailedMip = desc.Range.BaseMipLevel;
+        d.Texture2DArray.MipLevels = desc.Range.LevelCount;
+        d.Texture2DArray.FirstArraySlice = desc.Range.BaseArrayLayer;
+        d.Texture2DArray.ArraySize = desc.Range.LayerCount;
+        break;
+    case EImageViewType::View3D:
+        d.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
+        d.Texture3D.MostDetailedMip = desc.Range.BaseMipLevel;
+        d.Texture3D.MipLevels = desc.Range.LevelCount;
+        break;
+    case EImageViewType::Cube:
+        d.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
+        d.TextureCube.MostDetailedMip = desc.Range.BaseMipLevel;
+        d.TextureCube.MipLevels = desc.Range.LevelCount;
+        break;
+    case EImageViewType::CubeArray:
+        d.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBEARRAY;
+        d.TextureCubeArray.MostDetailedMip = desc.Range.BaseMipLevel;
+        d.TextureCubeArray.MipLevels = desc.Range.LevelCount;
+        d.TextureCubeArray.First2DArrayFace = desc.Range.BaseArrayLayer;
+        d.TextureCubeArray.NumCubes = desc.Range.LayerCount / 6; //TODO: confirm this
+        break;
+    default:
+        throw CRHIRuntimeError("EImageViewType unrecognized");
+    }
+    return d;
+}
+
+D3D11_RENDER_TARGET_VIEW_DESC ConvertDescToRTV(const CImageViewDesc & desc)
+{
+    D3D11_RENDER_TARGET_VIEW_DESC d;
+    d.Format = Convert(desc.Format);
+    switch (desc.Type)
+    {
+    case EImageViewType::View1D:
+        d.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE1D;
+        d.Texture1D.MipSlice = desc.Range.BaseMipLevel;
+        break;
+    case EImageViewType::View1DArray:
+        d.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE1DARRAY;
+        d.Texture1DArray.MipSlice = desc.Range.BaseMipLevel;
+        d.Texture1DArray.FirstArraySlice = desc.Range.BaseArrayLayer;
+        d.Texture1DArray.ArraySize = desc.Range.LayerCount;
+        break;
+    case EImageViewType::View2D:
+        d.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+        d.Texture2D.MipSlice = desc.Range.BaseMipLevel;
+        break;
+    case EImageViewType::View2DArray:
+        d.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2DARRAY;
+        d.Texture2DArray.MipSlice = desc.Range.BaseMipLevel;
+        d.Texture2DArray.FirstArraySlice = desc.Range.BaseArrayLayer;
+        d.Texture2DArray.ArraySize = desc.Range.LayerCount;
+        break;
+    case EImageViewType::View3D:
+        d.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE3D;
+        d.Texture3D.MipSlice = desc.Range.BaseMipLevel;
+        d.Texture3D.FirstWSlice = desc.Range.BaseArrayLayer;
+        d.Texture3D.WSize = desc.Range.LayerCount;
+        break;
+    default:
+        throw CRHIRuntimeError("EImageViewType unrecognized or unsuitable for render target view");
+    }
+    return d;
+}
+
+D3D11_DEPTH_STENCIL_VIEW_DESC ConvertDescToDSV(const CImageViewDesc & desc)
+{
+    D3D11_DEPTH_STENCIL_VIEW_DESC d;
+    d.Format = Convert(desc.Format);
+    switch (desc.Type)
+    {
+    case EImageViewType::View1D:
+        d.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE1D;
+        d.Texture1D.MipSlice = desc.Range.BaseMipLevel;
+        break;
+    case EImageViewType::View1DArray:
+        d.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE1DARRAY;
+        d.Texture1DArray.MipSlice = desc.Range.BaseMipLevel;
+        d.Texture1DArray.FirstArraySlice = desc.Range.BaseArrayLayer;
+        d.Texture1DArray.ArraySize = desc.Range.LayerCount;
+        break;
+    case EImageViewType::View2D:
+        d.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+        d.Texture2D.MipSlice = desc.Range.BaseMipLevel;
+        break;
+    case EImageViewType::View2DArray:
+        d.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2DARRAY;
+        d.Texture2DArray.MipSlice = desc.Range.BaseMipLevel;
+        d.Texture2DArray.FirstArraySlice = desc.Range.BaseArrayLayer;
+        d.Texture2DArray.ArraySize = desc.Range.LayerCount;
+        break;
+    default:
+        throw CRHIRuntimeError("EImageViewType unrecognized or unsuitable for depth stencil view");
+    }
+    return d;
+}
+
+} /* namespace RHI */

@@ -1,6 +1,6 @@
 #include "SamplerD3D11.h"
 
-namespace Nome::RHI
+namespace RHI
 {
 
 CSamplerD3D11::CSamplerD3D11(ID3D11SamplerState* state)
@@ -8,4 +8,4 @@ CSamplerD3D11::CSamplerD3D11(ID3D11SamplerState* state)
 {
 }
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

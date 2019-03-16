@@ -3,13 +3,14 @@
 #include "Buffer.h"
 #include "ImageView.h"
 #include "Sampler.h"
+#include <CompileTimeHash.h>
 #include <map>
 #include <string>
 #include <utility>
 #include <variant>
 #include <vector>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 using tc::sp;
@@ -18,29 +19,58 @@ using tc::sp;
 struct CVertexShaderInputDesc
 {
     EFormat Format;
-    uint32_t Location;
     std::string Name; //For debugging only, presumably
 };
 
 struct CVertexShaderInputSignature
 {
-    std::vector<CVertexShaderInputDesc> InputDescs;
+    //       Location
+    std::map<uint32_t, CVertexShaderInputDesc> InputDescs;
 };
 
 struct CVertexShaderInputBinding
 {
-    struct CAccessor
+    struct CBoundAccessor
     {
+        uint32_t Location;
         sp<CBuffer> Buffer;
-        uint32_t Offset;
         uint32_t Stride;
+        uint32_t Offset;
+
+        bool operator=(const CBoundAccessor& rhs) const
+        {
+            return Location == rhs.Location && Buffer == rhs.Buffer && Offset == rhs.Offset && Stride == rhs.Stride;
+        }
     };
 
-    std::map<uint32_t, CAccessor> LocationToAccessor;
+    struct CLocationComparator
+    {
+        bool operator()(const CBoundAccessor& lhs, const CBoundAccessor& rhs) const
+        {
+            return lhs.Location < rhs.Location;
+        }
+    };
+
+    struct CBufferAndStrideComparator
+    {
+        bool operator()(const CBoundAccessor& lhs, const CBoundAccessor& rhs) const
+        {
+            if (lhs.Buffer == rhs.Buffer)
+                return lhs.Stride < rhs.Stride;
+            return lhs.Buffer < rhs.Buffer;
+        }
+    };
+
+    std::vector<CBoundAccessor> BoundAccessors;
 
     void AddAccessor(uint32_t location, sp<CBuffer> buffer, uint32_t offset, uint32_t stride)
     {
-        LocationToAccessor.insert(std::make_pair(location, CAccessor{ buffer, offset, stride }));
+        BoundAccessors.push_back(CBoundAccessor{ location, buffer, offset, stride });
+    }
+
+    void AddAccessor(uint32_t location, const CBufferAccessor& a)
+    {
+        BoundAccessors.push_back(CBoundAccessor{ location, a.Buffer, a.Offset, a.Stride });
     }
 };
 
@@ -58,14 +88,16 @@ struct CPipelineArguments
     std::map<uint32_t, CArgType> Arguments;
 
     template <typename T>
-    void Add(uint32_t id, const T&& arg)
+    void Add(uint32_t id, const T& arg)
     {
-        Arguments.insert_or_assign(std::make_pair(id, CArgType(arg)));
+        //TODO warn if override
+        Arguments.insert_or_assign(id, CArgType(arg));
     }
 };
 
 struct HLSLSrc{};
 
+//"ShaderModule" may not be the most appropriate name for this class, since it merely represents an uncompiled shader
 class CShaderModule : public tc::CVirtualLightRefBase
 {
 public:
@@ -73,7 +105,7 @@ public:
     CShaderModule(const std::string& sourcePath, const std::string& target, const std::string& entryPoint, HLSLSrc);
 
     bool operator=(const CShaderModule& rhs) const;
-    size_t GetShaderCacheKey() const;
+    std::string GetShaderCacheKey() const;
 
 private:
     friend class CShaderD3D11;
@@ -83,4 +115,4 @@ private:
     std::string EntryPoint;
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

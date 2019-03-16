@@ -5,11 +5,51 @@
 #include "SwapChainD3D11.h"
 #include "CommandListD3D11.h"
 #include "StateCacheD3D11.h"
+#include "ShaderD3D11.h"
 #include "ConstantConverter.h"
+#include "AbstractionBreaker.h"
+#include "RenderGraph.h"
 #include "RHIException.h"
 
-namespace Nome::RHI
+namespace RHI
 {
+
+//Part of the AbstractionBreaker, this just seems like a good place for implementation
+CNativeDevice GetNativeDevice(CDevice* device)
+{
+    CNativeDevice native;
+    auto* deviceImpl = static_cast<CDeviceD3D11*>(device);
+    native.D3dDevice = deviceImpl->D3dDevice;
+    native.ImmediateContext = deviceImpl->ImmediateContext;
+    return native;
+}
+
+void CNativeRenderPass::BindRenderTargets() const
+{
+    ComPtr<ID3D11DepthStencilView> DSV;
+    CNodeId depthId = GetDepthStencilAttachment();
+    if (depthId != kInvalidNodeId)
+    {
+        auto& attachment = GetRenderGraph().GetRenderTarget(depthId);
+        auto imageView = attachment.GetImageView();
+        auto* imageViewImpl = static_cast<CImageViewD3D11*>(imageView.Get());
+        DSV = imageViewImpl->GetDepthStencilView();
+    }
+
+    std::vector<ID3D11RenderTargetView*> RTVs;
+    ForEachColorAttachment([&](CNodeId id)
+    {
+        if (id == kInvalidNodeId)
+            return;
+        auto& attachment = GetRenderGraph().GetRenderTarget(id);
+        auto imageView = attachment.GetImageView();
+        auto* imageViewImpl = static_cast<CImageViewD3D11*>(imageView.Get());
+        auto rtv = imageViewImpl->GetRenderTargetView();
+        RTVs.push_back(rtv.Get());
+    });
+
+    ImmediateContext->OMSetRenderTargets((UINT)RTVs.size(), RTVs.data(), DSV.Get());
+}
 
 CDeviceD3D11::CDeviceD3D11(EDeviceCreateHints hints)
 {
@@ -61,7 +101,18 @@ CDeviceD3D11::CDeviceD3D11(EDeviceCreateHints hints)
     StateCache.reset(new CStateCacheD3D11(this));
 }
 
-sp<CBuffer> CDeviceD3D11::CreateBuffer(uint32_t size, EBufferUsageFlags usage, void* initialData)
+CDeviceD3D11::~CDeviceD3D11()
+{
+#ifdef _DEBUG
+    ID3D11Debug* debugDevice = nullptr;
+    HRESULT hr = D3dDevice->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&debugDevice));
+    debugDevice->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
+    if (debugDevice)
+        debugDevice->Release();
+#endif
+}
+
+sp<CBuffer> CDeviceD3D11::CreateBuffer(uint32_t size, EBufferUsageFlags usage, const void* initialData)
 {
     return new CBufferD3D11(D3dDevice.Get(), size, usage, initialData);
 }
@@ -73,29 +124,31 @@ sp<CImage> CDeviceD3D11::CreateImage1D(EFormat format, EImageUsageFlags usage, u
 
 sp<CImage> CDeviceD3D11::CreateImage2D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t arrayLayers)
 {
-    //Determine bind flags
+    //Determine various properties
     UINT bindFlags = 0;
+    bool bCreateImmediately = false;
     if (Any(usage, EImageUsageFlags::DepthStencil))
+    {
+        bCreateImmediately = true;
         bindFlags |= D3D11_BIND_DEPTH_STENCIL;
+    }
 
-    D3D11_TEXTURE2D_DESC descDepth = {};
-    descDepth.Width = width;
-    descDepth.Height = height;
-    descDepth.MipLevels = 1;
-    descDepth.ArraySize = 1;
-    descDepth.Format = Convert(format);
-    descDepth.SampleDesc.Count = 1;
-    descDepth.SampleDesc.Quality = 0;
-    descDepth.Usage = D3D11_USAGE_DEFAULT;
-    descDepth.BindFlags = bindFlags;
-    descDepth.CPUAccessFlags = 0;
-    descDepth.MiscFlags = 0;
-    ID3D11Texture2D* result; //don't release, will be released by imaged3d11
-    HRESULT hr = D3dDevice->CreateTexture2D(&descDepth, nullptr, &result);
-    if (!SUCCEEDED(hr))
-        throw CRHIRuntimeError("Could not create texture.");
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width = width;
+    desc.Height = height;
+    desc.MipLevels = mipLevels;
+    desc.ArraySize = arrayLayers;
+    desc.Format = Convert(format);
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.BindFlags = bindFlags;
+    desc.CPUAccessFlags = 0;
+    desc.MiscFlags = 0;
 
-    sp<CImage> image = new CImageD3D11(this, descDepth);
+    sp<CImageD3D11> image = new CImageD3D11(this, desc);
+    if (bCreateImmediately)
+        image->CreateFromMem(nullptr);
     return image;
 }
 
@@ -106,62 +159,8 @@ sp<CImage> CDeviceD3D11::CreateImage3D(EFormat format, EImageUsageFlags usage, u
 
 sp<CImageView> CDeviceD3D11::CreateImageView(const CImageViewDesc& desc, CImage* image)
 {
-    ID3D11ShaderResourceView* srv;
-    D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc;
-    srvDesc.Format = Convert(desc.Format);
-    switch (desc.Type)
-    {
-    case EImageViewType::View1D:
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1D;
-        srvDesc.Texture1D.MostDetailedMip = desc.Range.BaseMipLevel;
-        srvDesc.Texture1D.MipLevels = desc.Range.LevelCount;
-        break;
-    case EImageViewType::View1DArray:
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE1DARRAY;
-        srvDesc.Texture1DArray.MostDetailedMip = desc.Range.BaseMipLevel;
-        srvDesc.Texture1DArray.MipLevels = desc.Range.LevelCount;
-        srvDesc.Texture1DArray.FirstArraySlice = desc.Range.BaseArrayLayer;
-        srvDesc.Texture1DArray.ArraySize = desc.Range.LayerCount;
-        break;
-    case EImageViewType::View2D:
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
-        srvDesc.Texture2D.MostDetailedMip = desc.Range.BaseMipLevel;
-        srvDesc.Texture2D.MipLevels = desc.Range.LevelCount;
-        break;
-    case EImageViewType::View2DArray:
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
-        srvDesc.Texture2DArray.MostDetailedMip = desc.Range.BaseMipLevel;
-        srvDesc.Texture2DArray.MipLevels = desc.Range.LevelCount;
-        srvDesc.Texture2DArray.FirstArraySlice = desc.Range.BaseArrayLayer;
-        srvDesc.Texture2DArray.ArraySize = desc.Range.LayerCount;
-        break;
-    case EImageViewType::View3D:
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE3D;
-        srvDesc.Texture3D.MostDetailedMip = desc.Range.BaseMipLevel;
-        srvDesc.Texture3D.MipLevels = desc.Range.LevelCount;
-        break;
-    case EImageViewType::Cube:
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBE;
-        srvDesc.TextureCube.MostDetailedMip = desc.Range.BaseMipLevel;
-        srvDesc.TextureCube.MipLevels = desc.Range.LevelCount;
-        break;
-    case EImageViewType::CubeArray:
-        srvDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURECUBEARRAY;
-        srvDesc.TextureCubeArray.MostDetailedMip = desc.Range.BaseMipLevel;
-        srvDesc.TextureCubeArray.MipLevels = desc.Range.LevelCount;
-        srvDesc.TextureCubeArray.First2DArrayFace = desc.Range.BaseArrayLayer;
-        srvDesc.TextureCubeArray.NumCubes = desc.Range.LayerCount / 6; //TODO: confirm this
-        break;
-    default:
-        break;
-    }
-
     auto* imageImpl = static_cast<CImageD3D11*>(image);
-    HRESULT hr = D3dDevice->CreateShaderResourceView(static_cast<ID3D11Resource*>(imageImpl->AsVoidPtr()), &srvDesc, &srv);
-    if (!SUCCEEDED(hr))
-        throw CRHIRuntimeError("Could not CreateImageView");
-
-    return new CImageViewD3D11(srv);
+    return new CImageViewD3D11(this, imageImpl, desc);
 }
 
 sp<CSampler> CDeviceD3D11::CreateSampler(const CSamplerDesc& desc)
@@ -287,7 +286,9 @@ sp<CSwapChain> CDeviceD3D11::CreateSwapChain(const CSwapChainCreateInfo& info)
     if (FAILED(hr))
         throw CRHIException("CreateSwapChain failed");
 
-    return new CSwapChainD3D11(pSwapChain);
+    sp<CSwapChain> result = new CSwapChainD3D11(pSwapChain);
+    if (pSwapChain1) pSwapChain1->Release();
+    return result;
 }
 
 CCommandListD3D11* CDeviceD3D11::CreateCommandList()
@@ -295,4 +296,4 @@ CCommandListD3D11* CDeviceD3D11::CreateCommandList()
     return new CCommandListD3D11(this);
 }
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

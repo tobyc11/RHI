@@ -1,7 +1,7 @@
 #pragma once
 #include "Device.h"
 
-namespace Nome::RHI
+namespace RHI
 {
 
 using tc::sp;
@@ -26,4 +26,4 @@ private:
     CInstance& operator=(CInstance&&) = delete;
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

@@ -2,7 +2,7 @@
 #include "PipelineStateDesc.h"
 #include <RefBase.h>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 enum class EFilter
@@ -47,7 +47,7 @@ struct CSamplerDesc
 class CSampler : public tc::CVirtualLightRefBase
 {
 public:
-    //We've got a virtual destructor, that for sure...
+    //We've got a virtual destructor from tc::CVirtualLightRefBase
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

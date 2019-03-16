@@ -4,8 +4,10 @@
 #include <RefBase.h>
 #include <cstdint>
 
-namespace Nome::RHI
+namespace RHI
 {
+
+using tc::sp;
 
 enum class EBufferUsageFlags
 {
@@ -21,7 +23,7 @@ template <typename TDerived>
 class CBufferBase : public tc::TLightRefBase<CBufferBase<TDerived>>
 {
 protected:
-    CBufferBase(uint32_t size, EBufferUsageFlags usage, void* initialData = nullptr);
+    CBufferBase(uint32_t size, EBufferUsageFlags usage);
 
 public:
     virtual ~CBufferBase() = default;
@@ -36,4 +38,11 @@ private:
 
 using CBuffer = TChooseImpl<CBufferBase>::TConcreteBase;
 
-} /* namespace Nome::RHI */
+struct CBufferAccessor
+{
+    sp<CBuffer> Buffer;
+    uint32_t Stride;
+    uint32_t Offset;
+};
+
+} /* namespace RHI */

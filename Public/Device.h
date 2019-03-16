@@ -6,7 +6,7 @@
 #include "SwapChain.h"
 #include <RefBase.h>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 using tc::sp;
@@ -27,12 +27,13 @@ protected:
 public:
     virtual ~CDeviceBase() = default;
 
-    sp<CBuffer> CreateBuffer(uint32_t size, EBufferUsageFlags usage, void* initialData = nullptr);
+    sp<CBuffer> CreateBuffer(uint32_t size, EBufferUsageFlags usage, const void* initialData = nullptr);
 
     sp<CImage> CreateImage1D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
     sp<CImage> CreateImage2D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
     sp<CImage> CreateImage3D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
-    
+    sp<CImageView> CreateImageView(const CImageViewDesc& desc, CImage* image);
+
     sp<CSampler> CreateSampler(const CSamplerDesc& desc);
 
     sp<CSwapChain> CreateSwapChain(const CSwapChainCreateInfo& info);
@@ -40,4 +41,4 @@ public:
 
 using CDevice = TChooseImpl<CDeviceBase>::TConcreteBase;
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

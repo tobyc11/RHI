@@ -2,29 +2,37 @@
 #include "Image.h"
 #include "RenderPass.h"
 
-namespace Nome::RHI
+namespace RHI
 {
 
 //I am the frame.
 class CRenderGraph
 {
 public:
-    CNodeId ImportRenderTarget(CImageView* view);
-    CNodeId ImportRenderTarget(CSwapChain* swapChain);
+    void ImportRenderTarget(CNodeId id, CImageView* view);
+    void ImportRenderTarget(CNodeId id, CSwapChain* swapChain);
     CNodeId DeclareRenderTarget();
+    CRenderTargetRef& GetRenderTarget(CNodeId id);
 
-    CRenderPass& AddRenderPass(CNodeId id, const std::vector<CNodeId>& outputTargets, CNodeId depthStencilTarget);
+    void AddRenderPass(CNodeId id, CRenderPass& pass);
+    bool HasRenderPass(CNodeId id) const;
     CRenderPass& GetRenderPass(CNodeId id);
+    void RemoveRenderPass(CNodeId id);
 
     void BeginFrame();
     void SubmitFrame();
+    void PrepareToResize();
 
 private:
-    //Sole ownership
-    std::map<CNodeId, CRenderPass*> RenderPasses;
+    void DFSRenderPassTopologicalSort(CRenderPass* pass);
 
-    uint32_t RenderTargetCount = 0;
+    //Sole ownership
+    std::map<CNodeId, sp<CRenderPass>> RenderPasses;
+
     std::map<CNodeId, CRenderTargetRef> RenderTargets;
+
+    std::set<CRenderPass*> DFSVisited;
+    std::vector<CRenderPass*> TopoSortedPasses;
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

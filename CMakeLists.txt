@@ -10,6 +10,7 @@ source_group(Private\\Direct3D11 FILES ${RHI_PRIVATE_DIRECT3D11_SOURCES})
 source_group(Public FILES ${RHI_PUBLIC_SOURCES})
 
 add_library(${MODULE_NAME} ${RHI_PRIVATE_SOURCES} ${RHI_PRIVATE_DIRECT3D11_SOURCES} ${RHI_PUBLIC_SOURCES})
+add_library(tc::${MODULE_NAME} ALIAS ${MODULE_NAME})
 
 include(GenerateExportHeader)
 target_include_directories(${MODULE_NAME} PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
@@ -19,9 +20,8 @@ target_include_directories(${MODULE_NAME} PRIVATE Private)
 target_include_directories(${MODULE_NAME} PUBLIC Public)
 target_compile_options(${MODULE_NAME} ${DEFAULT_COMPILE_OPTIONS})
 
-target_link_libraries(${MODULE_NAME} PRIVATE Foundation)
-target_link_libraries(${MODULE_NAME} PRIVATE Math)
+target_link_libraries(${MODULE_NAME} PUBLIC Foundation)
+target_link_libraries(${MODULE_NAME} PUBLIC Math)
 
 target_compile_definitions(${MODULE_NAME} PUBLIC RHI_IMPL_DIRECT3D11)
-
 target_link_libraries(${MODULE_NAME} PRIVATE d3d11.lib d3dcompiler.lib dxgi.lib dxguid.lib)

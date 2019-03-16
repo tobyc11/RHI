@@ -1,6 +1,6 @@
 #include "DrawTemplate.h"
 
-namespace Nome::RHI
+namespace RHI
 {
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

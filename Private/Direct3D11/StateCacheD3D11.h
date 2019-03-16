@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <mutex>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 class CStateCacheD3D11
@@ -134,4 +134,4 @@ private:
     std::unordered_map<CBlendDesc, ComPtr<ID3D11BlendState>, tc::hash<CBlendDesc>> BlendCache;
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

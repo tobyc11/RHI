@@ -2,7 +2,7 @@
 #include "Sampler.h"
 #include "D3D11Platform.h"
 
-namespace Nome::RHI
+namespace RHI
 {
 
 class CSamplerD3D11 : public CSampler
@@ -10,8 +10,10 @@ class CSamplerD3D11 : public CSampler
 public:
     CSamplerD3D11(ID3D11SamplerState* state);
 
+    ID3D11SamplerState* GetSamplerState() const { return SamplerState.Get(); }
+
 private:
     ComPtr<ID3D11SamplerState> SamplerState;
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

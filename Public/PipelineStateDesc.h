@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 struct CViewportDesc
@@ -363,4 +363,4 @@ struct CBlendDesc
     }
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

@@ -3,7 +3,7 @@
 #include "Direct3D11/DeviceD3D11.h"
 #endif
 
-namespace Nome::RHI
+namespace RHI
 {
 
 static thread_local CDevice* CurrDevice;
@@ -29,4 +29,4 @@ sp<CDevice> CInstance::CreateDevice(EDeviceCreateHints hints)
     return new TChooseImpl<CDeviceBase>::TDerived(hints);
 }
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

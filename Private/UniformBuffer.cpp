@@ -1,6 +1,6 @@
 #include "UniformBuffer.h"
 
-namespace Nome::RHI
+namespace RHI
 {
 
 CUniformMemberDecl::CUniformMemberDecl(std::string keyword, std::string name)

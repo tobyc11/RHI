@@ -1,7 +1,7 @@
 #pragma once
 #include <stdexcept>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 class CRHIException : public std::runtime_error
@@ -18,4 +18,4 @@ public:
     }
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

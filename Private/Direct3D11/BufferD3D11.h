@@ -2,13 +2,13 @@
 #include "Buffer.h"
 #include "D3D11Platform.h"
 
-namespace Nome::RHI
+namespace RHI
 {
 
 class CBufferD3D11 : public CBufferBase<CBufferD3D11>
 {
 public:
-    CBufferD3D11(ID3D11Device* d3dDevice, uint32_t size, EBufferUsageFlags usage, void* initialData = nullptr);
+    CBufferD3D11(ID3D11Device* d3dDevice, uint32_t size, EBufferUsageFlags usage, const void* initialData = nullptr);
 
     void* Map(size_t offset, size_t size);
     void Unmap();
@@ -24,4 +24,4 @@ private:
     ComPtr<ID3D11Buffer> BufferPtr;
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

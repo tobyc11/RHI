@@ -1,11 +1,11 @@
 #include "BufferD3D11.h"
 #include "RHIException.h"
 
-namespace Nome::RHI
+namespace RHI
 {
 
-CBufferD3D11::CBufferD3D11(ID3D11Device* d3dDevice, uint32_t size, EBufferUsageFlags usage, void* initialData)
-    : CBufferBase(size, usage, initialData)
+CBufferD3D11::CBufferD3D11(ID3D11Device* d3dDevice, uint32_t size, EBufferUsageFlags usage, const void* initialData)
+    : CBufferBase(size, usage)
 {
     //Determine bind flags
     UINT bindFlags = 0;
@@ -51,4 +51,4 @@ void CBufferD3D11::Unmap()
     ImmediateContext->Unmap(BufferPtr.Get(), 0);
 }
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

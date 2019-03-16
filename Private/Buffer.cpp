@@ -3,11 +3,11 @@
 #include "Direct3D11/BufferD3D11.h"
 #endif
 
-namespace Nome::RHI
+namespace RHI
 {
 
 template<typename TDerived>
-CBufferBase<TDerived>::CBufferBase(uint32_t size, EBufferUsageFlags usage, void* initialData)
+CBufferBase<TDerived>::CBufferBase(uint32_t size, EBufferUsageFlags usage)
     : Size(size), Usage(usage)
 {
 }
@@ -27,4 +27,4 @@ void CBufferBase<TDerived>::Unmap()
 //Explicitly instanciate the wrapper for the chosen implementation
 template class RHI_API CBufferBase<TChooseImpl<CBufferBase>::TDerived>;
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

@@ -6,7 +6,7 @@
 #include <Matrix4.h>
 #include <string>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 //Import types and define type traits
@@ -112,7 +112,7 @@ private:
 class Name \
 { \
     struct _BeginTypeId {}; \
-    static std::vector<CUniformMemberDecl> GetMembersSoFar(_BeginTypeId) \
+    static std::vector<RHI::CUniformMemberDecl> GetMembersSoFar(_BeginTypeId) \
     { \
         return {}; \
     } \
@@ -121,13 +121,13 @@ class Name \
 #define MEMBER(Type, Name) \
     _PrevTypeId##Name; \
 public: \
-    alignas(TUniformBufferMemberTraits<Type>::Align) Type Name; \
+    alignas(RHI::TUniformBufferMemberTraits<Type>::Align) Type Name; \
 private: \
     struct _TypeId##Name {}; \
-    static std::vector<CUniformMemberDecl> GetMembersSoFar(_TypeId##Name) \
+    static std::vector<RHI::CUniformMemberDecl> GetMembersSoFar(_TypeId##Name) \
     { \
         auto result = GetMembersSoFar(_PrevTypeId##Name()); \
-        result.emplace_back(TUniformBufferMemberTraits<Type>::HLSLKeyword, #Name); \
+        result.emplace_back(RHI::TUniformBufferMemberTraits<Type>::HLSLKeyword, #Name); \
         return result; \
     } \
     typedef _TypeId##Name
@@ -136,4 +136,4 @@ private: \
     _FinalTypeId; \
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

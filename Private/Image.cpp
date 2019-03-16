@@ -3,7 +3,7 @@
 #include "Direct3D11/ImageD3D11.h"
 #endif
 
-namespace Nome::RHI
+namespace RHI
 {
 
 template<typename TDerived>
@@ -20,4 +20,4 @@ void CImageBase<TDerived>::CopyFrom(void* mem)
 //Explicitly instanciate the wrapper for the chosen implementation
 template class RHI_API CImageBase<TChooseImpl<CImageBase>::TDerived>;
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

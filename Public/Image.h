@@ -4,7 +4,7 @@
 #include <EnumClass.h>
 #include <RefBase.h>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 enum class EImageType
@@ -16,8 +16,10 @@ enum class EImageType
 
 enum class EImageUsageFlags
 {
-    Sampled,
-    DepthStencil
+    None = 0,
+    Sampled = 1,
+    DepthStencil = 2,
+    RenderTarget = 4,
 };
 
 DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EImageUsageFlags);
@@ -35,4 +37,4 @@ public:
 
 using CImage = CImageBase<TChooseImpl<CImageBase>::TDerived>;
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

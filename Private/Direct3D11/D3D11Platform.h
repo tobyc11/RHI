@@ -3,9 +3,9 @@
 #include <d3dcompiler.h>
 #include <wrl/client.h>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 using Microsoft::WRL::ComPtr;
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

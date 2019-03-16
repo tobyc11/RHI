@@ -2,7 +2,7 @@
 #include "Format.h"
 #include <RefBase.h>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 enum class EImageViewType
@@ -37,4 +37,4 @@ public:
     virtual ~CImageView() = default;
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

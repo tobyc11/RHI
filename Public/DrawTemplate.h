@@ -3,7 +3,7 @@
 #include "ShaderModule.h"
 #include <vector>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 class CDrawTemplate
@@ -33,6 +33,19 @@ public:
     sp<CShaderModule> GetPixelShader() const { return PixelShader; }
     void SetPixelShader(CShaderModule* value) { PixelShader = value; }
 
+    const sp<CBuffer>& GetIndexBuffer() const { return IndexBuffer; }
+    void SetIndexBuffer(CBuffer* value) { IndexBuffer = value; }
+
+    const CPipelineArguments& GetPipelineArguments() const { return PipelineArgs; }
+    CPipelineArguments& GetPipelineArguments() { return PipelineArgs; }
+
+    bool IsIndexed = false;
+    uint32_t ElementCount = 0;
+    uint32_t InstanceCount = 0; //Zero means not instanced
+    uint32_t VertexOffset = 0;
+    uint32_t IndexOffset = 0;
+    uint32_t InstanceOffset = 0;
+
 private:
     std::vector<CViewportDesc> Viewports;
     std::vector<CRectDesc> Scissors;
@@ -41,10 +54,11 @@ private:
     CBlendDesc Blend;
 
     CVertexShaderInputBinding VertexShaderInputBinding;
+    sp<CBuffer> IndexBuffer;
     CPipelineArguments PipelineArgs;
 
     sp<CShaderModule> VertexShader;
     sp<CShaderModule> PixelShader;
 };
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

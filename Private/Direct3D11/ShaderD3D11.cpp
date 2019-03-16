@@ -4,10 +4,11 @@
 #include "SamplerD3D11.h"
 #include "RHIException.h"
 #include <CompileTimeHash.h>
+#include <cassert>
 #include <fstream>
 #include <iostream>
 
-namespace Nome::RHI
+namespace RHI
 {
 
 class IDeviceContextShaderRedir
@@ -63,6 +64,8 @@ void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, I
     sp<CImageViewD3D11> view;
     sp<CSamplerD3D11> sampler;
     ID3D11Buffer* bufPtr;
+    ComPtr<ID3D11ShaderResourceView> srvPtr;
+    ID3D11SamplerState* samplerPtr;
     CVSRedir ctxWrapper(ctx);
 
     for (const auto& pair : args.Arguments)
@@ -79,17 +82,21 @@ void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, I
         {
         //CBuffer
         case 0:
-            buf = static_cast<CBufferD3D11*>(std::get<sp<CBuffer>>(pair.second).get());
+            buf = static_cast<CBufferD3D11*>(std::get<sp<CBuffer>>(pair.second).Get());
             bufPtr = buf->GetD3D11Buffer();
             ctxWrapper.SetConstantBuffers(paramIter->second, 1, &bufPtr);
             break;
         //CImageView
         case 1:
-            view = static_cast<CImageViewD3D11*>(std::get<sp<CImageView>>(pair.second).get());
+            view = static_cast<CImageViewD3D11*>(std::get<sp<CImageView>>(pair.second).Get());
+            srvPtr = view->GetShaderResourceView();
+            ctxWrapper.SetShaderResources(paramIter->second, 1, &srvPtr);
             break;
         //CSampler
         case 2:
-            sampler = static_cast<CSamplerD3D11*>(std::get<sp<CSampler>>(pair.second).get());
+            sampler = static_cast<CSamplerD3D11*>(std::get<sp<CSampler>>(pair.second).Get());
+            samplerPtr = sampler->GetSamplerState();
+            ctxWrapper.SetSamplers(paramIter->second, 1, &samplerPtr);
             break;
         }
     }
@@ -123,7 +130,7 @@ CShaderD3D11::CShaderD3D11(CShaderModule& fromSrc)
     //Compile vertex shader
     ID3DBlob* errorBlob;
     D3DCompile(str.c_str(), str.size(), fromSrc.SourcePath.c_str(), nullptr, nullptr,
-        fromSrc.EntryPoint.c_str(), fromSrc.Target.c_str(), dwShaderFlags, 0, &CodeBlob, &errorBlob);
+        fromSrc.EntryPoint.c_str(), fromSrc.Target.c_str(), dwShaderFlags, 0, CodeBlob.GetAddressOf(), &errorBlob);
     if (errorBlob)
     {
         std::cout << "[" << fromSrc.Target << "] Shader compilation error:" << std::endl;
@@ -133,10 +140,14 @@ CShaderD3D11::CShaderD3D11(CShaderModule& fromSrc)
     }
 }
 
-CShaderD3D11::~CShaderD3D11()
+const CVertexShaderInputSignature& CShaderD3D11::GetVSInputSignature() const
 {
-    if (CodeBlob)
-        CodeBlob->Release();
+    return InputSig;
+}
+
+ComPtr<ID3DBlob> CShaderD3D11::GetCodeBlob() const
+{
+    return CodeBlob;
 }
 
 void CShaderD3D11::GenMappings()
@@ -147,6 +158,47 @@ void CShaderD3D11::GenMappings()
     {
         D3D11_SHADER_DESC shaderDesc;
         reflector->GetDesc(&shaderDesc);
+
+        //Input signature
+        for (uint32_t i = 0; i < shaderDesc.InputParameters; i++)
+        {
+            D3D11_SIGNATURE_PARAMETER_DESC paramDesc;
+            reflector->GetInputParameterDesc(i, &paramDesc);
+            uint32_t location = paramDesc.SemanticIndex;
+            assert(paramDesc.ComponentType == D3D_REGISTER_COMPONENT_FLOAT32);
+            BYTE mask = paramDesc.Mask;
+            int elems = 0;
+            while (mask)
+            {
+                if (mask & 1) elems++;
+                mask >>= 1;
+            }
+
+            EFormat format = EFormat::UNDEFINED;
+            if (paramDesc.ComponentType == D3D_REGISTER_COMPONENT_FLOAT32)
+            {
+                if (elems == 1) format = EFormat::R32_SFLOAT;
+                if (elems == 2) format = EFormat::R32G32_SFLOAT;
+                if (elems == 3) format = EFormat::R32G32B32_SFLOAT;
+                if (elems == 4) format = EFormat::R32G32B32A32_SFLOAT;
+            }
+            else if (paramDesc.ComponentType == D3D_REGISTER_COMPONENT_SINT32)
+            {
+                if (elems == 1) format = EFormat::R32_SINT;
+                if (elems == 2) format = EFormat::R32G32_SINT;
+                if (elems == 3) format = EFormat::R32G32B32_SINT;
+                if (elems == 4) format = EFormat::R32G32B32A32_SINT;
+            }
+            else if (paramDesc.ComponentType == D3D_REGISTER_COMPONENT_UINT32)
+            {
+                if (elems == 1) format = EFormat::R32_UINT;
+                if (elems == 2) format = EFormat::R32G32_UINT;
+                if (elems == 3) format = EFormat::R32G32B32_UINT;
+                if (elems == 4) format = EFormat::R32G32B32A32_UINT;
+            }
+
+            InputSig.InputDescs.emplace(location, CVertexShaderInputDesc{ format, std::string() });
+        }
 
         //Record constant buffer mappings
         for (uint32_t i = 0; i < shaderDesc.ConstantBuffers; i++)
@@ -177,4 +229,4 @@ void CShaderD3D11::GenMappings()
     }
 }
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */

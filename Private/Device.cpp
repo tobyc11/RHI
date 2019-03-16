@@ -3,7 +3,7 @@
 #include "Direct3D11/DeviceD3D11.h"
 #endif
 
-namespace Nome::RHI
+namespace RHI
 {
 
 template<typename TDerived>
@@ -12,7 +12,7 @@ CDeviceBase<TDerived>::CDeviceBase()
 }
 
 template<typename TDerived>
-sp<CBuffer> CDeviceBase<TDerived>::CreateBuffer(uint32_t size, EBufferUsageFlags usage, void* initialData)
+sp<CBuffer> CDeviceBase<TDerived>::CreateBuffer(uint32_t size, EBufferUsageFlags usage, const void* initialData)
 {
     return static_cast<TDerived*>(this)->CreateBuffer(size, usage, initialData);
 }
@@ -36,6 +36,12 @@ sp<CImage> CDeviceBase<TDerived>::CreateImage3D(EFormat format, EImageUsageFlags
 }
 
 template<typename TDerived>
+sp<CImageView> CDeviceBase<TDerived>::CreateImageView(const CImageViewDesc& desc, CImage* image)
+{
+    return static_cast<TDerived*>(this)->CreateImageView(desc, image);
+}
+
+template<typename TDerived>
 sp<CSampler> CDeviceBase<TDerived>::CreateSampler(const CSamplerDesc & desc)
 {
     return static_cast<TDerived*>(this)->CreateSampler(desc);
@@ -50,4 +56,4 @@ sp<CSwapChain> CDeviceBase<TDerived>::CreateSwapChain(const CSwapChainCreateInfo
 //Explicitly instanciate the wrapper for the chosen implementation
 template class RHI_API CDeviceBase<TChooseImpl<CDeviceBase>::TDerived>;
 
-} /* namespace Nome::RHI */
+} /* namespace RHI */
