@@ -423,6 +423,7 @@ D3D11_DEPTH_STENCIL_VIEW_DESC ConvertDescToDSV(const CImageViewDesc & desc)
 {
     D3D11_DEPTH_STENCIL_VIEW_DESC d;
     d.Format = Convert(desc.Format);
+    d.Flags = 0;
     switch (desc.Type)
     {
     case EImageViewType::View1D:

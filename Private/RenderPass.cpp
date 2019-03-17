@@ -67,10 +67,40 @@ void CRenderTargetRef::SetImageViewFromSwapChain()
     ImageView = CInstance::Get().GetCurrDevice()->CreateImageView(desc, Image);
 }
 
-void CRenderTargetRef::InitDepthStencilImage()
+void CRenderTargetRef::Reinit2D(int w, int h, ERenderTargetFlags flags)
 {
-    auto dev = CInstance::Get().GetCurrDevice();
-    Image = dev->CreateImage2D(EFormat::D24_UNORM_S8_UINT, EImageUsageFlags::DepthStencil, Width, Height);
+    bool doit = false;
+    if (Width != w || Height != h)
+        doit = true;
+    if (!ImageView || !Image)
+        doit = true;
+
+    SetDimensions(w, h);
+
+    auto device = CInstance::Get().GetCurrDevice();
+    using IU = EImageUsageFlags;
+    Flags = flags;
+    EFormat fmt;
+    if (Flags == ERenderTargetFlags::Color)
+    {
+        fmt = EFormat::R8G8B8A8_UNORM;
+        Image = device->CreateImage2D(fmt, IU::RenderTarget | IU::Sampled, Width, Height);
+    }
+    else
+    {
+        fmt = EFormat::D24_UNORM_S8_UINT;
+        Image = device->CreateImage2D(fmt, IU::DepthStencil, Width, Height);
+    }
+
+    CImageViewDesc desc;
+    desc.Format = fmt;
+    desc.Type = EImageViewType::View2D;
+    desc.Range.BaseMipLevel = 0;
+    desc.Range.LevelCount = 1;
+    desc.Range.BaseArrayLayer = 0;
+    desc.Range.LayerCount = 1;
+
+    ImageView = CInstance::Get().GetCurrDevice()->CreateImageView(desc, Image);
 }
 
 void CRenderTargetRef::ClearImageAndView()

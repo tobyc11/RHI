@@ -2,6 +2,7 @@
 #include "Image.h"
 #include "DrawTemplate.h"
 #include "SwapChain.h"
+#include <EnumClass.h>
 #include <array>
 #include <set>
 
@@ -14,6 +15,14 @@ using CNodeId = uint64_t;
 const CNodeId kInvalidNodeId = 0;
 
 class CRenderGraph;
+
+enum ERenderTargetFlags
+{
+    Color = 1,
+    DepthStencil = 2
+};
+
+DEFINE_ENUM_CLASS_BITWISE_OPERATORS(ERenderTargetFlags)
 
 class CRenderTargetRef
 {
@@ -32,7 +41,7 @@ public:
     void SetDimensions(int width, int height);
 
     void SetImageViewFromSwapChain();
-    void InitDepthStencilImage();
+    void Reinit2D(int w, int h, ERenderTargetFlags flags);
 
     sp<CImageView> GetImageView() const { return ImageView; }
 
@@ -45,6 +54,8 @@ private:
 
     sp<CImage> Image;
     sp<CImageView> ImageView;
+
+    ERenderTargetFlags Flags;
 };
 
 class CRenderPass : public tc::TLightRefBase<CRenderPass>
@@ -130,8 +141,8 @@ public:
     void Submit() const override;
 
     std::array<float, 4> ClearColors[8];
-    float ClearDepth;
-    uint8_t ClearStencil;
+    float ClearDepth = 1.0f;
+    uint8_t ClearStencil = 0;
 
 private:
     class Impl;

@@ -1,5 +1,7 @@
 #include "RenderGraph.h"
 #include "RHIException.h"
+#include <cstdlib>
+#include <ctime>
 
 namespace RHI
 {
@@ -17,7 +19,8 @@ void CRenderGraph::ImportRenderTarget(CNodeId id, CSwapChain* swapChain)
 CNodeId CRenderGraph::DeclareRenderTarget()
 {
     //Try to generate an unused id
-    CNodeId id;
+    std::srand(static_cast<uint32_t>(std::time(nullptr)));
+    CNodeId id = std::rand();
     do
     {
         //https://burtleburtle.net/bob/hash/integer.html
@@ -77,6 +80,40 @@ void CRenderGraph::BeginFrame()
     {
         if (pair.second.IsSwapChain())
             pair.second.SetImageViewFromSwapChain();
+    }
+
+    for (const auto& pair : RenderPasses)
+    {
+        int width, height;
+        //Find a swap chain so that we know the dimensions
+        pair.second->ForEachColorAttachment([&](CNodeId rtid)
+        {
+            if (rtid != kInvalidNodeId)
+            {
+                auto& rt = GetRenderTarget(rtid);
+                if (rt.IsSwapChain())
+                    rt.GetDimensions(width, height);
+            }
+        });
+
+        if (width == 0 || height == 0)
+            throw CRHIRuntimeError("Render graph unable to automatically deduce render target dimensions");
+
+        pair.second->ForEachColorAttachment([&](CNodeId rtid)
+        {
+            if (rtid == kInvalidNodeId)
+                return;
+            auto& rt = GetRenderTarget(rtid);
+            if (!rt.IsSwapChain())
+                rt.Reinit2D(width, height, ERenderTargetFlags::Color);
+        });
+
+        CNodeId dsid = pair.second->GetDepthStencilAttachment();
+        if (dsid != kInvalidNodeId)
+        {
+            auto& rt = GetRenderTarget(dsid);
+            rt.Reinit2D(width, height, ERenderTargetFlags::DepthStencil);
+        }
     }
 }
 
