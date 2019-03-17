@@ -1,5 +1,6 @@
 #pragma once
 #include <EnumClass.h>
+#include <Hash.h>
 #include <cstdint>
 #include <vector>
 
@@ -168,9 +169,9 @@ struct CStencilOpState
         result |= static_cast<std::size_t>(r.PassOp); result <<= 1;
         result |= static_cast<std::size_t>(r.DepthFailOp); result <<= 1;
         result |= static_cast<std::size_t>(r.CompareOp); result <<= 1;
-        result |= static_cast<std::size_t>(r.CompareMask); result <<= 1;
-        result |= static_cast<std::size_t>(r.WriteMask); result <<= 1;
-        result |= static_cast<std::size_t>(r.Reference); result <<= 1;
+        tc::hash_combine(result, r.CompareMask);
+        tc::hash_combine(result, r.WriteMask);
+        tc::hash_combine(result, r.Reference);
         return result;
     }
 };
@@ -213,13 +214,13 @@ struct CDepthStencilDesc
     friend std::size_t hash_value(const CDepthStencilDesc& r)
     {
         std::size_t result = 0;
-        result |= static_cast<std::size_t>(r.DepthTestEnable); result <<= 1;
-        result |= static_cast<std::size_t>(r.DepthWriteEnable); result <<= 1;
+        tc::hash_combine(result, r.DepthTestEnable);
+        tc::hash_combine(result, r.DepthWriteEnable);
         result |= static_cast<std::size_t>(r.DepthCompareOp); result <<= 1;
-        result |= static_cast<std::size_t>(r.StencilTestEnable); result <<= 1;
-        result |= static_cast<std::size_t>(r.DepthBoundsTestEnable); result <<= 1;
-        result |= static_cast<std::size_t>(r.MinDepthBounds); result <<= 1;
-        result |= static_cast<std::size_t>(r.MaxDepthBounds); result <<= 1;
+        tc::hash_combine(result, r.StencilTestEnable);
+        tc::hash_combine(result, r.DepthBoundsTestEnable);
+        tc::hash_combine(result, r.MinDepthBounds);
+        tc::hash_combine(result, r.MaxDepthBounds);
         return result;
     }
 };

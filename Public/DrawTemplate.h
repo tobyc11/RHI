@@ -40,25 +40,50 @@ public:
     CPipelineArguments& GetPipelineArguments() { return PipelineArgs; }
 
     bool IsIndexed = false;
+    uint32_t IndexWidth = 4;
+
     uint32_t ElementCount = 0;
     uint32_t InstanceCount = 0; //Zero means not instanced
     uint32_t VertexOffset = 0;
     uint32_t IndexOffset = 0;
     uint32_t InstanceOffset = 0;
 
+    //Those hash functions aren't used right now, but will be needed when we do pipeline caching
+    std::size_t HashStaticStates() const
+    {
+        std::size_t result = 0;
+        tc::hash_combine(result, Rasterizer);
+        tc::hash_combine(result, DepthStencil);
+        tc::hash_combine(result, Blend);
+        tc::hash_combine(result, VertexShader);
+        tc::hash_combine(result, PixelShader);
+        return result;
+    }
+
+    bool StaticStatesEqual(const CDrawTemplate& rhs) const
+    {
+        return Rasterizer == rhs.Rasterizer &&
+            DepthStencil == rhs.DepthStencil &&
+            Blend == rhs.Blend &&
+            VertexShader == rhs.VertexShader &&
+            PixelShader == rhs.PixelShader;
+    }
+
 private:
-    std::vector<CViewportDesc> Viewports;
-    std::vector<CRectDesc> Scissors;
     CRasterizerDesc Rasterizer;
     CDepthStencilDesc DepthStencil;
     CBlendDesc Blend;
 
+    sp<CShaderModule> VertexShader;
+    sp<CShaderModule> PixelShader;
+
+    //Dynamic states
+    std::vector<CViewportDesc> Viewports;
+    std::vector<CRectDesc> Scissors;
+
     CVertexShaderInputBinding VertexShaderInputBinding;
     sp<CBuffer> IndexBuffer;
     CPipelineArguments PipelineArgs;
-
-    sp<CShaderModule> VertexShader;
-    sp<CShaderModule> PixelShader;
 };
 
 } /* namespace RHI */

@@ -92,6 +92,7 @@ void CRenderGraph::SubmitFrame()
         DFSRenderPassTopologicalSort(pair.second.Get());
     }
 
+    //TODO: this probably only works with legacy rendering APIs as well
     for (auto iter = TopoSortedPasses.rbegin(); iter != TopoSortedPasses.rend(); ++iter)
     {
         (*iter)->Submit();

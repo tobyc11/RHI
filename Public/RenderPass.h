@@ -2,6 +2,7 @@
 #include "Image.h"
 #include "DrawTemplate.h"
 #include "SwapChain.h"
+#include <array>
 #include <set>
 
 namespace RHI
@@ -102,16 +103,15 @@ class CDrawPass : public CRenderPass
 {
 public:
     CDrawPass(CRenderGraph& renderGraph);
-    ~CDrawPass();
 
-    //Draw
-    void DrawOnce(const CDrawTemplate& drawInfo);
-    void AddOrUpdateDraw(CNodeId id, const CDrawTemplate& drawInfo);
-    void TouchDraw(CNodeId id);
-    void GarbageCollect();
+    void BeginRecording();
+    void Record(const CDrawTemplate& drawTemplate);
+    void FinishRecording();
+    void Submit() const override;
 
 private:
-    CDrawPassPriv* Priv;
+    class Impl;
+    std::unique_ptr<Impl> PImpl;
 };
 
 class CPresentPass : public CRenderPass
@@ -120,6 +120,22 @@ public:
     CPresentPass(CRenderGraph& renderGraph);
 
     void Submit() const override;
+};
+
+class CClearPass : public CRenderPass
+{
+public:
+    CClearPass(CRenderGraph& renderGraph);
+
+    void Submit() const override;
+
+    std::array<float, 4> ClearColors[8];
+    float ClearDepth;
+    uint8_t ClearStencil;
+
+private:
+    class Impl;
+    std::unique_ptr<Impl> PImpl;
 };
 
 } /* namespace RHI */

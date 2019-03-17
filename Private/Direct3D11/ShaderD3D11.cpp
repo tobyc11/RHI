@@ -2,6 +2,8 @@
 #include "BufferD3D11.h"
 #include "ImageD3D11.h"
 #include "SamplerD3D11.h"
+#include "DeviceD3D11.h"
+#include "RHIInstance.h"
 #include "RHIException.h"
 #include <CompileTimeHash.h>
 #include <cassert>
@@ -57,7 +59,8 @@ public:
     }
 };
 
-void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, ID3D11DeviceContext* ctx)
+template <typename TRedir>
+void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, ID3D11DeviceContext* ctx) const
 {
     //Local vars used by the switch statement
     sp<CBufferD3D11> buf;
@@ -66,7 +69,7 @@ void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, I
     ID3D11Buffer* bufPtr;
     ComPtr<ID3D11ShaderResourceView> srvPtr;
     ID3D11SamplerState* samplerPtr;
-    CVSRedir ctxWrapper(ctx);
+    TRedir ctxWrapper(ctx);
 
     for (const auto& pair : args.Arguments)
     {
@@ -101,6 +104,9 @@ void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, I
         }
     }
 }
+
+template void CPipelineParamMappingD3D11::BindArguments<CVSRedir>(const CPipelineArguments& args, ID3D11DeviceContext* ctx) const;
+template void CPipelineParamMappingD3D11::BindArguments<CPSRedir>(const CPipelineArguments& args, ID3D11DeviceContext* ctx) const;
 
 CShaderD3D11::CShaderD3D11(CShaderModule& fromSrc)
 {
@@ -148,6 +154,26 @@ const CVertexShaderInputSignature& CShaderD3D11::GetVSInputSignature() const
 ComPtr<ID3DBlob> CShaderD3D11::GetCodeBlob() const
 {
     return CodeBlob;
+}
+
+ID3D11VertexShader* CShaderD3D11::GetVS() const
+{
+    if (!VS)
+    {
+        auto* deviceImpl = static_cast<CDeviceD3D11*>(CInstance::Get().GetCurrDevice());
+        deviceImpl->D3dDevice->CreateVertexShader(CodeBlob->GetBufferPointer(), CodeBlob->GetBufferSize(), nullptr, VS.GetAddressOf());
+    }
+    return VS.Get();
+}
+
+ID3D11PixelShader* CShaderD3D11::GetPS() const
+{
+    if (!PS)
+    {
+        auto* deviceImpl = static_cast<CDeviceD3D11*>(CInstance::Get().GetCurrDevice());
+        deviceImpl->D3dDevice->CreatePixelShader(CodeBlob->GetBufferPointer(), CodeBlob->GetBufferSize(), nullptr, PS.GetAddressOf());
+    }
+    return PS.Get();
 }
 
 void CShaderD3D11::GenMappings()

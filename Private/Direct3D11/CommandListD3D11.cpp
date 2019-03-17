@@ -13,7 +13,7 @@ namespace RHI
 
 CCommandListD3D11::CCommandListD3D11(CDeviceD3D11* parent) : Parent(parent)
 {
-    HRESULT hr = Parent->D3dDevice->CreateDeferredContext(0, DeferredCtx.GetAddressOf());
+    HRESULT hr = Parent->D3dDevice->CreateDeferredContext(0, Context.GetAddressOf());
     if (!SUCCEEDED(hr))
         throw CRHIRuntimeError("Could not create command list d3d11");
 }
@@ -23,9 +23,9 @@ CCommandListD3D11::CDrawCallCacheEntryRef CCommandListD3D11::CacheDrawCall(const
     auto result = DrawCallCache.GetNewElement(tc::kAddToBack);
 
     static_assert(sizeof(CViewportDesc) == sizeof(D3D11_VIEWPORT), "D3D11 viewport and CViewportDesc incompatible.");
-    //DeferredCtx->RSSetViewports((UINT)drawTemplate.GetViewports().size(), (D3D11_VIEWPORT*)drawTemplate.GetViewports().data());
+    //Context->RSSetViewports((UINT)drawTemplate.GetViewports().size(), (D3D11_VIEWPORT*)drawTemplate.GetViewports().data());
     static_assert(sizeof(CRectDesc) == sizeof(D3D11_RECT), "D3D11 rect and CRectDecs incompatible.");
-    //DeferredCtx->RSSetScissorRects((UINT)drawTemplate.GetScissors().size(), (D3D11_RECT*)drawTemplate.GetScissors().data());
+    //Context->RSSetScissorRects((UINT)drawTemplate.GetScissors().size(), (D3D11_RECT*)drawTemplate.GetScissors().data());
 
     result->RastState = Parent->StateCache->FindOrCreate(drawTemplate.GetRasterizerDesc());
     result->DepthStencilState = Parent->StateCache->FindOrCreate(drawTemplate.GetDepthStencilDesc());
@@ -36,6 +36,7 @@ CCommandListD3D11::CDrawCallCacheEntryRef CCommandListD3D11::CacheDrawCall(const
     if (!(result->VertexShader = Parent->ShaderCache->GetShader(key)))
     {
         result->VertexShader = new CShaderD3D11(*vs);
+        result->VertexShader->GetVS(); //Triggers CreateVertexShader
         Parent->ShaderCache->PutShader(key, result->VertexShader);
     }
 
@@ -44,6 +45,7 @@ CCommandListD3D11::CDrawCallCacheEntryRef CCommandListD3D11::CacheDrawCall(const
     if (!(result->PixelShader = Parent->ShaderCache->GetShader(key)))
     {
         result->PixelShader = new CShaderD3D11(*ps);
+        result->PixelShader->GetPS(); //Triggers CreatePixelShader
         Parent->ShaderCache->PutShader(key, result->PixelShader);
     }
 
@@ -108,7 +110,21 @@ CCommandListD3D11::CDrawCallCacheEntryRef CCommandListD3D11::CacheDrawCall(const
     {
         auto* bufferImpl = static_cast<CBufferD3D11*>(drawTemplate.GetIndexBuffer().Get());
         result->IndexBuffer = bufferImpl->GetD3D11Buffer();
+        if (drawTemplate.IndexWidth == 4)
+            result->IndexFormat = DXGI_FORMAT_R32_UINT;
+        else if (drawTemplate.IndexWidth == 2)
+            result->IndexFormat = DXGI_FORMAT_R16_UINT;
+        else if (drawTemplate.IndexWidth == 1)
+            result->IndexFormat = DXGI_FORMAT_R8_UINT;
+        else
+            throw CRHIRuntimeError("drawTemplate.IndexWidth incorrect");
     }
+
+    result->ElementCount = drawTemplate.ElementCount;
+    result->InstanceCount = drawTemplate.InstanceCount;
+    result->VertexOffset = drawTemplate.VertexOffset;
+    result->IndexOffset = drawTemplate.IndexOffset;
+    result->InstanceOffset = drawTemplate.InstanceOffset;
 
     result->PipelineArgs = drawTemplate.GetPipelineArguments();
 
@@ -123,16 +139,50 @@ void CCommandListD3D11::RemoveCachedDrawCall(CDrawCallCacheEntryRef cachedDraw)
 
 void CCommandListD3D11::BeginRecording()
 {
-    DeferredCtx->ClearState();
+    Context->ClearState();
 }
 
 void CCommandListD3D11::FinishRecording()
 {
-    DeferredCtx->FinishCommandList(false, CmdList.GetAddressOf());
+    Context->FinishCommandList(false, CmdList.GetAddressOf());
 }
 
 void CCommandListD3D11::Draw(CDrawCallCacheEntryRef cachedDraw)
 {
+    Context->IASetPrimitiveTopology(cachedDraw->Topology);
+    Context->IASetInputLayout(cachedDraw->InputLayout.Get());
+    static_assert(sizeof(ComPtr<ID3D11Buffer>) == sizeof(ID3D11Buffer*), "Smart pointer size too big");
+    uint32_t numBuffers = cachedDraw->VertexBuffers.size();
+    Context->IASetVertexBuffers(0, numBuffers,
+        reinterpret_cast<ID3D11Buffer**>(cachedDraw->VertexBuffers.data()), cachedDraw->Strides.data(), cachedDraw->Offsets.data());
+    Context->IASetIndexBuffer(cachedDraw->IndexBuffer.Get(), cachedDraw->IndexFormat, 0); //TODO: specify IB offset
+
+    Context->RSSetState(cachedDraw->RastState.Get());
+    Context->OMSetDepthStencilState(cachedDraw->DepthStencilState.Get(), 0); //TODO: stencil ref
+    Context->OMSetBlendState(cachedDraw->BlendState.Get(), nullptr, 0xffffffff);
+
+    Context->VSSetShader(cachedDraw->VertexShader->GetVS(), nullptr, 0);
+    Context->PSSetShader(cachedDraw->PixelShader->GetPS(), nullptr, 0);
+
+    cachedDraw->VertexShader->GetParamMappings().BindArguments<CVSRedir>(cachedDraw->PipelineArgs, Context.Get());
+    cachedDraw->PixelShader->GetParamMappings().BindArguments<CPSRedir>(cachedDraw->PipelineArgs, Context.Get());
+
+    if (cachedDraw->IndexBuffer)
+    {
+        if (cachedDraw->InstanceCount > 0)
+            Context->DrawIndexedInstanced(cachedDraw->ElementCount, cachedDraw->InstanceCount,
+                cachedDraw->IndexOffset, cachedDraw->VertexOffset, cachedDraw->InstanceOffset);
+        else
+            Context->DrawIndexed(cachedDraw->ElementCount, cachedDraw->IndexOffset, cachedDraw->VertexOffset);
+    }
+    else
+    {
+        if (cachedDraw->InstanceCount > 0)
+            Context->DrawInstanced(cachedDraw->ElementCount, cachedDraw->InstanceCount,
+                cachedDraw->VertexOffset, cachedDraw->InstanceOffset);
+        else
+            Context->Draw(cachedDraw->ElementCount, cachedDraw->VertexOffset);
+    }
 }
 
 } /* namespace RHI */

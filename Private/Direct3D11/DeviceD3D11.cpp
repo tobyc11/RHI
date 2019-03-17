@@ -106,9 +106,12 @@ CDeviceD3D11::~CDeviceD3D11()
 #ifdef _DEBUG
     ID3D11Debug* debugDevice = nullptr;
     HRESULT hr = D3dDevice->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&debugDevice));
-    debugDevice->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
-    if (debugDevice)
-        debugDevice->Release();
+    if (SUCCEEDED(hr))
+    {
+        debugDevice->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
+        if (debugDevice)
+            debugDevice->Release();
+    }
 #endif
 }
 

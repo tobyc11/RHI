@@ -3,7 +3,7 @@
 #include "RHIInstance.h"
 #include "RHIException.h"
 #ifdef RHI_IMPL_DIRECT3D11
-#include "Direct3D11/CommandListD3D11.h"
+#include "Direct3D11/RenderPassD3D11.h"
 #endif
 #include <unordered_map>
 
@@ -119,59 +119,28 @@ void CRenderPass::Submit() const
 // Draw pass
 ///////////////////////////////////////////////////////////////////////////////
 
-class CDrawPassPriv
+CDrawPass::CDrawPass(CRenderGraph& renderGraph) : CRenderPass(renderGraph), PImpl(new Impl(*this))
 {
-public:
-    //TODO: this is currently d3d11 dependent, make this more general
-    sp<CDevice> Device;
-    std::unique_ptr<CCommandListD3D11> CommandList;
-    std::unordered_map<CNodeId, CCommandListD3D11::CDrawCallCacheEntryRef> CachedDrawCalls;
-};
-
-CDrawPass::CDrawPass(CRenderGraph& renderGraph) : CRenderPass(renderGraph)
-{
-    Priv = new CDrawPassPriv();
-    Priv->Device = CInstance::Get().GetCurrDevice();
-    auto* deviceImpl = static_cast<CDeviceD3D11*>(Priv->Device.Get());
-    Priv->CommandList = std::make_unique<CCommandListD3D11>(deviceImpl);
 }
 
-CDrawPass::~CDrawPass()
+void CDrawPass::BeginRecording()
 {
-    delete Priv;
+    PImpl->BeginRecording();
 }
 
-void CDrawPass::DrawOnce(const CDrawTemplate& drawInfo)
+void CDrawPass::Record(const CDrawTemplate& drawTemplate)
 {
-    throw std::runtime_error("unimplemented");
+    PImpl->Record(drawTemplate);
 }
 
-void CDrawPass::AddOrUpdateDraw(CNodeId id, const CDrawTemplate& drawInfo)
+void CDrawPass::FinishRecording()
 {
-    auto iter = Priv->CachedDrawCalls.find(id);
-    if (iter != Priv->CachedDrawCalls.end())
-    {
-        Priv->CommandList->RemoveCachedDrawCall(iter->second);
-    }
-    auto cacheRef = Priv->CommandList->CacheDrawCall(drawInfo);
-    Priv->CachedDrawCalls.emplace(id, cacheRef);
-
-    Priv->CommandList->Draw(cacheRef);
+    PImpl->FinishRecording();
 }
 
-void CDrawPass::TouchDraw(CNodeId id)
+void CDrawPass::Submit() const
 {
-    auto iter = Priv->CachedDrawCalls.find(id);
-    if (iter != Priv->CachedDrawCalls.end())
-    {
-        Priv->CommandList->Draw(iter->second);
-        return;
-    }
-    throw CRHIRuntimeError("id does not exist in cached draw calls");
-}
-
-void CDrawPass::GarbageCollect()
-{
+    PImpl->Submit();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -195,6 +164,19 @@ void CPresentPass::Submit() const
             target.GetSwapChain()->Present();
         }
     });
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Clear pass
+///////////////////////////////////////////////////////////////////////////////
+
+CClearPass::CClearPass(CRenderGraph& renderGraph) : CRenderPass(renderGraph), PImpl(new Impl(*this))
+{
+}
+
+void CClearPass::Submit() const
+{
+    PImpl->Submit();
 }
 
 } /* namespace RHI */

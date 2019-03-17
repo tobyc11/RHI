@@ -36,6 +36,13 @@ public:
     std::vector<uint32_t> Strides;
     std::vector<uint32_t> Offsets;
     ComPtr<ID3D11Buffer> IndexBuffer;
+    DXGI_FORMAT IndexFormat;
+
+    uint32_t ElementCount;
+    uint32_t InstanceCount;
+    uint32_t VertexOffset;
+    uint32_t IndexOffset;
+    uint32_t InstanceOffset;
 
     ComPtr<ID3D11RasterizerState> RastState;
     ComPtr<ID3D11DepthStencilState> DepthStencilState;
@@ -61,9 +68,11 @@ public:
     void FinishRecording();
     void Draw(CDrawCallCacheEntryRef cachedDraw);
 
+    ID3D11CommandList* GetD3DCommandList() const { return CmdList.Get(); }
+
 private:
     CDeviceD3D11* Parent;
-    ComPtr<ID3D11DeviceContext> DeferredCtx;
+    ComPtr<ID3D11DeviceContext> Context;
     ComPtr<ID3D11CommandList> CmdList;
     tc::TVectorPool<CDrawCallCacheEntry> DrawCallCache;
 };

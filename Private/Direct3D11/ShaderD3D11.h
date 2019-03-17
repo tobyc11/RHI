@@ -9,13 +9,16 @@ namespace RHI
 {
 
 //Mapping from user-facing parameters to pipeline slots for a single shader stage
+class CVSRedir;
+class CPSRedir;
 class CPipelineParamMappingD3D11
 {
 public:
     //Id to slot
     std::map<uint32_t, uint32_t> Mappings;
 
-    void BindArguments(const CPipelineArguments& args, ID3D11DeviceContext* ctx);
+    template <typename TRedir>
+    void BindArguments(const CPipelineArguments& args, ID3D11DeviceContext* ctx) const;
 };
 
 class CShaderD3D11
@@ -24,8 +27,12 @@ public:
     CShaderD3D11(CShaderModule& fromSrc);
 
     const CVertexShaderInputSignature& GetVSInputSignature() const;
+    const CPipelineParamMappingD3D11& GetParamMappings() const { return Mappings; }
 
     ComPtr<ID3DBlob> GetCodeBlob() const;
+
+    ID3D11VertexShader* GetVS() const;
+    ID3D11PixelShader* GetPS() const;
 
 private:
     void GenMappings();
@@ -37,8 +44,8 @@ private:
     CVertexShaderInputSignature InputSig;
     CPipelineParamMappingD3D11 Mappings;
 
-    using CShaderVariant = std::variant<ComPtr<ID3D11VertexShader>, ComPtr<ID3D11PixelShader>>;
-    CShaderVariant ShaderObject;
+    mutable ComPtr<ID3D11VertexShader> VS;
+    mutable ComPtr<ID3D11PixelShader> PS;
 };
 
 class CShaderCacheD3D11
