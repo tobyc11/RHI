@@ -6,6 +6,16 @@
 namespace RHI
 {
 
+enum class EPrimitiveTopology
+{
+    PointList = 0,
+    LineList = 1,
+    LineStrip = 2,
+    TriangleList = 3,
+    TriangleStrip = 4,
+    TriangleFan = 5,
+};
+
 class CDrawTemplate
 {
 public:

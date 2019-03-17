@@ -51,6 +51,7 @@ private:
 class CShaderCacheD3D11
 {
 public:
+    CShaderCacheD3D11() = default;
     CShaderCacheD3D11(const CShaderCacheD3D11&) = delete;
     CShaderCacheD3D11(CShaderCacheD3D11&&) = delete;
     CShaderCacheD3D11& operator=(const CShaderCacheD3D11&) = delete;

@@ -1,6 +1,7 @@
 #pragma once
 #include <EnumClass.h>
 #include <Hash.h>
+#include <array>
 #include <cstdint>
 #include <vector>
 
@@ -54,16 +55,16 @@ DEFINE_ENUM_CLASS_BITWISE_OPERATORS(ECullModeFlags)
 
 struct CRasterizerDesc
 {
-    bool DepthClampEnable;
-    bool RasterizerDiscardEnable;
-    EPolygonMode PolygonMode;
-    ECullModeFlags CullMode;
-    bool FrontFaceCCW;
-    bool DepthBiasEnable;
-    float DepthBiasConstantFactor;
-    float DepthBiasClamp;
-    float DepthBiasSlopeFactor;
-    float LineWidth;
+    bool DepthClampEnable = false;
+    bool RasterizerDiscardEnable = true;
+    EPolygonMode PolygonMode = EPolygonMode::Fill;
+    ECullModeFlags CullMode = ECullModeFlags::Back;
+    bool FrontFaceCCW = true;
+    bool DepthBiasEnable = false;
+    float DepthBiasConstantFactor = 0.0f;
+    float DepthBiasClamp = 0.0f;
+    float DepthBiasSlopeFactor = 0.0f;
+    float LineWidth = 1.0f;
 
     CRasterizerDesc& SetDepthClampEnable(bool value) { DepthClampEnable = value; return *this; }
     CRasterizerDesc& SetRasterizerDiscardEnable(bool value) { RasterizerDiscardEnable = value; return *this; }
@@ -264,14 +265,14 @@ DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EColorComponentFlags)
 
 struct CRenderTargetBlendDesc
 {
-    bool BlendEnable;
-    EBlendMode SrcBlend;
-    EBlendMode DestBlend;
-    EBlendOp BlendOp;
-    EBlendMode SrcBlendAlpha;
-    EBlendMode DestBlendAlpha;
-    EBlendOp BlendOpAlpha;
-    EColorComponentFlags RenderTargetWriteMask;
+    bool BlendEnable = false;
+    EBlendMode SrcBlend = EBlendMode::One;
+    EBlendMode DestBlend = EBlendMode::Zero;
+    EBlendOp BlendOp = EBlendOp::Add;
+    EBlendMode SrcBlendAlpha = EBlendMode::One;
+    EBlendMode DestBlendAlpha = EBlendMode::Zero;
+    EBlendOp BlendOpAlpha = EBlendOp::Add;
+    EColorComponentFlags RenderTargetWriteMask = EColorComponentFlags::All;
 
     CRenderTargetBlendDesc& SetBlendEnable(bool value) { BlendEnable = value; return *this; }
     CRenderTargetBlendDesc& SetSrcBlend(EBlendMode value) { SrcBlend = value; return *this; }
@@ -313,7 +314,7 @@ struct CRenderTargetBlendDesc
 struct CBlendDesc
 {
     CRenderTargetBlendDesc RenderTargets[8];
-    float BlendConstants[4];
+    std::array<float, 4> BlendConstants;
 
     CBlendDesc& SetRenderTargets(size_t num, CRenderTargetBlendDesc desc)
     {

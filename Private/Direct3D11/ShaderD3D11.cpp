@@ -6,6 +6,7 @@
 #include "RHIInstance.h"
 #include "RHIException.h"
 #include <CompileTimeHash.h>
+#include <StringUtils.h>
 #include <cassert>
 #include <fstream>
 #include <iostream>
@@ -77,7 +78,7 @@ void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, I
         auto paramIter = Mappings.find(argId);
         if (paramIter == Mappings.end())
         {
-            printf("Argument %d does not match any parameter.\n", argId);
+            printf("Argument %u does not match any parameter.\n", argId);
             continue;
         }
 
@@ -110,39 +111,53 @@ template void CPipelineParamMappingD3D11::BindArguments<CPSRedir>(const CPipelin
 
 CShaderD3D11::CShaderD3D11(CShaderModule& fromSrc)
 {
-    //Read the shader template from disk
-    std::ifstream ifs(fromSrc.SourcePath);
-    std::string str;
+    if (fromSrc.GetShaderFormat() == EShaderFormat::HLSLFile)
+    {
+        //Read the shader template from disk
+        std::ifstream ifs(fromSrc.SourcePath);
+        std::string str;
 
-    ifs.seekg(0, std::ios::end);
-    str.reserve(ifs.tellg());
-    ifs.seekg(0, std::ios::beg);
+        ifs.seekg(0, std::ios::end);
+        str.reserve(ifs.tellg());
+        ifs.seekg(0, std::ios::beg);
 
-    str.assign((std::istreambuf_iterator<char>(ifs)),
-        std::istreambuf_iterator<char>());
+        str.assign((std::istreambuf_iterator<char>(ifs)),
+            std::istreambuf_iterator<char>());
 
-    DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+        DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
 #ifdef _DEBUG
-    // Set the D3DCOMPILE_DEBUG flag to embed debug information in the shaders.
-    // Setting this flag improves the shader debugging experience, but still allows 
-    // the shaders to be optimized and to run exactly the way they will run in 
-    // the release configuration of this program.
-    dwShaderFlags |= D3DCOMPILE_DEBUG;
+        // Set the D3DCOMPILE_DEBUG flag to embed debug information in the shaders.
+        // Setting this flag improves the shader debugging experience, but still allows 
+        // the shaders to be optimized and to run exactly the way they will run in 
+        // the release configuration of this program.
+        dwShaderFlags |= D3DCOMPILE_DEBUG;
 
-    // Disable optimizations to further improve shader debugging
-    dwShaderFlags |= D3DCOMPILE_SKIP_OPTIMIZATION;
+        // Disable optimizations to further improve shader debugging
+        dwShaderFlags |= D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif
 
-    //Compile vertex shader
-    ID3DBlob* errorBlob;
-    D3DCompile(str.c_str(), str.size(), fromSrc.SourcePath.c_str(), nullptr, nullptr,
-        fromSrc.EntryPoint.c_str(), fromSrc.Target.c_str(), dwShaderFlags, 0, CodeBlob.GetAddressOf(), &errorBlob);
-    if (errorBlob)
+        //Compile vertex shader
+        ID3DBlob* errorBlob;
+        D3DCompile(str.c_str(), str.size(), fromSrc.SourcePath.c_str(), nullptr, nullptr,
+            fromSrc.EntryPoint.c_str(), fromSrc.Target.c_str(), dwShaderFlags, 0, CodeBlob.GetAddressOf(), &errorBlob);
+        if (errorBlob)
+        {
+            std::cout << "[" << fromSrc.Target << "] Shader compilation error:" << std::endl;
+            std::cout << reinterpret_cast<const char*>(errorBlob->GetBufferPointer()) << std::endl;
+            errorBlob->Release();
+            throw CRHIException("Shader compilation failed.");
+        }
+
+        GenMappings();
+    }
+    else if (fromSrc.GetShaderFormat() == EShaderFormat::DXBC)
     {
-        std::cout << "[" << fromSrc.Target << "] Shader compilation error:" << std::endl;
-        std::cout << reinterpret_cast<const char*>(errorBlob->GetBufferPointer()) << std::endl;
-        errorBlob->Release();
-        throw CRHIException("Shader compilation failed.");
+        HRESULT hr = D3DCreateBlob(fromSrc.DataBlob.size(), CodeBlob.GetAddressOf());
+        if (!SUCCEEDED(hr))
+            throw CRHIException("Could not create blob");
+        memcpy(CodeBlob->GetBufferPointer(), fromSrc.DataBlob.data(), CodeBlob->GetBufferSize());
+
+        GenMappings();
     }
 }
 
@@ -191,7 +206,6 @@ void CShaderD3D11::GenMappings()
             D3D11_SIGNATURE_PARAMETER_DESC paramDesc;
             reflector->GetInputParameterDesc(i, &paramDesc);
             uint32_t location = paramDesc.SemanticIndex;
-            assert(paramDesc.ComponentType == D3D_REGISTER_COMPONENT_FLOAT32);
             BYTE mask = paramDesc.Mask;
             int elems = 0;
             while (mask)
@@ -227,28 +241,38 @@ void CShaderD3D11::GenMappings()
         }
 
         //Record constant buffer mappings
-        for (uint32_t i = 0; i < shaderDesc.ConstantBuffers; i++)
-        {
-            //TODO: i is not necessarily the binding slot
-            auto* cbufferReflector = reflector->GetConstantBufferByIndex(i);
-            D3D11_SHADER_BUFFER_DESC cbufferDesc;
-            cbufferReflector->GetDesc(&cbufferDesc);
-            uint32_t paramId = tc::StrHash(cbufferDesc.Name);
-            Mappings.Mappings[paramId] = i;
-#ifdef _DEBUG
-            printf("Constant Buffer %d(%s, %d)\n", paramId, cbufferDesc.Name, i);
-#endif
-        }
+//        for (uint32_t i = 0; i < shaderDesc.ConstantBuffers; i++)
+//        {
+//            //TODO: i is not necessarily the binding slot
+//            auto* cbufferReflector = reflector->GetConstantBufferByIndex(i);
+//            D3D11_SHADER_BUFFER_DESC cbufferDesc;
+//            cbufferReflector->GetDesc(&cbufferDesc);
+//
+//            std::string name = cbufferDesc.Name;
+//            if (tc::FStringUtils::EndsWith(name, "_0"))
+//                name = name.substr(0, name.size() - 2);
+//
+//            uint32_t paramId = tc::StrHash(name.c_str());
+//            Mappings.Mappings[paramId] = i;
+//#ifdef _DEBUG
+//            printf("Constant Buffer %u(%s, %d)\n", paramId, name.c_str(), i);
+//#endif
+//        }
 
         //Record resource mappings
         for (uint32_t i = 0; i < shaderDesc.BoundResources; i++)
         {
             D3D11_SHADER_INPUT_BIND_DESC desc;
             reflector->GetResourceBindingDesc(i, &desc);
-            uint32_t paramId = tc::StrHash(desc.Name);
+
+            std::string name = desc.Name;
+            if (tc::FStringUtils::EndsWith(name, "_0"))
+                name = name.substr(0, name.size() - 2);
+
+            uint32_t paramId = tc::StrHash(name.c_str());
             Mappings.Mappings[paramId] = desc.BindPoint;
 #ifdef _DEBUG
-            printf("Shader Resource %d(%s, %d)\n", paramId, desc.Name, desc.BindPoint);
+            printf("Shader Resource %u(%s, slot: %d)\n", paramId, name.c_str(), desc.BindPoint);
 #endif
         }
         reflector->Release();

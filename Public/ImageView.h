@@ -18,10 +18,10 @@ enum class EImageViewType
 
 struct CImageSubresourceRange
 {
-    uint32_t BaseMipLevel;
-    uint32_t LevelCount;
-    uint32_t BaseArrayLayer;
-    uint32_t LayerCount;
+    uint32_t BaseMipLevel = 0;
+    uint32_t LevelCount = 1;
+    uint32_t BaseArrayLayer = 0;
+    uint32_t LayerCount = 1;
 };
 
 struct CImageViewDesc

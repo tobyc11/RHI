@@ -95,24 +95,43 @@ struct CPipelineArguments
     }
 };
 
-struct HLSLSrc{};
+struct HLSLSrc {};
+struct DXBCBlob {};
 
 //"ShaderModule" may not be the most appropriate name for this class, since it merely represents an uncompiled shader
+enum class EShaderFormat
+{
+    HLSLFile,
+    DXBC
+};
+
 class CShaderModule : public tc::CVirtualLightRefBase
 {
 public:
     CShaderModule() = default;
     CShaderModule(const std::string& sourcePath, const std::string& target, const std::string& entryPoint, HLSLSrc);
+    CShaderModule(const void* data, size_t size, DXBCBlob);
 
     bool operator=(const CShaderModule& rhs) const;
     std::string GetShaderCacheKey() const;
+    EShaderFormat GetShaderFormat() const
+    {
+        if (bIsDXBC)
+            return EShaderFormat::DXBC;
+        return EShaderFormat::HLSLFile;
+    }
 
 private:
     friend class CShaderD3D11;
 
+    bool bIsDXBC = false;
+
     std::string SourcePath;
     std::string Target;
     std::string EntryPoint;
+
+    std::vector<char> DataBlob;
+    std::string DataBlobHash;
 };
 
 } /* namespace RHI */

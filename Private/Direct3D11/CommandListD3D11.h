@@ -67,14 +67,19 @@ public:
     void BeginRecording();
     void FinishRecording();
     void Draw(CDrawCallCacheEntryRef cachedDraw);
+    void SetRenderTargets(const std::vector<CImageView*> color, const CImageView* depthStencil);
 
     ID3D11CommandList* GetD3DCommandList() const { return CmdList.Get(); }
+    void ClearD3DCommandList() { CmdList.Reset(); }
+
+    void SetDefaultViewport(const D3D11_VIEWPORT& vp) { DefaultViewport = vp; }
 
 private:
     CDeviceD3D11* Parent;
     ComPtr<ID3D11DeviceContext> Context;
     ComPtr<ID3D11CommandList> CmdList;
     tc::TVectorPool<CDrawCallCacheEntry> DrawCallCache;
+    D3D11_VIEWPORT DefaultViewport;
 };
 
 } /* namespace RHI */

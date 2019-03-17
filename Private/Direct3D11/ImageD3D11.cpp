@@ -29,7 +29,7 @@ CImageD3D11::~CImageD3D11()
     }
 }
 
-void CImageD3D11::CreateFromMem(void* mem)
+void CImageD3D11::CreateFromMem(const void* mem)
 {
     if (!bIsDescOnly)
     {

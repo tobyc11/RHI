@@ -9,16 +9,24 @@ CBufferD3D11::CBufferD3D11(ID3D11Device* d3dDevice, uint32_t size, EBufferUsageF
 {
     //Determine bind flags
     UINT bindFlags = 0;
+    D3D11_USAGE u = D3D11_USAGE_DEFAULT;
+    UINT accessFlags = 0;
     if (Any(usage, EBufferUsageFlags::VertexBuffer))
         bindFlags |= D3D11_BIND_VERTEX_BUFFER;
     if (Any(usage, EBufferUsageFlags::IndexBuffer))
         bindFlags |= D3D11_BIND_INDEX_BUFFER;
+    if (Any(usage, EBufferUsageFlags::ConstantBuffer))
+    {
+        bindFlags |= D3D11_BIND_CONSTANT_BUFFER;
+        u = D3D11_USAGE_DYNAMIC;
+        accessFlags |= D3D11_CPU_ACCESS_WRITE;
+    }
 
     D3D11_BUFFER_DESC bd = {};
-    bd.Usage = D3D11_USAGE_DEFAULT;
+    bd.Usage = u;
     bd.ByteWidth = size;
     bd.BindFlags = bindFlags;
-    bd.CPUAccessFlags = 0;
+    bd.CPUAccessFlags = accessFlags;
 
     HRESULT hr;
     if (initialData)

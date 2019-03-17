@@ -3,6 +3,7 @@
 #include "ShaderD3D11.h"
 #include "BufferD3D11.h"
 #include "StateCacheD3D11.h"
+#include "ImageD3D11.h"
 #include "RHIException.h"
 #include <Hash.h>
 #include <algorithm>
@@ -40,7 +41,7 @@ CCommandListD3D11::CDrawCallCacheEntryRef CCommandListD3D11::CacheDrawCall(const
         Parent->ShaderCache->PutShader(key, result->VertexShader);
     }
 
-    auto ps = drawTemplate.GetVertexShader();
+    auto ps = drawTemplate.GetPixelShader();
     key = ps->GetShaderCacheKey();
     if (!(result->PixelShader = Parent->ShaderCache->GetShader(key)))
     {
@@ -101,11 +102,16 @@ CCommandListD3D11::CDrawCallCacheEntryRef CCommandListD3D11::CacheDrawCall(const
             groupMinOffset = min(groupMinOffset, accessors[i].Offset);
         }
     }
-    auto vsCode = result->VertexShader->GetCodeBlob();
-    Parent->D3dDevice->CreateInputLayout(inputDescs.data(), static_cast<UINT>(inputDescs.size()),
-        vsCode->GetBufferPointer(), vsCode->GetBufferSize(), result->InputLayout.GetAddressOf());
+
+    if (inputDescs.size() > 0)
+    {
+        auto vsCode = result->VertexShader->GetCodeBlob();
+        Parent->D3dDevice->CreateInputLayout(inputDescs.data(), static_cast<UINT>(inputDescs.size()),
+            vsCode->GetBufferPointer(), vsCode->GetBufferSize(), result->InputLayout.GetAddressOf());
+    }
 
     result->Topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST; //TODO: fixme
+    result->IndexFormat = DXGI_FORMAT_UNKNOWN;
     if (drawTemplate.GetIndexBuffer())
     {
         auto* bufferImpl = static_cast<CBufferD3D11*>(drawTemplate.GetIndexBuffer().Get());
@@ -139,20 +145,23 @@ void CCommandListD3D11::RemoveCachedDrawCall(CDrawCallCacheEntryRef cachedDraw)
 
 void CCommandListD3D11::BeginRecording()
 {
-    Context->ClearState();
 }
 
 void CCommandListD3D11::FinishRecording()
 {
+    CmdList.Reset();
     Context->FinishCommandList(false, CmdList.GetAddressOf());
+    Context->ClearState();
 }
 
 void CCommandListD3D11::Draw(CDrawCallCacheEntryRef cachedDraw)
 {
+    Context->RSSetViewports(1, &DefaultViewport);
+
     Context->IASetPrimitiveTopology(cachedDraw->Topology);
     Context->IASetInputLayout(cachedDraw->InputLayout.Get());
     static_assert(sizeof(ComPtr<ID3D11Buffer>) == sizeof(ID3D11Buffer*), "Smart pointer size too big");
-    uint32_t numBuffers = cachedDraw->VertexBuffers.size();
+    uint32_t numBuffers = (uint32_t)cachedDraw->VertexBuffers.size();
     Context->IASetVertexBuffers(0, numBuffers,
         reinterpret_cast<ID3D11Buffer**>(cachedDraw->VertexBuffers.data()), cachedDraw->Strides.data(), cachedDraw->Offsets.data());
     Context->IASetIndexBuffer(cachedDraw->IndexBuffer.Get(), cachedDraw->IndexFormat, 0); //TODO: specify IB offset
@@ -164,8 +173,10 @@ void CCommandListD3D11::Draw(CDrawCallCacheEntryRef cachedDraw)
     Context->VSSetShader(cachedDraw->VertexShader->GetVS(), nullptr, 0);
     Context->PSSetShader(cachedDraw->PixelShader->GetPS(), nullptr, 0);
 
-    cachedDraw->VertexShader->GetParamMappings().BindArguments<CVSRedir>(cachedDraw->PipelineArgs, Context.Get());
-    cachedDraw->PixelShader->GetParamMappings().BindArguments<CPSRedir>(cachedDraw->PipelineArgs, Context.Get());
+    if (cachedDraw->VertexShader)
+        cachedDraw->VertexShader->GetParamMappings().BindArguments<CVSRedir>(cachedDraw->PipelineArgs, Context.Get());
+    if (cachedDraw->PixelShader)
+        cachedDraw->PixelShader->GetParamMappings().BindArguments<CPSRedir>(cachedDraw->PipelineArgs, Context.Get());
 
     if (cachedDraw->IndexBuffer)
     {
@@ -183,6 +194,19 @@ void CCommandListD3D11::Draw(CDrawCallCacheEntryRef cachedDraw)
         else
             Context->Draw(cachedDraw->ElementCount, cachedDraw->VertexOffset);
     }
+}
+
+void CCommandListD3D11::SetRenderTargets(const std::vector<CImageView*> color, const CImageView* depthStencil)
+{
+    ComPtr<ID3D11DepthStencilView> dsv;
+    if (depthStencil)
+        dsv = static_cast<const CImageViewD3D11*>(depthStencil)->GetDepthStencilView();
+
+    std::vector<ID3D11RenderTargetView*> rtvs;
+    for (const auto* p : color)
+        rtvs.push_back(static_cast<const CImageViewD3D11*>(p)->GetRenderTargetView().Get());
+
+    Context->OMSetRenderTargets((UINT)rtvs.size(), rtvs.data(), dsv.Get());
 }
 
 } /* namespace RHI */

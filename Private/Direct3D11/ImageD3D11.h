@@ -22,8 +22,8 @@ public:
     CImageD3D11& operator=(const CImageD3D11&) = delete;
     CImageD3D11& operator=(CImageD3D11&&) = delete;
 
-    void CreateFromMem(void* mem);
-    void CopyFrom(void* mem) { CreateFromMem(mem); }
+    void CreateFromMem(const void* mem);
+    void CopyFrom(const void* mem) { CreateFromMem(mem); }
 
     ID3D11Texture1D* AsTexture1D() const
     {

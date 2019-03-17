@@ -5,6 +5,7 @@
 #ifdef RHI_IMPL_DIRECT3D11
 #include "Direct3D11/RenderPassD3D11.h"
 #endif
+#include <cassert>
 #include <unordered_map>
 
 namespace RHI
@@ -115,16 +116,19 @@ void CRenderTargetRef::ClearImageAndView()
 
 void CRenderPass::SetColorAttachment(uint32_t index, CNodeId id)
 {
+    assert(!RenderGraph.IsDuringFrame());
     ColorAttachments[index] = id;
 }
 
 void CRenderPass::SetDepthStencilAttachment(CNodeId id)
 {
+    assert(!RenderGraph.IsDuringFrame());
     DepthStencilAttachment = id;
 }
 
 void CRenderPass::AddDependency(CRenderPass& predecessor)
 {
+    assert(!RenderGraph.IsDuringFrame());
     auto iter = Pred.find(&predecessor);
     if (iter != Pred.end())
         return;
@@ -134,6 +138,7 @@ void CRenderPass::AddDependency(CRenderPass& predecessor)
 
 void CRenderPass::RemoveDependency(CRenderPass& predecessor)
 {
+    assert(!RenderGraph.IsDuringFrame());
     auto iter = Pred.find(&predecessor);
     if (iter == Pred.end())
         return;

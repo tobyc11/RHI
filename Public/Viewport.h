@@ -5,6 +5,7 @@ namespace RHI
 {
 
 class IViewportClient;
+class CRenderGraph;
 
 //Represents a window, widget, offscreen buffer, etc.
 class IViewport
@@ -18,6 +19,7 @@ public:
     virtual float GetHeight() const = 0;
 
     virtual tc::sp<CSwapChain> GetSwapChain() const = 0;
+    virtual CRenderGraph* GetRenderGraph() = 0;
 
 protected:
     IViewportClient* Client;
@@ -27,6 +29,7 @@ protected:
 class IViewportClient
 {
 public:
+    //TODO: more like update
     virtual void Draw(IViewport* vp) = 0;
     
     //OnSizeChange, maybe?

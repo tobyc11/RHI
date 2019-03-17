@@ -19,6 +19,44 @@ CDrawPass::Impl::Impl(CDrawPass& owner) : Owner(owner)
 void CDrawPass::Impl::BeginRecording()
 {
     CommandList->BeginRecording();
+
+    //Bind render targets
+    int vpWidth = 0, vpHeight = 0;
+
+    std::vector<CImageView*> colors;
+    CImageView* depthStencil = nullptr;
+
+    CNodeId depthId = Owner.GetDepthStencilAttachment();
+    if (depthId != kInvalidNodeId)
+    {
+        auto& attachment = Owner.GetRenderGraph().GetRenderTarget(depthId);
+        auto imageView = attachment.GetImageView();
+        depthStencil = imageView;
+    }
+
+    Owner.ForEachColorAttachment([&](CNodeId id)
+    {
+        if (id == kInvalidNodeId)
+            return;
+        auto& attachment = Owner.GetRenderGraph().GetRenderTarget(id);
+        auto imageView = attachment.GetImageView();
+        colors.push_back(imageView);
+
+        if (attachment.IsSwapChain())
+            attachment.GetDimensions(vpWidth, vpHeight);
+    });
+
+    CommandList->SetRenderTargets(colors, depthStencil);
+
+    //Try with default viewport
+    D3D11_VIEWPORT vp;
+    vp.TopLeftX = 0;
+    vp.TopLeftY = 0;
+    vp.Width = (FLOAT)vpWidth;
+    vp.Height = (FLOAT)vpHeight;
+    vp.MinDepth = 0;
+    vp.MaxDepth = 1;
+    CommandList->SetDefaultViewport(vp);
 }
 
 void CDrawPass::Impl::Record(const CDrawTemplate& drawTemplate)
@@ -56,53 +94,13 @@ void CDrawPass::Impl::FinishRecording()
 
 void CDrawPass::Impl::Submit()
 {
-    //Bind render targets
-    int vpWidth = 0, vpHeight = 0;
-
-    ComPtr<ID3D11DepthStencilView> DSV;
-    CNodeId depthId = Owner.GetDepthStencilAttachment();
-    if (depthId != kInvalidNodeId)
-    {
-        auto& attachment = Owner.GetRenderGraph().GetRenderTarget(depthId);
-        auto imageView = attachment.GetImageView();
-        auto* imageViewImpl = static_cast<CImageViewD3D11*>(imageView.Get());
-        DSV = imageViewImpl->GetDepthStencilView();
-    }
-
-    std::vector<ID3D11RenderTargetView*> RTVs;
-    Owner.ForEachColorAttachment([&](CNodeId id)
-    {
-        if (id == kInvalidNodeId)
-            return;
-        auto& attachment = Owner.GetRenderGraph().GetRenderTarget(id);
-        auto imageView = attachment.GetImageView();
-        auto* imageViewImpl = static_cast<CImageViewD3D11*>(imageView.Get());
-        auto rtv = imageViewImpl->GetRenderTargetView();
-        RTVs.push_back(rtv.Get());
-
-        if (attachment.IsSwapChain())
-            attachment.GetDimensions(vpWidth, vpHeight);
-    });
-
-    DeviceImpl->ImmediateContext->OMSetRenderTargets((UINT)RTVs.size(), RTVs.data(), DSV.Get());
-
-    //Try with default viewport
-    //D3D11_VIEWPORT vp;
-    //vp.TopLeftX = 0;
-    //vp.TopLeftY = 0;
-    //vp.Width = vpWidth;
-    //vp.Height = vpHeight;
-    //vp.MinDepth = 0;
-    //vp.MaxDepth = 1;
-    //DeviceImpl->ImmediateContext->RSSetViewports(1, &vp);
-    //DeviceImpl->ImmediateContext->RSSetScissorRects(0, nullptr);
-
     //Submit
     DeviceImpl->ImmediateContext->ExecuteCommandList(CommandList->GetD3DCommandList(), false);
 
     //Cleanup
     for (const auto& entry : OneShotEntries)
         CommandList->RemoveCachedDrawCall(entry);
+    CommandList->ClearD3DCommandList();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

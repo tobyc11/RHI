@@ -12,7 +12,7 @@ CImageBase<TDerived>::CImageBase()
 }
 
 template<typename TDerived>
-void CImageBase<TDerived>::CopyFrom(void* mem)
+void CImageBase<TDerived>::CopyFrom(const void* mem)
 {
     static_cast<TDerived*>(this)->CopyFrom(mem);
 }

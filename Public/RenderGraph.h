@@ -23,6 +23,8 @@ public:
     void SubmitFrame();
     void PrepareToResize();
 
+    bool IsDuringFrame() const { return bIsDuringFrame; }
+
 private:
     void DFSRenderPassTopologicalSort(CRenderPass* pass);
 
@@ -33,6 +35,8 @@ private:
 
     std::set<CRenderPass*> DFSVisited;
     std::vector<CRenderPass*> TopoSortedPasses;
+
+    bool bIsDuringFrame = false;
 };
 
 } /* namespace RHI */

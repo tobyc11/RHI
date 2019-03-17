@@ -1,5 +1,6 @@
 #include "RenderGraph.h"
 #include "RHIException.h"
+#include <cassert>
 #include <cstdlib>
 #include <ctime>
 
@@ -75,6 +76,8 @@ void CRenderGraph::RemoveRenderPass(CNodeId id)
 
 void CRenderGraph::BeginFrame()
 {
+    bIsDuringFrame = true;
+
     //Go through all the render targets and make sure the swapchains are properly setup
     for (auto& pair : RenderTargets)
     {
@@ -134,10 +137,12 @@ void CRenderGraph::SubmitFrame()
     {
         (*iter)->Submit();
     }
+    bIsDuringFrame = false;
 }
 
 void CRenderGraph::PrepareToResize()
 {
+    assert(!bIsDuringFrame);
     for (auto& pair : RenderTargets)
     {
         if (pair.second.IsSwapChain())

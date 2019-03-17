@@ -25,7 +25,7 @@ public:
         {
             ComPtr<ID3D11RasterizerState> rastState;
             //Translate RHI state block to D3D
-            D3D11_RASTERIZER_DESC desc;
+            D3D11_RASTERIZER_DESC desc = {};
             desc.FillMode = Convert(inDesc.PolygonMode);
             desc.CullMode = Convert(inDesc.CullMode);
             desc.FrontCounterClockwise = inDesc.FrontFaceCCW;
@@ -36,7 +36,7 @@ public:
                 desc.SlopeScaledDepthBias = inDesc.DepthBiasSlopeFactor;
             }
             desc.DepthClipEnable = inDesc.DepthClampEnable;
-            desc.ScissorEnable = true; //TODO
+            desc.ScissorEnable = false; //TODO
             desc.MultisampleEnable = false;
             desc.AntialiasedLineEnable = false;
             HRESULT hr = Parent->D3dDevice->CreateRasterizerState(&desc, rastState.GetAddressOf());

@@ -18,6 +18,7 @@ class CRenderGraph;
 
 enum ERenderTargetFlags
 {
+    None = 0,
     Color = 1,
     DepthStencil = 2
 };
@@ -55,7 +56,7 @@ private:
     sp<CImage> Image;
     sp<CImageView> ImageView;
 
-    ERenderTargetFlags Flags;
+    ERenderTargetFlags Flags = ERenderTargetFlags::None;
 };
 
 class CRenderPass : public tc::TLightRefBase<CRenderPass>

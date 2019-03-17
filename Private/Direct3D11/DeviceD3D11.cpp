@@ -99,11 +99,15 @@ CDeviceD3D11::CDeviceD3D11(EDeviceCreateHints hints)
         throw CRHIException("Device creation failed");
 
     StateCache.reset(new CStateCacheD3D11(this));
+    ShaderCache = std::make_unique<CShaderCacheD3D11>();
 }
 
 CDeviceD3D11::~CDeviceD3D11()
 {
 #ifdef _DEBUG
+    StateCache.release();
+    ShaderCache.release();
+
     ID3D11Debug* debugDevice = nullptr;
     HRESULT hr = D3dDevice->QueryInterface(__uuidof(ID3D11Debug), reinterpret_cast<void**>(&debugDevice));
     if (SUCCEEDED(hr))
