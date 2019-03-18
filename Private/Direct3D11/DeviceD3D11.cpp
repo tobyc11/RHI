@@ -1,15 +1,16 @@
 #include "DeviceD3D11.h"
-#include "ImageD3D11.h"
-#include "BufferD3D11.h"
-#include "SamplerD3D11.h"
-#include "SwapChainD3D11.h"
-#include "CommandListD3D11.h"
-#include "StateCacheD3D11.h"
-#include "ShaderD3D11.h"
-#include "ConstantConverter.h"
 #include "AbstractionBreaker.h"
-#include "RenderGraph.h"
+#include "BufferD3D11.h"
+#include "CommandListD3D11.h"
+#include "ConstantConverter.h"
+#include "ImageD3D11.h"
 #include "RHIException.h"
+#include "RenderGraph.h"
+#include "SamplerD3D11.h"
+#include "ShaderD3D11.h"
+#include "StateCacheD3D11.h"
+#include "SwapChainD3D11.h"
+#include "PipelineCacheD3D11.h"
 
 namespace RHI
 {
@@ -37,8 +38,7 @@ void CNativeRenderPass::BindRenderTargets() const
     }
 
     std::vector<ID3D11RenderTargetView*> RTVs;
-    ForEachColorAttachment([&](CNodeId id)
-    {
+    ForEachColorAttachment([&](CNodeId id) {
         if (id == kInvalidNodeId)
             return;
         auto& attachment = GetRenderGraph().GetRenderTarget(id);
@@ -62,16 +62,14 @@ CDeviceD3D11::CDeviceD3D11(EDeviceCreateHints hints)
     createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-    D3D_DRIVER_TYPE driverTypes[] =
-    {
+    D3D_DRIVER_TYPE driverTypes[] = {
         D3D_DRIVER_TYPE_HARDWARE,
         D3D_DRIVER_TYPE_WARP,
         D3D_DRIVER_TYPE_REFERENCE,
     };
     UINT numDriverTypes = ARRAYSIZE(driverTypes);
 
-    D3D_FEATURE_LEVEL featureLevels[] =
-    {
+    D3D_FEATURE_LEVEL featureLevels[] = {
         D3D_FEATURE_LEVEL_11_1,
         D3D_FEATURE_LEVEL_11_0,
         D3D_FEATURE_LEVEL_10_1,
@@ -139,6 +137,8 @@ sp<CImage> CDeviceD3D11::CreateImage2D(EFormat format, EImageUsageFlags usage, u
         bCreateImmediately = true;
         bindFlags |= D3D11_BIND_DEPTH_STENCIL;
     }
+    if (Any(usage, EImageUsageFlags::Sampled))
+        bindFlags |= D3D11_BIND_SHADER_RESOURCE;
 
     D3D11_TEXTURE2D_DESC desc = {};
     desc.Width = width;
@@ -294,8 +294,14 @@ sp<CSwapChain> CDeviceD3D11::CreateSwapChain(const CSwapChainCreateInfo& info)
         throw CRHIException("CreateSwapChain failed");
 
     sp<CSwapChain> result = new CSwapChainD3D11(pSwapChain);
-    if (pSwapChain1) pSwapChain1->Release();
+    if (pSwapChain1)
+        pSwapChain1->Release();
     return result;
+}
+
+sp<CPipelineCache> CDeviceD3D11::CreatePipelineCache()
+{
+    return new CPipelineCacheD3D11(*this);
 }
 
 CCommandListD3D11* CDeviceD3D11::CreateCommandList()

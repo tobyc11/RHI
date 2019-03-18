@@ -26,8 +26,13 @@ struct TChooseImpl<BaseType> \
 
 #ifdef RHI_IMPL_DIRECT3D11
 DEFINE_IMPL(CDeviceBase, CDeviceD3D11)
+using CDevice = TChooseImpl<CDeviceBase>::TConcreteBase;
+
 DEFINE_IMPL(CBufferBase, CBufferD3D11)
 DEFINE_IMPL(CImageBase, CImageD3D11)
+DEFINE_IMPL(CPipelineCacheBase, CPipelineCacheD3D11)
+using CPipelineCache = CPipelineCacheBase<TChooseImpl<CPipelineCacheBase>::TDerived>;
+
 #else
 static_assert(false, "No RHI implementation chosen.");
 #endif

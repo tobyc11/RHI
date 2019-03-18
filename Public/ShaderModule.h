@@ -28,50 +28,46 @@ struct CVertexShaderInputSignature
     std::map<uint32_t, CVertexShaderInputDesc> InputDescs;
 };
 
-struct CVertexShaderInputBinding
+struct CVertexInputs
 {
     struct CBoundAccessor
     {
-        uint32_t Location;
+        uint32_t Binding;
         sp<CBuffer> Buffer;
-        uint32_t Stride;
         uint32_t Offset;
 
         bool operator=(const CBoundAccessor& rhs) const
         {
-            return Location == rhs.Location && Buffer == rhs.Buffer && Offset == rhs.Offset && Stride == rhs.Stride;
-        }
-    };
-
-    struct CLocationComparator
-    {
-        bool operator()(const CBoundAccessor& lhs, const CBoundAccessor& rhs) const
-        {
-            return lhs.Location < rhs.Location;
-        }
-    };
-
-    struct CBufferAndStrideComparator
-    {
-        bool operator()(const CBoundAccessor& lhs, const CBoundAccessor& rhs) const
-        {
-            if (lhs.Buffer == rhs.Buffer)
-                return lhs.Stride < rhs.Stride;
-            return lhs.Buffer < rhs.Buffer;
+            return Binding == rhs.Binding && Buffer == rhs.Buffer && Offset == rhs.Offset;
         }
     };
 
     std::vector<CBoundAccessor> BoundAccessors;
 
-    void AddAccessor(uint32_t location, sp<CBuffer> buffer, uint32_t offset, uint32_t stride)
+    void AddAccessor(uint32_t binding, sp<CBuffer> buffer, uint32_t offset)
     {
-        BoundAccessors.push_back(CBoundAccessor{ location, buffer, offset, stride });
+        BoundAccessors.push_back(CBoundAccessor{ binding, buffer, offset });
     }
 
-    void AddAccessor(uint32_t location, const CBufferAccessor& a)
+    void AddAccessor(uint32_t binding, const CBufferView& a)
     {
-        BoundAccessors.push_back(CBoundAccessor{ location, a.Buffer, a.Offset, a.Stride });
+        BoundAccessors.push_back(CBoundAccessor{ binding, a.Buffer, a.Offset });
     }
+};
+
+struct CVertexInputAttributeDesc
+{
+    uint32_t Location = 0;
+    EFormat Format = EFormat::UNDEFINED;
+    uint32_t Offset = 0;
+    uint32_t Binding = 0;
+};
+
+struct CVertexInputBindingDesc
+{
+    uint32_t Binding = 0;
+    uint32_t Stride = 0;
+    bool bIsPerInstance = false;
 };
 
 struct CPixelShaderOutputDesc

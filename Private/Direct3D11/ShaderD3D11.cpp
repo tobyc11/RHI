@@ -78,7 +78,7 @@ void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, I
         auto paramIter = Mappings.find(argId);
         if (paramIter == Mappings.end())
         {
-            printf("Argument %u does not match any parameter.\n", argId);
+            //printf("Argument %u does not match any parameter.\n", argId);
             continue;
         }
 
@@ -94,7 +94,7 @@ void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, I
         case 1:
             view = static_cast<CImageViewD3D11*>(std::get<sp<CImageView>>(pair.second).Get());
             srvPtr = view->GetShaderResourceView();
-            ctxWrapper.SetShaderResources(paramIter->second, 1, &srvPtr);
+            ctxWrapper.SetShaderResources(paramIter->second, 1, srvPtr.GetAddressOf());
             break;
         //CSampler
         case 2:

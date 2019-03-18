@@ -328,6 +328,26 @@ D3D11_BLEND_OP Convert(EBlendOp op)
     }
 }
 
+D3D11_PRIMITIVE_TOPOLOGY Convert(EPrimitiveTopology op)
+{
+    switch (op)
+    {
+    case RHI::EPrimitiveTopology::PointList:
+        return D3D11_PRIMITIVE_TOPOLOGY_POINTLIST;
+    case RHI::EPrimitiveTopology::LineList:
+        return D3D11_PRIMITIVE_TOPOLOGY_LINELIST;
+    case RHI::EPrimitiveTopology::LineStrip:
+        return D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP;
+    case RHI::EPrimitiveTopology::TriangleList:
+        return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    case RHI::EPrimitiveTopology::TriangleStrip:
+        return D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+    case RHI::EPrimitiveTopology::TriangleFan:
+    default:
+        return D3D11_PRIMITIVE_TOPOLOGY_POINTLIST;
+    }
+}
+
 D3D11_SHADER_RESOURCE_VIEW_DESC ConvertDescToSRV(const CImageViewDesc & desc)
 {
     D3D11_SHADER_RESOURCE_VIEW_DESC d;

@@ -26,6 +26,7 @@ public:
     sp<CSampler> CreateSampler(const CSamplerDesc& desc);
 
     sp<CSwapChain> CreateSwapChain(const CSwapChainCreateInfo& info);
+    sp<CPipelineCache> CreatePipelineCache();
 
     CCommandListD3D11* CreateCommandList();
 

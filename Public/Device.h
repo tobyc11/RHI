@@ -1,8 +1,9 @@
 #pragma once
+#include "Buffer.h"
 #include "Image.h"
 #include "ImageView.h"
+#include "PipelineCache.h"
 #include "Sampler.h"
-#include "Buffer.h"
 #include "SwapChain.h"
 #include <RefBase.h>
 
@@ -37,8 +38,7 @@ public:
     sp<CSampler> CreateSampler(const CSamplerDesc& desc);
 
     sp<CSwapChain> CreateSwapChain(const CSwapChainCreateInfo& info);
+    sp<CPipelineCache> CreatePipelineCache();
 };
-
-using CDevice = TChooseImpl<CDeviceBase>::TConcreteBase;
 
 } /* namespace RHI */

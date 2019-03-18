@@ -163,9 +163,9 @@ void CDrawPass::BeginRecording()
     PImpl->BeginRecording();
 }
 
-void CDrawPass::Record(const CDrawTemplate& drawTemplate)
+void CDrawPass::Record(CPipelineStates states, const CDrawTemplate& drawTemplate)
 {
-    PImpl->Record(drawTemplate);
+    PImpl->Record(states, drawTemplate);
 }
 
 void CDrawPass::FinishRecording()

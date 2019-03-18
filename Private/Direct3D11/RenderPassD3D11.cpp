@@ -46,8 +46,6 @@ void CDrawPass::Impl::BeginRecording()
             attachment.GetDimensions(vpWidth, vpHeight);
     });
 
-    CommandList->SetRenderTargets(colors, depthStencil);
-
     //Try with default viewport
     D3D11_VIEWPORT vp;
     vp.TopLeftX = 0;
@@ -57,38 +55,17 @@ void CDrawPass::Impl::BeginRecording()
     vp.MinDepth = 0;
     vp.MaxDepth = 1;
     CommandList->SetDefaultViewport(vp);
+
+    CommandList->SetRenderTargets(colors, depthStencil);
 }
 
-void CDrawPass::Impl::Record(const CDrawTemplate& drawTemplate)
+void CDrawPass::Impl::Record(CPipelineStates states, const CDrawTemplate& drawTemplate)
 {
-    auto entry = CommandList->CacheDrawCall(drawTemplate);
-    CommandList->Draw(entry);
-    OneShotEntries.insert(entry);
-}
-
-void CDrawPass::Impl::Record(CNodeId id, const CDrawTemplate& drawTemplate)
-{
-    //Return if the id is already in the cache, if changed, pls delete and re-record
-    if (IdToCacheEntry.find(id) != IdToCacheEntry.end())
-        return;
-
-    auto cacheEntry = CommandList->CacheDrawCall(drawTemplate);
-    IdToCacheEntry[id] = cacheEntry;
-    CommandList->Draw(cacheEntry);
-}
-
-void CDrawPass::Impl::DeleteRecord(CNodeId id)
-{
-    CommandList->RemoveCachedDrawCall(IdToCacheEntry[id]);
-    IdToCacheEntry.erase(id);
+    CommandList->Draw(states, drawTemplate);
 }
 
 void CDrawPass::Impl::FinishRecording()
 {
-    //Draw all the cached records
-    for (auto& pair : IdToCacheEntry)
-        CommandList->Draw(pair.second);
-
     CommandList->FinishRecording();
 }
 
@@ -96,10 +73,6 @@ void CDrawPass::Impl::Submit()
 {
     //Submit
     DeviceImpl->ImmediateContext->ExecuteCommandList(CommandList->GetD3DCommandList(), false);
-
-    //Cleanup
-    for (const auto& entry : OneShotEntries)
-        CommandList->RemoveCachedDrawCall(entry);
     CommandList->ClearD3DCommandList();
 }
 

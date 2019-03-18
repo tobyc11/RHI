@@ -28,20 +28,20 @@ enum class ESamplerAddressMode
 
 struct CSamplerDesc
 {
-    EFilter MagFilter;
-    EFilter MinFilter;
-    ESamplerMipmapMode MipmapMode;
-    ESamplerAddressMode AddressModeU;
-    ESamplerAddressMode AddressModeV;
-    ESamplerAddressMode AddressModeW;
-    float MipLodBias;
-    bool AnisotropyEnable;
-    float MaxAnisotropy;
-    bool CompareEnable;
-    ECompareOp CompareOp;
-    float MinLod;
-    float MaxLod;
-    float BorderColor[4];
+    EFilter MagFilter = EFilter::Linear;
+    EFilter MinFilter = EFilter::Linear;
+    ESamplerMipmapMode MipmapMode = ESamplerMipmapMode::Linear;
+    ESamplerAddressMode AddressModeU = ESamplerAddressMode::Clamp;
+    ESamplerAddressMode AddressModeV = ESamplerAddressMode::Clamp;
+    ESamplerAddressMode AddressModeW = ESamplerAddressMode::Clamp;
+    float MipLodBias = 0.0f;
+    bool AnisotropyEnable = false;
+    float MaxAnisotropy = 1.0f;
+    bool CompareEnable = false;
+    ECompareOp CompareOp = ECompareOp::Never;
+    float MinLod = -FLT_MAX;
+    float MaxLod = FLT_MAX;
+    std::array<float, 4> BorderColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 };
 
 class CSampler : public tc::CVirtualLightRefBase

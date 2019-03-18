@@ -11,10 +11,10 @@ using tc::sp;
 
 enum class EBufferUsageFlags
 {
-    VertexBuffer,
-    IndexBuffer,
-    ConstantBuffer,
-    Streaming,
+    VertexBuffer = 1,
+    IndexBuffer = 2,
+    ConstantBuffer = 4,
+    Streaming = 8,
 };
 
 DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EBufferUsageFlags);
@@ -38,7 +38,7 @@ private:
 
 using CBuffer = TChooseImpl<CBufferBase>::TConcreteBase;
 
-struct CBufferAccessor
+struct CBufferView
 {
     sp<CBuffer> Buffer;
     uint32_t Stride;

@@ -53,6 +53,12 @@ sp<CSwapChain> CDeviceBase<TDerived>::CreateSwapChain(const CSwapChainCreateInfo
     return static_cast<TDerived*>(this)->CreateSwapChain(info);
 }
 
+template <typename TDerived>
+sp<CPipelineCache> CDeviceBase<TDerived>::CreatePipelineCache()
+{
+    return static_cast<TDerived*>(this)->CreatePipelineCache();
+}
+
 //Explicitly instanciate the wrapper for the chosen implementation
 template class RHI_API CDeviceBase<TChooseImpl<CDeviceBase>::TDerived>;
 

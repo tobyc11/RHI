@@ -16,41 +16,86 @@ enum class EPrimitiveTopology
     TriangleFan = 5,
 };
 
+struct CBufferUpdateRequest
+{
+    sp<CBuffer> Buffer;
+    uint32_t Size = 0;
+    const void* Data = nullptr;
+};
+
 class CDrawTemplate
 {
 public:
-    const std::vector<CViewportDesc>& GetViewports() const { return Viewports; }
-    void SetViewports(std::vector<CViewportDesc> value) { Viewports = std::move(value); }
+    //Vertex Input
+    const std::vector<CVertexInputAttributeDesc>& GetVertexAttributeDescs() const
+    {
+        return VertexAttributeDescs;
+    }
 
-    const std::vector<CRectDesc>& GetScissors() const { return Scissors; }
-    void SetScissors(std::vector<CRectDesc> value) { Scissors = std::move(value); }
+    std::vector<CVertexInputAttributeDesc>& GetVertexAttributeDescs()
+    {
+        return VertexAttributeDescs;
+    }
 
+    const std::vector<CVertexInputBindingDesc>& GetVertexBindingDescs() const
+    {
+        return VertexBindingDescs;
+    }
+
+    std::vector<CVertexInputBindingDesc>& GetVertexBindingDescs()
+    {
+        return VertexBindingDescs;
+    }
+
+    //Input Assembly
+    EPrimitiveTopology GetPrimitiveTopology() const { return PrimitiveTopology; }
+    void SetPrimitiveTopology(EPrimitiveTopology value) { PrimitiveTopology = value; }
+
+    //Rasterization
     const CRasterizerDesc& GetRasterizerDesc() const { return Rasterizer; }
     void SetRasterizerDesc(CRasterizerDesc value) { Rasterizer = value; }
-    
+
+    //DepthStencil
     const CDepthStencilDesc& GetDepthStencilDesc() const { return DepthStencil; }
     void SetDepthStencilDesc(CDepthStencilDesc value) { DepthStencil = value; }
-    
+
+    //ColorBlend
     const CBlendDesc& GetBlendDesc() const { return Blend; }
     void SetBlendDesc(CBlendDesc value) { Blend = value; }
 
-    const CVertexShaderInputBinding& GetVertexInputBinding() const { return VertexShaderInputBinding; }
-    CVertexShaderInputBinding& GetVertexInputBinding() { return VertexShaderInputBinding; }
-
+    //Shader Stages
     sp<CShaderModule> GetVertexShader() const { return VertexShader; }
     void SetVertexShader(CShaderModule* value) { VertexShader = value; }
 
     sp<CShaderModule> GetPixelShader() const { return PixelShader; }
     void SetPixelShader(CShaderModule* value) { PixelShader = value; }
 
-    const sp<CBuffer>& GetIndexBuffer() const { return IndexBuffer; }
-    void SetIndexBuffer(CBuffer* value) { IndexBuffer = value; }
+    //Dynamic stuff
+    const CVertexInputs& GetVertexInputs() const { return VertexInputs; }
+    CVertexInputs& GetVertexInputs() { return VertexInputs; }
+
+    void SetIndexBuffer(CBuffer* value, uint32_t byteOffset, EFormat format)
+    {
+        IndexBuffer = value;
+        IndexBufferOffset = byteOffset;
+        IndexFormat = format;
+    }
+
+    sp<CBuffer> GetIndexBuffer() const { return IndexBuffer; }
+    uint32_t GetIndexBufferOffset() const { return IndexBufferOffset; };
+    EFormat GetIndexFormat() const { return IndexFormat; };
 
     const CPipelineArguments& GetPipelineArguments() const { return PipelineArgs; }
     CPipelineArguments& GetPipelineArguments() { return PipelineArgs; }
 
-    bool IsIndexed = false;
-    uint32_t IndexWidth = 4;
+    const std::vector<CViewportDesc>& GetViewports() const { return Viewports; }
+    void SetViewports(std::vector<CViewportDesc> value) { Viewports = std::move(value); }
+
+    const std::vector<CRectDesc>& GetScissors() const { return Scissors; }
+    void SetScissors(std::vector<CRectDesc> value) { Scissors = std::move(value); }
+
+    const std::vector<CBufferUpdateRequest>& GetBufferUpdateReqs() const { return BufferUpdateReqs; }
+    std::vector<CBufferUpdateRequest>& GetBufferUpdateReqs() { return BufferUpdateReqs; }
 
     uint32_t ElementCount = 0;
     uint32_t InstanceCount = 0; //Zero means not instanced
@@ -58,42 +103,38 @@ public:
     uint32_t IndexOffset = 0;
     uint32_t InstanceOffset = 0;
 
-    //Those hash functions aren't used right now, but will be needed when we do pipeline caching
-    std::size_t HashStaticStates() const
-    {
-        std::size_t result = 0;
-        tc::hash_combine(result, Rasterizer);
-        tc::hash_combine(result, DepthStencil);
-        tc::hash_combine(result, Blend);
-        tc::hash_combine(result, VertexShader);
-        tc::hash_combine(result, PixelShader);
-        return result;
-    }
-
-    bool StaticStatesEqual(const CDrawTemplate& rhs) const
-    {
-        return Rasterizer == rhs.Rasterizer &&
-            DepthStencil == rhs.DepthStencil &&
-            Blend == rhs.Blend &&
-            VertexShader == rhs.VertexShader &&
-            PixelShader == rhs.PixelShader;
-    }
-
 private:
+    //Vertex Input
+    std::vector<CVertexInputAttributeDesc> VertexAttributeDescs;
+    std::vector<CVertexInputBindingDesc> VertexBindingDescs;
+
+    //Input Assembly
+    EPrimitiveTopology PrimitiveTopology = EPrimitiveTopology::TriangleList;
+
+    //Rasterization
     CRasterizerDesc Rasterizer;
+    
+    //DepthStencil
     CDepthStencilDesc DepthStencil;
+    
+    //ColorBlend
     CBlendDesc Blend;
 
+    //Shader Stages
     sp<CShaderModule> VertexShader;
     sp<CShaderModule> PixelShader;
 
     //Dynamic states
+    CVertexInputs VertexInputs;
+    sp<CBuffer> IndexBuffer;
+    uint32_t IndexBufferOffset;
+    EFormat IndexFormat;
+    CPipelineArguments PipelineArgs;
+
     std::vector<CViewportDesc> Viewports;
     std::vector<CRectDesc> Scissors;
 
-    CVertexShaderInputBinding VertexShaderInputBinding;
-    sp<CBuffer> IndexBuffer;
-    CPipelineArguments PipelineArgs;
+    std::vector<CBufferUpdateRequest> BufferUpdateReqs;
 };
 
 } /* namespace RHI */

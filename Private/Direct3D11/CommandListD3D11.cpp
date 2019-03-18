@@ -19,130 +19,6 @@ CCommandListD3D11::CCommandListD3D11(CDeviceD3D11* parent) : Parent(parent)
         throw CRHIRuntimeError("Could not create command list d3d11");
 }
 
-CCommandListD3D11::CDrawCallCacheEntryRef CCommandListD3D11::CacheDrawCall(const CDrawTemplate& drawTemplate)
-{
-    auto result = DrawCallCache.GetNewElement(tc::kAddToBack);
-
-    static_assert(sizeof(CViewportDesc) == sizeof(D3D11_VIEWPORT), "D3D11 viewport and CViewportDesc incompatible.");
-    //Context->RSSetViewports((UINT)drawTemplate.GetViewports().size(), (D3D11_VIEWPORT*)drawTemplate.GetViewports().data());
-    static_assert(sizeof(CRectDesc) == sizeof(D3D11_RECT), "D3D11 rect and CRectDecs incompatible.");
-    //Context->RSSetScissorRects((UINT)drawTemplate.GetScissors().size(), (D3D11_RECT*)drawTemplate.GetScissors().data());
-
-    result->RastState = Parent->StateCache->FindOrCreate(drawTemplate.GetRasterizerDesc());
-    result->DepthStencilState = Parent->StateCache->FindOrCreate(drawTemplate.GetDepthStencilDesc());
-    result->BlendState = Parent->StateCache->FindOrCreate(drawTemplate.GetBlendDesc());
-
-    auto vs = drawTemplate.GetVertexShader();
-    std::string key = vs->GetShaderCacheKey();
-    if (!(result->VertexShader = Parent->ShaderCache->GetShader(key)))
-    {
-        result->VertexShader = new CShaderD3D11(*vs);
-        result->VertexShader->GetVS(); //Triggers CreateVertexShader
-        Parent->ShaderCache->PutShader(key, result->VertexShader);
-    }
-
-    auto ps = drawTemplate.GetPixelShader();
-    key = ps->GetShaderCacheKey();
-    if (!(result->PixelShader = Parent->ShaderCache->GetShader(key)))
-    {
-        result->PixelShader = new CShaderD3D11(*ps);
-        result->PixelShader->GetPS(); //Triggers CreatePixelShader
-        Parent->ShaderCache->PutShader(key, result->PixelShader);
-    }
-
-    std::vector<D3D11_INPUT_ELEMENT_DESC> inputDescs;
-    auto& accessors = drawTemplate.GetVertexInputBinding().BoundAccessors;
-    std::sort(accessors.begin(), accessors.end(), CVertexShaderInputBinding::CBufferAndStrideComparator());
-    sp<CBuffer> groupBuf;
-    uint32_t groupStride = static_cast<uint32_t>(-1);
-    size_t groupBegin = SIZE_MAX;
-    uint32_t groupMinOffset = INT_MAX;
-    for (size_t i = 0; i <= accessors.size(); i++) //Intentially loop over one more index
-    {
-        //Starting a new group?
-        if (i == accessors.size() || accessors[i].Stride != groupStride || accessors[i].Buffer != groupBuf)
-        {
-            if (i != 0)
-            {
-                //Finalize last group
-                uint32_t bufferSlot = static_cast<uint32_t>(result->VertexBuffers.size());
-                auto* bufferImpl = static_cast<CBufferD3D11*>(accessors[groupBegin].Buffer.Get());
-                result->VertexBuffers.emplace_back(bufferImpl->GetD3D11Buffer());
-                result->Strides.emplace_back(groupStride);
-                result->Offsets.emplace_back(groupMinOffset);
-
-                for (size_t j = groupBegin; j < i; j++)
-                {
-                    auto iter = result->VertexShader->GetVSInputSignature().InputDescs.find(accessors[j].Location);
-                    if (iter == result->VertexShader->GetVSInputSignature().InputDescs.end())
-                        throw CRHIRuntimeError("Vertex input binding names a nonexistent location");
-
-                    D3D11_INPUT_ELEMENT_DESC inputDesc;
-                    inputDesc.SemanticName = "ATTRIBUTE"; //TODO: let shader provide a way to map "location" to semantic strings
-                    inputDesc.SemanticIndex = accessors[j].Location;
-                    inputDesc.Format = Convert(iter->second.Format);
-                    inputDesc.InputSlot = bufferSlot;
-                    inputDesc.AlignedByteOffset = accessors[j].Offset - groupMinOffset;
-                    inputDesc.InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
-                    inputDesc.InstanceDataStepRate = 0;
-                    inputDescs.push_back(inputDesc);
-                }
-            }
-            if (i != accessors.size())
-            {
-                //Initialize next group
-                groupBuf = accessors[i].Buffer;
-                groupStride = accessors[i].Stride;
-                groupBegin = i;
-                groupMinOffset = accessors[i].Offset;
-            }
-        }
-        if (i != accessors.size())
-        {
-            groupMinOffset = min(groupMinOffset, accessors[i].Offset);
-        }
-    }
-
-    if (inputDescs.size() > 0)
-    {
-        auto vsCode = result->VertexShader->GetCodeBlob();
-        Parent->D3dDevice->CreateInputLayout(inputDescs.data(), static_cast<UINT>(inputDescs.size()),
-            vsCode->GetBufferPointer(), vsCode->GetBufferSize(), result->InputLayout.GetAddressOf());
-    }
-
-    result->Topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST; //TODO: fixme
-    result->IndexFormat = DXGI_FORMAT_UNKNOWN;
-    if (drawTemplate.GetIndexBuffer())
-    {
-        auto* bufferImpl = static_cast<CBufferD3D11*>(drawTemplate.GetIndexBuffer().Get());
-        result->IndexBuffer = bufferImpl->GetD3D11Buffer();
-        if (drawTemplate.IndexWidth == 4)
-            result->IndexFormat = DXGI_FORMAT_R32_UINT;
-        else if (drawTemplate.IndexWidth == 2)
-            result->IndexFormat = DXGI_FORMAT_R16_UINT;
-        else if (drawTemplate.IndexWidth == 1)
-            result->IndexFormat = DXGI_FORMAT_R8_UINT;
-        else
-            throw CRHIRuntimeError("drawTemplate.IndexWidth incorrect");
-    }
-
-    result->ElementCount = drawTemplate.ElementCount;
-    result->InstanceCount = drawTemplate.InstanceCount;
-    result->VertexOffset = drawTemplate.VertexOffset;
-    result->IndexOffset = drawTemplate.IndexOffset;
-    result->InstanceOffset = drawTemplate.InstanceOffset;
-
-    result->PipelineArgs = drawTemplate.GetPipelineArguments();
-
-    result->bIsValid = true;
-    return result;
-}
-
-void CCommandListD3D11::RemoveCachedDrawCall(CDrawCallCacheEntryRef cachedDraw)
-{
-    DrawCallCache.FreeElement(cachedDraw);
-}
-
 void CCommandListD3D11::BeginRecording()
 {
 }
@@ -154,45 +30,61 @@ void CCommandListD3D11::FinishRecording()
     Context->ClearState();
 }
 
-void CCommandListD3D11::Draw(CDrawCallCacheEntryRef cachedDraw)
+void CCommandListD3D11::Draw(CPipelineStates states, const CDrawTemplate& draw)
 {
-    Context->RSSetViewports(1, &DefaultViewport);
+    CPipelineStatesD3D11* statesImpl = static_cast<CPipelineStatesD3D11*>(states);
+    Context->IASetInputLayout(statesImpl->InputLayout.Get());
+    Context->IASetPrimitiveTopology(Convert(statesImpl->PrimitiveTopology));
+    Context->RSSetState(statesImpl->RasterizerState.Get());
+    Context->OMSetDepthStencilState(statesImpl->DepthStencilState.Get(), 0); //TODO: stencil ref
+    Context->OMSetBlendState(statesImpl->BlendState.Get(), nullptr, 0xffffffff); //TODO: blend factor
+    if (statesImpl->VertexShader)
+        Context->VSSetShader(statesImpl->VertexShader->GetVS(), nullptr, 0);
+    if (statesImpl->PixelShader)
+        Context->PSSetShader(statesImpl->PixelShader->GetPS(), nullptr, 0);
 
-    Context->IASetPrimitiveTopology(cachedDraw->Topology);
-    Context->IASetInputLayout(cachedDraw->InputLayout.Get());
-    static_assert(sizeof(ComPtr<ID3D11Buffer>) == sizeof(ID3D11Buffer*), "Smart pointer size too big");
-    uint32_t numBuffers = (uint32_t)cachedDraw->VertexBuffers.size();
-    Context->IASetVertexBuffers(0, numBuffers,
-        reinterpret_cast<ID3D11Buffer**>(cachedDraw->VertexBuffers.data()), cachedDraw->Strides.data(), cachedDraw->Offsets.data());
-    Context->IASetIndexBuffer(cachedDraw->IndexBuffer.Get(), cachedDraw->IndexFormat, 0); //TODO: specify IB offset
+    //Context->RSSetViewports(1, &DefaultViewport); //TODO: set this only when draw does not
 
-    Context->RSSetState(cachedDraw->RastState.Get());
-    Context->OMSetDepthStencilState(cachedDraw->DepthStencilState.Get(), 0); //TODO: stencil ref
-    Context->OMSetBlendState(cachedDraw->BlendState.Get(), nullptr, 0xffffffff);
-
-    Context->VSSetShader(cachedDraw->VertexShader->GetVS(), nullptr, 0);
-    Context->PSSetShader(cachedDraw->PixelShader->GetPS(), nullptr, 0);
-
-    if (cachedDraw->VertexShader)
-        cachedDraw->VertexShader->GetParamMappings().BindArguments<CVSRedir>(cachedDraw->PipelineArgs, Context.Get());
-    if (cachedDraw->PixelShader)
-        cachedDraw->PixelShader->GetParamMappings().BindArguments<CPSRedir>(cachedDraw->PipelineArgs, Context.Get());
-
-    if (cachedDraw->IndexBuffer)
+    for (const auto& accessor : draw.GetVertexInputs().BoundAccessors)
     {
-        if (cachedDraw->InstanceCount > 0)
-            Context->DrawIndexedInstanced(cachedDraw->ElementCount, cachedDraw->InstanceCount,
-                cachedDraw->IndexOffset, cachedDraw->VertexOffset, cachedDraw->InstanceOffset);
+        ID3D11Buffer* buffer = static_cast<CBufferD3D11*>(accessor.Buffer.Get())->GetD3D11Buffer();
+        uint32_t stride = statesImpl->BindingToStride[accessor.Binding];
+        uint32_t offset = accessor.Offset;
+        Context->IASetVertexBuffers(accessor.Binding, 1, &buffer, &stride, &offset);
+    }
+    sp<CBuffer> ib = draw.GetIndexBuffer();
+    
+    //Update buffers
+    for (const auto& req : draw.GetBufferUpdateReqs())
+    {
+        ID3D11Buffer* buffer = static_cast<CBufferD3D11*>(req.Buffer.Get())->GetD3D11Buffer();
+        D3D11_MAPPED_SUBRESOURCE mapped;
+        Context->Map(buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        memcpy(mapped.pData, req.Data, req.Size);
+        Context->Unmap(buffer, 0);
+    }
+
+    if (statesImpl->VertexShader)
+        statesImpl->VertexShader->GetParamMappings().BindArguments<CVSRedir>(draw.GetPipelineArguments(), Context.Get());
+    if (statesImpl->PixelShader)
+        statesImpl->PixelShader->GetParamMappings().BindArguments<CPSRedir>(draw.GetPipelineArguments(), Context.Get());
+
+    if (ib)
+    {
+        ID3D11Buffer* ibD3d = static_cast<CBufferD3D11*>(ib.Get())->GetD3D11Buffer();
+        Context->IASetIndexBuffer(ibD3d, Convert(draw.GetIndexFormat()), draw.GetIndexBufferOffset());
+
+        if (draw.InstanceCount > 0)
+            Context->DrawIndexedInstanced(draw.ElementCount, draw.InstanceCount, draw.IndexOffset, draw.VertexOffset, draw.InstanceOffset);
         else
-            Context->DrawIndexed(cachedDraw->ElementCount, cachedDraw->IndexOffset, cachedDraw->VertexOffset);
+            Context->DrawIndexed(draw.ElementCount, draw.IndexOffset, draw.VertexOffset);
     }
     else
     {
-        if (cachedDraw->InstanceCount > 0)
-            Context->DrawInstanced(cachedDraw->ElementCount, cachedDraw->InstanceCount,
-                cachedDraw->VertexOffset, cachedDraw->InstanceOffset);
+        if (draw.InstanceCount > 0)
+            Context->DrawInstanced(draw.ElementCount, draw.InstanceCount, draw.VertexOffset, draw.InstanceOffset);
         else
-            Context->Draw(cachedDraw->ElementCount, cachedDraw->VertexOffset);
+            Context->Draw(draw.ElementCount, draw.VertexOffset);
     }
 }
 
@@ -207,6 +99,7 @@ void CCommandListD3D11::SetRenderTargets(const std::vector<CImageView*> color, c
         rtvs.push_back(static_cast<const CImageViewD3D11*>(p)->GetRenderTargetView().Get());
 
     Context->OMSetRenderTargets((UINT)rtvs.size(), rtvs.data(), dsv.Get());
+    Context->RSSetViewports(1, &DefaultViewport);
 }
 
 } /* namespace RHI */

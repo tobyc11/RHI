@@ -1,6 +1,7 @@
 #pragma once
 #include "Image.h"
 #include "DrawTemplate.h"
+#include "PipelineCache.h"
 #include "SwapChain.h"
 #include <EnumClass.h>
 #include <array>
@@ -117,7 +118,7 @@ public:
     CDrawPass(CRenderGraph& renderGraph);
 
     void BeginRecording();
-    void Record(const CDrawTemplate& drawTemplate);
+    void Record(CPipelineStates states, const CDrawTemplate& drawTemplate);
     void FinishRecording();
     void Submit() const override;
 
