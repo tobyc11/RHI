@@ -8,30 +8,33 @@ namespace RHI
  *   time aid to determine which class actually implements it.
  */
 
-template <template<typename> typename TBaseClass>
-struct TChooseImpl;
+template <template <typename> typename TBaseClass> struct TChooseImpl;
 
-#define DEFINE_IMPL(BaseType, ImplType) \
-template <typename TDerived> \
-class BaseType; \
- \
-class ImplType; \
- \
-template <> \
-struct TChooseImpl<BaseType> \
-{ \
-    using TDerived = ImplType; \
-    using TConcreteBase = BaseType<TDerived>; \
-};
+#define DEFINE_IMPL(ApiType, ImplType)                                                             \
+    template <typename TDerived> class ApiType##Base;                                              \
+                                                                                                   \
+    class ImplType;                                                                                \
+                                                                                                   \
+    template <> struct TChooseImpl<ApiType##Base>                                                  \
+    {                                                                                              \
+        using TDerived = ImplType;                                                                 \
+        using TConcreteBase = ApiType##Base<TDerived>;                                             \
+    };                                                                                             \
+                                                                                                   \
+    typedef ApiType##Base<ImplType> ApiType;
 
 #ifdef RHI_IMPL_DIRECT3D11
-DEFINE_IMPL(CDeviceBase, CDeviceD3D11)
-using CDevice = TChooseImpl<CDeviceBase>::TConcreteBase;
+DEFINE_IMPL(CBuffer, CBufferD3D11)
+DEFINE_IMPL(CImage, CImageD3D11)
 
-DEFINE_IMPL(CBufferBase, CBufferD3D11)
-DEFINE_IMPL(CImageBase, CImageD3D11)
-DEFINE_IMPL(CPipelineCacheBase, CPipelineCacheD3D11)
-using CPipelineCache = CPipelineCacheBase<TChooseImpl<CPipelineCacheBase>::TDerived>;
+DEFINE_IMPL(CDevice, CDeviceD3D11)
+
+#elif defined(RHI_IMPL_VULKAN)
+// Resources
+DEFINE_IMPL(CBuffer, CBufferVk)
+DEFINE_IMPL(CImage, CImageVk)
+
+DEFINE_IMPL(CDevice, CDeviceVk)
 
 #else
 static_assert(false, "No RHI implementation chosen.");

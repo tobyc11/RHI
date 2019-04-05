@@ -16,12 +16,12 @@ CSwapChainD3D11::~CSwapChainD3D11()
     SwapChain->Release();
 }
 
-sp<CImage> CSwapChainD3D11::GetImage(uint32_t index)
+CImage::Ref CSwapChainD3D11::GetImage(uint32_t index)
 {
-    ID3D11Texture2D* pBackBuffer;
-    SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&pBackBuffer));
+    ComPtr<ID3D11Texture2D> pBackBuffer;
+    SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(pBackBuffer.GetAddressOf()));
     auto* devImpl = static_cast<CDeviceD3D11*>(CInstance::Get().GetCurrDevice());
-    return new CImageD3D11(devImpl, pBackBuffer, 2);
+    return new CImageD3D11(*devImpl, pBackBuffer);
 }
 
 void CSwapChainD3D11::Resize(int width, int height)

@@ -3,8 +3,8 @@
 namespace RHI
 {
 
-//Blatantly plagiarized from Vulkan.
-//Apache license.
+// Blatantly plagiarized from Vulkan.
+// Apache license.
 enum class EFormat
 {
     UNDEFINED = 0,

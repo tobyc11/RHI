@@ -1,4 +1,5 @@
 #pragma once
+#include "RHICommon.h"
 #include <EnumClass.h>
 #include <Hash.h>
 #include <array>
@@ -17,25 +18,36 @@ struct CViewportDesc
     float MinDepth;
     float MaxDepth;
 
-    CViewportDesc& SetX(float value) { X = value; return *this; }
-    CViewportDesc& SetY(float value) { Y = value; return *this; }
-    CViewportDesc& SetWidth(float value) { Width = value; return *this; }
-    CViewportDesc& SetHeight(float value) { Height = value; return *this; }
-    CViewportDesc& SetMinDepth(float value) { MinDepth = value; return *this; }
-    CViewportDesc& SetMaxDepth(float value) { MaxDepth = value; return *this; }
-};
-
-struct CRectDesc
-{
-    int32_t X;
-    int32_t Y;
-    uint32_t Width;
-    uint32_t Height;
-
-    CRectDesc& SetX(int32_t value) { X = value; return *this; }
-    CRectDesc& SetY(int32_t value) { Y = value; return *this; }
-    CRectDesc& SetWidth(uint32_t value) { Width = value; return *this; }
-    CRectDesc& SetHeight(uint32_t value) { Height = value; return *this; }
+    CViewportDesc& SetX(float value)
+    {
+        X = value;
+        return *this;
+    }
+    CViewportDesc& SetY(float value)
+    {
+        Y = value;
+        return *this;
+    }
+    CViewportDesc& SetWidth(float value)
+    {
+        Width = value;
+        return *this;
+    }
+    CViewportDesc& SetHeight(float value)
+    {
+        Height = value;
+        return *this;
+    }
+    CViewportDesc& SetMinDepth(float value)
+    {
+        MinDepth = value;
+        return *this;
+    }
+    CViewportDesc& SetMaxDepth(float value)
+    {
+        MaxDepth = value;
+        return *this;
+    }
 };
 
 enum class EPolygonMode
@@ -55,8 +67,6 @@ DEFINE_ENUM_CLASS_BITWISE_OPERATORS(ECullModeFlags)
 
 struct CRasterizerDesc
 {
-    bool DepthClampEnable = false;
-    bool RasterizerDiscardEnable = true;
     EPolygonMode PolygonMode = EPolygonMode::Fill;
     ECullModeFlags CullMode = ECullModeFlags::Back;
     bool FrontFaceCCW = true;
@@ -64,51 +74,113 @@ struct CRasterizerDesc
     float DepthBiasConstantFactor = 0.0f;
     float DepthBiasClamp = 0.0f;
     float DepthBiasSlopeFactor = 0.0f;
-    float LineWidth = 1.0f;
+    bool DepthClampEnable = false;
 
-    CRasterizerDesc& SetDepthClampEnable(bool value) { DepthClampEnable = value; return *this; }
-    CRasterizerDesc& SetRasterizerDiscardEnable(bool value) { RasterizerDiscardEnable = value; return *this; }
-    CRasterizerDesc& SetPolygonMode(EPolygonMode value) { PolygonMode = value; return *this; }
-    CRasterizerDesc& SetCullMode(ECullModeFlags value) { CullMode = value; return *this; }
-    CRasterizerDesc& SetFrontFaceCCW(bool value) { FrontFaceCCW = value; return *this; }
-    CRasterizerDesc& SetDepthBiasEnable(bool value) { DepthBiasEnable = value; return *this; }
-    CRasterizerDesc& SetDepthBiasConstantFactor(float value) { DepthBiasConstantFactor = value; return *this; }
-    CRasterizerDesc& SetDepthBiasClamp(float value) { DepthBiasClamp = value; return *this; }
-    CRasterizerDesc& SetDepthBiasSlopeFactor(float value) { DepthBiasSlopeFactor = value; return *this; }
-    CRasterizerDesc& SetLineWidth(float value) { LineWidth = value; return *this; }
+    CRasterizerDesc& SetPolygonMode(EPolygonMode value)
+    {
+        PolygonMode = value;
+        return *this;
+    }
+    CRasterizerDesc& SetCullMode(ECullModeFlags value)
+    {
+        CullMode = value;
+        return *this;
+    }
+    CRasterizerDesc& SetFrontFaceCCW(bool value)
+    {
+        FrontFaceCCW = value;
+        return *this;
+    }
+    CRasterizerDesc& SetDepthBiasEnable(bool value)
+    {
+        DepthBiasEnable = value;
+        return *this;
+    }
+    CRasterizerDesc& SetDepthBiasConstantFactor(float value)
+    {
+        DepthBiasConstantFactor = value;
+        return *this;
+    }
+    CRasterizerDesc& SetDepthBiasClamp(float value)
+    {
+        DepthBiasClamp = value;
+        return *this;
+    }
+    CRasterizerDesc& SetDepthBiasSlopeFactor(float value)
+    {
+        DepthBiasSlopeFactor = value;
+        return *this;
+    }
+    CRasterizerDesc& SetDepthClampEnable(bool value)
+    {
+        DepthClampEnable = value;
+        return *this;
+    }
 
     bool operator==(const CRasterizerDesc& rhs) const
     {
-        return DepthClampEnable == rhs.DepthClampEnable &&
-            RasterizerDiscardEnable == rhs.RasterizerDiscardEnable &&
-            PolygonMode == rhs.PolygonMode &&
-            CullMode == rhs.CullMode &&
-            FrontFaceCCW == rhs.FrontFaceCCW &&
-            DepthBiasEnable == rhs.DepthBiasEnable &&
-            DepthBiasConstantFactor == rhs.DepthBiasConstantFactor &&
-            DepthBiasClamp == rhs.DepthBiasClamp &&
-            DepthBiasSlopeFactor == rhs.DepthBiasSlopeFactor &&
-            LineWidth == rhs.LineWidth;
+        return PolygonMode == rhs.PolygonMode && CullMode == rhs.CullMode
+            && FrontFaceCCW == rhs.FrontFaceCCW && DepthBiasEnable == rhs.DepthBiasEnable
+            && DepthBiasConstantFactor == rhs.DepthBiasConstantFactor
+            && DepthBiasClamp == rhs.DepthBiasClamp
+            && DepthBiasSlopeFactor == rhs.DepthBiasSlopeFactor
+            && DepthClampEnable == rhs.DepthClampEnable;
     }
 
     friend std::size_t hash_value(const CRasterizerDesc& r)
     {
         std::size_t result = 0;
-        result |= static_cast<std::size_t>(r.DepthClampEnable); result <<= 1;
-        result |= static_cast<std::size_t>(r.RasterizerDiscardEnable); result <<= 1;
-        result |= static_cast<std::size_t>(r.PolygonMode); result <<= 1;
-        result |= static_cast<std::size_t>(r.CullMode); result <<= 1;
-        result |= static_cast<std::size_t>(r.FrontFaceCCW); result <<= 1;
-        result |= static_cast<std::size_t>(r.DepthBiasEnable); result <<= 1;
-        result |= static_cast<std::size_t>(r.DepthBiasConstantFactor); result <<= 1;
-        result |= static_cast<std::size_t>(r.DepthBiasClamp); result <<= 1;
-        result |= static_cast<std::size_t>(r.DepthBiasSlopeFactor); result <<= 1;
-        result |= static_cast<std::size_t>(r.LineWidth); result <<= 1;
+        result |= static_cast<std::size_t>(r.PolygonMode);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.CullMode);
+        result <<= 1;
+        tc::hash_combine(result, r.FrontFaceCCW);
+        tc::hash_combine(result, r.DepthBiasEnable);
+        tc::hash_combine(result, r.DepthBiasConstantFactor);
+        tc::hash_combine(result, r.DepthBiasClamp);
+        tc::hash_combine(result, r.DepthBiasSlopeFactor);
+        tc::hash_combine(result, r.DepthClampEnable);
         return result;
     }
 };
 
-//Multisampling omitted
+struct CMultisampleStateDesc
+{
+    bool MultisampleEnable; // Replace with sample count?
+    uint64_t SampleMask;
+    bool AlphaToCoverageEnable;
+
+    CMultisampleStateDesc& SetMultisampleEnable(bool value)
+    {
+        MultisampleEnable = value;
+        return *this;
+    }
+    CMultisampleStateDesc& SetSampleMask(uint64_t value)
+    {
+        SampleMask = value;
+        return *this;
+    }
+    CMultisampleStateDesc& SetAlphaToCoverageEnable(bool value)
+    {
+        AlphaToCoverageEnable = value;
+        return *this;
+    }
+
+    bool operator==(const CMultisampleStateDesc& rhs) const
+    {
+        return MultisampleEnable == rhs.MultisampleEnable && SampleMask == rhs.SampleMask
+            && AlphaToCoverageEnable == rhs.AlphaToCoverageEnable;
+    }
+
+    friend std::size_t hash_value(const CMultisampleStateDesc& r)
+    {
+        std::size_t result = 0x11223344;
+        tc::hash_combine(result, r.MultisampleEnable);
+        tc::hash_combine(result, r.SampleMask);
+        tc::hash_combine(result, r.AlphaToCoverageEnable);
+        return result;
+    }
+};
 
 enum class ECompareOp
 {
@@ -144,32 +216,60 @@ struct CStencilOpState
     uint32_t WriteMask;
     uint32_t Reference;
 
-    CStencilOpState& SetFailOp(EStencilOp value) { FailOp = value; return *this; }
-    CStencilOpState& SetPassOp(EStencilOp value) { PassOp = value; return *this; }
-    CStencilOpState& SetDepthFailOp(EStencilOp value) { DepthFailOp = value; return *this; }
-    CStencilOpState& SetCompareOp(ECompareOp value) { CompareOp = value; return *this; }
-    CStencilOpState& SetCompareMask(uint32_t value) { CompareMask = value; return *this; }
-    CStencilOpState& SetWriteMask(uint32_t value) { WriteMask = value; return *this; }
-    CStencilOpState& SetReference(uint32_t value) { Reference = value; return *this; }
+    CStencilOpState& SetFailOp(EStencilOp value)
+    {
+        FailOp = value;
+        return *this;
+    }
+    CStencilOpState& SetPassOp(EStencilOp value)
+    {
+        PassOp = value;
+        return *this;
+    }
+    CStencilOpState& SetDepthFailOp(EStencilOp value)
+    {
+        DepthFailOp = value;
+        return *this;
+    }
+    CStencilOpState& SetCompareOp(ECompareOp value)
+    {
+        CompareOp = value;
+        return *this;
+    }
+    CStencilOpState& SetCompareMask(uint32_t value)
+    {
+        CompareMask = value;
+        return *this;
+    }
+    CStencilOpState& SetWriteMask(uint32_t value)
+    {
+        WriteMask = value;
+        return *this;
+    }
+    CStencilOpState& SetReference(uint32_t value)
+    {
+        Reference = value;
+        return *this;
+    }
 
     bool operator==(const CStencilOpState& rhs) const
     {
-        return FailOp == rhs.FailOp &&
-            PassOp == rhs.PassOp &&
-            DepthFailOp == rhs.DepthFailOp &&
-            CompareOp == rhs.CompareOp &&
-            CompareMask == rhs.CompareMask &&
-            WriteMask == rhs.WriteMask &&
-            Reference == rhs.Reference;
+        return FailOp == rhs.FailOp && PassOp == rhs.PassOp && DepthFailOp == rhs.DepthFailOp
+            && CompareOp == rhs.CompareOp && CompareMask == rhs.CompareMask
+            && WriteMask == rhs.WriteMask && Reference == rhs.Reference;
     }
 
     friend std::size_t hash_value(const CStencilOpState& r)
     {
         std::size_t result = 0;
-        result |= static_cast<std::size_t>(r.FailOp); result <<= 1;
-        result |= static_cast<std::size_t>(r.PassOp); result <<= 1;
-        result |= static_cast<std::size_t>(r.DepthFailOp); result <<= 1;
-        result |= static_cast<std::size_t>(r.CompareOp); result <<= 1;
+        result |= static_cast<std::size_t>(r.FailOp);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.PassOp);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.DepthFailOp);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.CompareOp);
+        result <<= 1;
         tc::hash_combine(result, r.CompareMask);
         tc::hash_combine(result, r.WriteMask);
         tc::hash_combine(result, r.Reference);
@@ -185,31 +285,43 @@ struct CDepthStencilDesc
     bool StencilTestEnable;
     CStencilOpState Front;
     CStencilOpState Back;
-    bool DepthBoundsTestEnable;
-    float MinDepthBounds;
-    float MaxDepthBounds;
 
-    CDepthStencilDesc& SetDepthTestEnable(bool value) { DepthTestEnable = value; return *this; }
-    CDepthStencilDesc& SetDepthWriteEnable(bool value) { DepthWriteEnable = value; return *this; }
-    CDepthStencilDesc& SetDepthCompareOp(ECompareOp value) { DepthCompareOp = value; return *this; }
-    CDepthStencilDesc& SetStencilTestEnable(bool value) { StencilTestEnable = value; return *this; }
-    CDepthStencilDesc& SetFront(CStencilOpState value) { Front = value; return *this; }
-    CDepthStencilDesc& SetBack(CStencilOpState value) { Back = value; return *this; }
-    CDepthStencilDesc& SetDepthBoundsTestEnable(bool value) { DepthBoundsTestEnable = value; return *this; }
-    CDepthStencilDesc& SetMinDepthBounds(float value) { MinDepthBounds = value; return *this; }
-    CDepthStencilDesc& SetMaxDepthBounds(float value) { MaxDepthBounds = value; return *this; }
+    CDepthStencilDesc& SetDepthTestEnable(bool value)
+    {
+        DepthTestEnable = value;
+        return *this;
+    }
+    CDepthStencilDesc& SetDepthWriteEnable(bool value)
+    {
+        DepthWriteEnable = value;
+        return *this;
+    }
+    CDepthStencilDesc& SetDepthCompareOp(ECompareOp value)
+    {
+        DepthCompareOp = value;
+        return *this;
+    }
+    CDepthStencilDesc& SetStencilTestEnable(bool value)
+    {
+        StencilTestEnable = value;
+        return *this;
+    }
+    CDepthStencilDesc& SetFront(CStencilOpState value)
+    {
+        Front = value;
+        return *this;
+    }
+    CDepthStencilDesc& SetBack(CStencilOpState value)
+    {
+        Back = value;
+        return *this;
+    }
 
     bool operator==(const CDepthStencilDesc& rhs) const
     {
-        return DepthTestEnable == rhs.DepthTestEnable &&
-            DepthWriteEnable == rhs.DepthWriteEnable &&
-            DepthCompareOp == rhs.DepthCompareOp &&
-            StencilTestEnable == rhs.StencilTestEnable &&
-            Front == rhs.Front &&
-            Back == rhs.Back &&
-            DepthBoundsTestEnable == rhs.DepthBoundsTestEnable &&
-            MinDepthBounds == rhs.MinDepthBounds &&
-            MaxDepthBounds == rhs.MaxDepthBounds;
+        return DepthTestEnable == rhs.DepthTestEnable && DepthWriteEnable == rhs.DepthWriteEnable
+            && DepthCompareOp == rhs.DepthCompareOp && StencilTestEnable == rhs.StencilTestEnable
+            && Front == rhs.Front && Back == rhs.Back;
     }
 
     friend std::size_t hash_value(const CDepthStencilDesc& r)
@@ -217,11 +329,11 @@ struct CDepthStencilDesc
         std::size_t result = 0;
         tc::hash_combine(result, r.DepthTestEnable);
         tc::hash_combine(result, r.DepthWriteEnable);
-        result |= static_cast<std::size_t>(r.DepthCompareOp); result <<= 1;
+        result |= static_cast<std::size_t>(r.DepthCompareOp);
+        result <<= 1;
         tc::hash_combine(result, r.StencilTestEnable);
-        tc::hash_combine(result, r.DepthBoundsTestEnable);
-        tc::hash_combine(result, r.MinDepthBounds);
-        tc::hash_combine(result, r.MaxDepthBounds);
+        tc::hash_combine(result, r.Front);
+        tc::hash_combine(result, r.Back);
         return result;
     }
 };
@@ -239,7 +351,7 @@ enum class EBlendMode
     DstColor,
     OneMinusDstColor,
     SrcAlphaSaturate,
-    //TODO: Custom blend factor support
+    // TODO: Custom blend factor support
 };
 
 enum class EBlendOp
@@ -274,47 +386,84 @@ struct CRenderTargetBlendDesc
     EBlendOp BlendOpAlpha = EBlendOp::Add;
     EColorComponentFlags RenderTargetWriteMask = EColorComponentFlags::All;
 
-    CRenderTargetBlendDesc& SetBlendEnable(bool value) { BlendEnable = value; return *this; }
-    CRenderTargetBlendDesc& SetSrcBlend(EBlendMode value) { SrcBlend = value; return *this; }
-    CRenderTargetBlendDesc& SetDestBlend(EBlendMode value) { DestBlend = value; return *this; }
-    CRenderTargetBlendDesc& SetBlendOp(EBlendOp value) { BlendOp = value; return *this; }
-    CRenderTargetBlendDesc& SetSrcBlendAlpha(EBlendMode value) { SrcBlendAlpha = value; return *this; }
-    CRenderTargetBlendDesc& SetDestBlendAlpha(EBlendMode value) { DestBlendAlpha = value; return *this; }
-    CRenderTargetBlendDesc& SetBlendOpAlpha(EBlendOp value) { BlendOpAlpha = value; return *this; }
-    CRenderTargetBlendDesc& SetRenderTargetWriteMask(EColorComponentFlags value) { RenderTargetWriteMask = value; return *this; }
+    CRenderTargetBlendDesc& SetBlendEnable(bool value)
+    {
+        BlendEnable = value;
+        return *this;
+    }
+    CRenderTargetBlendDesc& SetSrcBlend(EBlendMode value)
+    {
+        SrcBlend = value;
+        return *this;
+    }
+    CRenderTargetBlendDesc& SetDestBlend(EBlendMode value)
+    {
+        DestBlend = value;
+        return *this;
+    }
+    CRenderTargetBlendDesc& SetBlendOp(EBlendOp value)
+    {
+        BlendOp = value;
+        return *this;
+    }
+    CRenderTargetBlendDesc& SetSrcBlendAlpha(EBlendMode value)
+    {
+        SrcBlendAlpha = value;
+        return *this;
+    }
+    CRenderTargetBlendDesc& SetDestBlendAlpha(EBlendMode value)
+    {
+        DestBlendAlpha = value;
+        return *this;
+    }
+    CRenderTargetBlendDesc& SetBlendOpAlpha(EBlendOp value)
+    {
+        BlendOpAlpha = value;
+        return *this;
+    }
+    CRenderTargetBlendDesc& SetRenderTargetWriteMask(EColorComponentFlags value)
+    {
+        RenderTargetWriteMask = value;
+        return *this;
+    }
 
     bool operator==(const CRenderTargetBlendDesc& rhs) const
     {
-        return (BlendEnable == false && rhs.BlendEnable == false) ||
-            BlendEnable == rhs.BlendEnable &&
-            SrcBlend == rhs.SrcBlend &&
-            DestBlend == rhs.DestBlend &&
-            BlendOp == rhs.BlendOp &&
-            SrcBlendAlpha == rhs.SrcBlendAlpha &&
-            DestBlendAlpha == rhs.DestBlendAlpha &&
-            BlendOpAlpha == rhs.BlendOpAlpha &&
-            RenderTargetWriteMask == rhs.RenderTargetWriteMask;
+        return (BlendEnable == false && rhs.BlendEnable == false)
+            || BlendEnable == rhs.BlendEnable && SrcBlend == rhs.SrcBlend
+            && DestBlend == rhs.DestBlend && BlendOp == rhs.BlendOp
+            && SrcBlendAlpha == rhs.SrcBlendAlpha && DestBlendAlpha == rhs.DestBlendAlpha
+            && BlendOpAlpha == rhs.BlendOpAlpha
+            && RenderTargetWriteMask == rhs.RenderTargetWriteMask;
     }
 
     friend std::size_t hash_value(const CRenderTargetBlendDesc& r)
     {
         std::size_t result = 0;
-        result |= static_cast<std::size_t>(r.BlendEnable); result <<= 1;
-        result |= static_cast<std::size_t>(r.SrcBlend); result <<= 1;
-        result |= static_cast<std::size_t>(r.DestBlend); result <<= 1;
-        result |= static_cast<std::size_t>(r.BlendOp); result <<= 1;
-        result |= static_cast<std::size_t>(r.SrcBlendAlpha); result <<= 1;
-        result |= static_cast<std::size_t>(r.DestBlendAlpha); result <<= 1;
-        result |= static_cast<std::size_t>(r.BlendOpAlpha); result <<= 1;
-        result |= static_cast<std::size_t>(r.RenderTargetWriteMask); result <<= 1;
+        result |= static_cast<std::size_t>(r.BlendEnable);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.SrcBlend);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.DestBlend);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.BlendOp);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.SrcBlendAlpha);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.DestBlendAlpha);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.BlendOpAlpha);
+        result <<= 1;
+        result |= static_cast<std::size_t>(r.RenderTargetWriteMask);
+        result <<= 1;
         return result;
     }
 };
 
 struct CBlendDesc
 {
-    CRenderTargetBlendDesc RenderTargets[8];
-    std::array<float, 4> BlendConstants;
+    bool IndependentBlendEnable;
+    std::array<CRenderTargetBlendDesc, 8> RenderTargets;
 
     CBlendDesc& SetRenderTargets(size_t num, CRenderTargetBlendDesc desc)
     {
@@ -330,29 +479,12 @@ struct CBlendDesc
         }
     }
 
-    CBlendDesc& SetBlendConstants(float r, float g, float b, float a)
-    {
-        BlendConstants[0] = r;
-        BlendConstants[1] = g;
-        BlendConstants[2] = b;
-        BlendConstants[3] = a;
-        return *this;
-    }
-
     bool operator==(const CBlendDesc& rhs) const
     {
-        return BlendConstants[0] == rhs.BlendConstants[0] &&
-            BlendConstants[1] == rhs.BlendConstants[1] &&
-            BlendConstants[2] == rhs.BlendConstants[2] &&
-            BlendConstants[3] == rhs.BlendConstants[3] &&
-            RenderTargets[0] == rhs.RenderTargets[0] &&
-            RenderTargets[1] == rhs.RenderTargets[1] &&
-            RenderTargets[2] == rhs.RenderTargets[2] &&
-            RenderTargets[3] == rhs.RenderTargets[3] &&
-            RenderTargets[4] == rhs.RenderTargets[4] &&
-            RenderTargets[5] == rhs.RenderTargets[5] &&
-            RenderTargets[6] == rhs.RenderTargets[6] &&
-            RenderTargets[7] == rhs.RenderTargets[7];
+        return RenderTargets[0] == rhs.RenderTargets[0] && RenderTargets[1] == rhs.RenderTargets[1]
+            && RenderTargets[2] == rhs.RenderTargets[2] && RenderTargets[3] == rhs.RenderTargets[3]
+            && RenderTargets[4] == rhs.RenderTargets[4] && RenderTargets[5] == rhs.RenderTargets[5]
+            && RenderTargets[6] == rhs.RenderTargets[6] && RenderTargets[7] == rhs.RenderTargets[7];
     }
 
     friend std::size_t hash_value(const CBlendDesc& r)
@@ -360,9 +492,18 @@ struct CBlendDesc
         std::size_t result = 0;
         result = hash_value(r.RenderTargets[0]);
         result |= hash_value(r.RenderTargets[1]);
-        result |= static_cast<std::size_t>(r.BlendConstants[0]); result <<= 1;
         return result;
     }
+};
+
+enum class EPrimitiveTopology
+{
+    PointList = 0,
+    LineList = 1,
+    LineStrip = 2,
+    TriangleList = 3,
+    TriangleStrip = 4,
+    TriangleFan = 5,
 };
 
 } /* namespace RHI */

@@ -1,12 +1,17 @@
 #include "RHIInstance.h"
 #ifdef RHI_IMPL_DIRECT3D11
 #include "Direct3D11/DeviceD3D11.h"
+#elif defined(RHI_IMPL_VULKAN)
+#include "Vulkan/DeviceVk.h"
 #endif
 
 namespace RHI
 {
 
-static thread_local CDevice* CurrDevice;
+extern void InitRHIInstance();
+extern void ShutdownRHIInstance();
+
+static thread_local CDevice::Ref CurrDevice;
 
 CInstance& CInstance::Get()
 {
@@ -14,19 +19,17 @@ CInstance& CInstance::Get()
     return globalSingleton;
 }
 
-CDevice* CInstance::GetCurrDevice() const
+CDevice::Ref CInstance::GetCurrDevice() const { return CurrDevice; }
+
+void CInstance::SetCurrDevice(CDevice::Ref device) { CurrDevice = device; }
+
+CDevice::Ref CInstance::CreateDevice(EDeviceCreateHints hints)
 {
-    return CurrDevice;
+    return std::make_shared<TChooseImpl<CDeviceBase>::TDerived>(hints);
 }
 
-void CInstance::SetCurrDevice(CDevice* device)
-{
-    CurrDevice = device;
-}
+CInstance::CInstance() { InitRHIInstance(); }
 
-sp<CDevice> CInstance::CreateDevice(EDeviceCreateHints hints)
-{
-    return new TChooseImpl<CDeviceBase>::TDerived(hints);
-}
+CInstance::~CInstance() { ShutdownRHIInstance(); }
 
 } /* namespace RHI */

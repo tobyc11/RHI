@@ -12,6 +12,11 @@
 #include "SwapChainD3D11.h"
 #include "PipelineCacheD3D11.h"
 
+extern "C"
+{
+    _declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+}
+
 namespace RHI
 {
 
@@ -117,27 +122,43 @@ CDeviceD3D11::~CDeviceD3D11()
 #endif
 }
 
-sp<CBuffer> CDeviceD3D11::CreateBuffer(uint32_t size, EBufferUsageFlags usage, const void* initialData)
+CBuffer::Ref CDeviceD3D11::CreateBuffer(uint32_t size, EBufferUsageFlags usage, const void* initialData)
 {
     return new CBufferD3D11(D3dDevice.Get(), size, usage, initialData);
 }
 
-sp<CImage> CDeviceD3D11::CreateImage1D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t mipLevels, uint32_t arrayLayers)
+CImage::Ref CDeviceD3D11::CreateImage1D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t mipLevels, uint32_t arrayLayers)
 {
     throw std::runtime_error("unimplemented");
 }
 
-sp<CImage> CDeviceD3D11::CreateImage2D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t arrayLayers)
+CImage::Ref CDeviceD3D11::CreateImage2D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t arrayLayers)
 {
     //Determine various properties
     UINT bindFlags = 0;
     bool bCreateImmediately = false;
+    UINT miscFlags = 0;
+    if (Any(usage, EImageUsageFlags::RenderTarget))
+    {
+        bCreateImmediately = true;
+        bindFlags |= D3D11_BIND_RENDER_TARGET;
+    }
     if (Any(usage, EImageUsageFlags::DepthStencil))
     {
         bCreateImmediately = true;
         bindFlags |= D3D11_BIND_DEPTH_STENCIL;
     }
     if (Any(usage, EImageUsageFlags::Sampled))
+        bindFlags |= D3D11_BIND_SHADER_RESOURCE;
+    if (Any(usage, EImageUsageFlags::CubeMap))
+        miscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
+    if (Any(usage, EImageUsageFlags::GenMIPMaps))
+    {
+        miscFlags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
+        bindFlags |= D3D11_BIND_RENDER_TARGET;
+        mipLevels = 0;
+    }
+    if (bindFlags == 0)
         bindFlags |= D3D11_BIND_SHADER_RESOURCE;
 
     D3D11_TEXTURE2D_DESC desc = {};
@@ -151,26 +172,26 @@ sp<CImage> CDeviceD3D11::CreateImage2D(EFormat format, EImageUsageFlags usage, u
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags = bindFlags;
     desc.CPUAccessFlags = 0;
-    desc.MiscFlags = 0;
+    desc.MiscFlags = miscFlags;
 
-    sp<CImageD3D11> image = new CImageD3D11(this, desc);
+    CImageD3D11::Ref image = new CImageD3D11(*this, desc);
     if (bCreateImmediately)
         image->CreateFromMem(nullptr);
     return image;
 }
 
-sp<CImage> CDeviceD3D11::CreateImage3D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels, uint32_t arrayLayers)
+CImage::Ref CDeviceD3D11::CreateImage3D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels, uint32_t arrayLayers)
 {
     throw std::runtime_error("unimplemented");
 }
 
-sp<CImageView> CDeviceD3D11::CreateImageView(const CImageViewDesc& desc, CImage* image)
+CImageView::Ref CDeviceD3D11::CreateImageView(const CImageViewDesc& desc, CImage* image)
 {
     auto* imageImpl = static_cast<CImageD3D11*>(image);
-    return new CImageViewD3D11(this, imageImpl, desc);
+    return new CImageViewD3D11(*this, imageImpl, desc);
 }
 
-sp<CSampler> CDeviceD3D11::CreateSampler(const CSamplerDesc& desc)
+CSampler::Ref CDeviceD3D11::CreateSampler(const CSamplerDesc& desc)
 {
     //D3D11_FILTER Min Mag Mip
     //              00  00  00
@@ -187,25 +208,29 @@ sp<CSampler> CDeviceD3D11::CreateSampler(const CSamplerDesc& desc)
 
     ID3D11SamplerState* sampler;
     D3D11_SAMPLER_DESC sampDesc = {};
-    sampDesc.Filter = D3D11_FILTER(filter);
+    sampDesc.Filter = D3D11_FILTER(filter); //TODO: filter also encodes compare enable
     sampDesc.AddressU = Convert(desc.AddressModeU);
     sampDesc.AddressV = Convert(desc.AddressModeV);
     sampDesc.AddressW = Convert(desc.AddressModeW);
-    sampDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    sampDesc.MipLODBias = desc.MipLodBias;
+    sampDesc.ComparisonFunc = Convert(desc.CompareOp);
+    memcpy(sampDesc.BorderColor, desc.BorderColor.data(), 4 * sizeof(float));
     sampDesc.MinLOD = desc.MinLod;
     sampDesc.MaxLOD = desc.MaxLod;
+    if (desc.AnisotropyEnable)
+        sampDesc.MaxAnisotropy = (UINT)desc.MaxAnisotropy;
 
     HRESULT hr;
     hr = D3dDevice->CreateSamplerState(&sampDesc, &sampler);
     if (FAILED(hr))
         throw CRHIRuntimeError("Could not create sampler.");
 
-    sp<CSampler> result = new CSamplerD3D11(sampler);
+    CSampler::Ref result = new CSamplerD3D11(sampler);
     sampler->Release();
     return result;
 }
 
-sp<CSwapChain> CDeviceD3D11::CreateSwapChain(const CSwapChainCreateInfo& info)
+CSwapChain::Ref CDeviceD3D11::CreateSwapChain(const CSwapChainCreateInfo& info)
 {
     HRESULT hr = S_OK;
     IDXGISwapChain* pSwapChain = nullptr;
@@ -293,13 +318,13 @@ sp<CSwapChain> CDeviceD3D11::CreateSwapChain(const CSwapChainCreateInfo& info)
     if (FAILED(hr))
         throw CRHIException("CreateSwapChain failed");
 
-    sp<CSwapChain> result = new CSwapChainD3D11(pSwapChain);
+    CSwapChain::Ref result = new CSwapChainD3D11(pSwapChain);
     if (pSwapChain1)
         pSwapChain1->Release();
     return result;
 }
 
-sp<CPipelineCache> CDeviceD3D11::CreatePipelineCache()
+CPipelineCache::Ref CDeviceD3D11::CreatePipelineCache()
 {
     return new CPipelineCacheD3D11(*this);
 }

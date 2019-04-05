@@ -1,16 +1,14 @@
 #pragma once
-#include "Buffer.h"
-#include "Image.h"
-#include "ImageView.h"
-#include "PipelineCache.h"
+#include "Pipeline.h"
+#include "RHIException.h"
+#include "RenderContext.h"
+#include "RenderPass.h"
+#include "Resources.h"
 #include "Sampler.h"
-#include "SwapChain.h"
-#include <RefBase.h>
+#include "ShaderModule.h"
 
 namespace RHI
 {
-
-using tc::sp;
 
 enum class EDeviceCreateHints
 {
@@ -19,26 +17,47 @@ enum class EDeviceCreateHints
     Discrete,
 };
 
-template <typename TDerived>
-class CDeviceBase : public tc::TLightRefBase<CDeviceBase<TDerived>>
+template <typename TDerived> class CDeviceBase
 {
-protected:
-    CDeviceBase();
-
 public:
+    typedef std::shared_ptr<CDeviceBase> Ref;
+
     virtual ~CDeviceBase() = default;
 
-    sp<CBuffer> CreateBuffer(uint32_t size, EBufferUsageFlags usage, const void* initialData = nullptr);
+    // Resources and resource views
+    CBuffer::Ref CreateBuffer(size_t size, EBufferUsageFlags usage,
+                              const void* initialData = nullptr);
+    CImage::Ref CreateImage1D(EFormat format, EImageUsageFlags usage, uint32_t width,
+                              uint32_t mipLevels = 1, uint32_t arrayLayers = 1,
+                              uint32_t sampleCount = 1, const void* initialData = nullptr);
+    CImage::Ref CreateImage2D(EFormat format, EImageUsageFlags usage, uint32_t width,
+                              uint32_t height, uint32_t mipLevels = 1, uint32_t arrayLayers = 1,
+                              uint32_t sampleCount = 1, const void* initialData = nullptr);
+    CImage::Ref CreateImage3D(EFormat format, EImageUsageFlags usage, uint32_t width,
+                              uint32_t height, uint32_t depth, uint32_t mipLevels = 1,
+                              uint32_t arrayLayers = 1, uint32_t sampleCount = 1,
+                              const void* initialData = nullptr);
+    CImageView::Ref CreateImageView(const CImageViewDesc& desc, CImage::Ref image);
 
-    sp<CImage> CreateImage1D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
-    sp<CImage> CreateImage2D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
-    sp<CImage> CreateImage3D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
-    sp<CImageView> CreateImageView(const CImageViewDesc& desc, CImage* image);
+    // Shader and resource binding
+    CShaderModule::Ref CreateShaderModule(size_t size, const void* pCode);
 
-    sp<CSampler> CreateSampler(const CSamplerDesc& desc);
+    // States
+    CRenderPass::Ref CreateRenderPass(const CRenderPassDesc& desc);
+    CFramebuffer::Ref CreateFramebuffer(const CFramebufferDesc& desc);
+    CPipeline::Ref CreatePipeline(const CPipelineDesc& desc);
+    CSampler::Ref CreateSampler(const CSamplerDesc& desc);
 
-    sp<CSwapChain> CreateSwapChain(const CSwapChainCreateInfo& info);
-    sp<CPipelineCache> CreatePipelineCache();
+    // Command submission
+    IRenderContext::Ref GetImmediateContext();
+    IRenderContext::Ref CreateDeferredContext();
+
+    // Other stuff
+    // CSwapChain::Ref CreateSwapChain(const CSwapChainCreateInfo& info);
+    // CPipelineCache::Ref CreatePipelineCache();
+
+protected:
+    CDeviceBase() = default;
 };
 
 } /* namespace RHI */

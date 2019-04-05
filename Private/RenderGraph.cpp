@@ -1,170 +1,269 @@
 #include "RenderGraph.h"
-#include "RHIException.h"
-#include <cassert>
-#include <cstdlib>
-#include <ctime>
 
 namespace RHI
 {
 
-void CRenderGraph::ImportRenderTarget(CNodeId id, CImageView* view)
+void CGraphRenderPass::AddColorAttachment(const std::string& resource, uint32_t index, bool read,
+                                          bool write)
 {
-    throw std::runtime_error("unimplemented");
+    assert(GetGraph().NameToNodeId.find(resource) != GetGraph().NameToNodeId.end());
+    size_t src = GetGraph().NameToNodeId[GetName()];
+    size_t dst = GetGraph().NameToNodeId[resource];
+    auto usage = GetGraph().AddEdge(src, dst);
+    usage->Type = EResourceUsageType::ColorAttachment;
+    usage->bRead = read;
+    usage->bWrite = write;
+    usage->ColorAttachmentIndex = index;
+    usage->RequiredState = EResourceState::RenderTarget;
 }
 
-void CRenderGraph::ImportRenderTarget(CNodeId id, CSwapChain* swapChain)
+void CGraphRenderPass::AddDepthStencilAttachment(const std::string& resource, bool read, bool write)
 {
-    RenderTargets.insert_or_assign(id, CRenderTargetRef(swapChain));
+    assert(GetGraph().NameToNodeId.find(resource) != GetGraph().NameToNodeId.end());
+    size_t src = GetGraph().NameToNodeId[GetName()];
+    size_t dst = GetGraph().NameToNodeId[resource];
+    auto usage = GetGraph().AddEdge(src, dst);
+    usage->Type = EResourceUsageType::DepthStencilAttachment;
+    usage->bRead = read;
+    usage->bWrite = write;
+    usage->RequiredState = EResourceState::DepthStencil;
 }
 
-CNodeId CRenderGraph::DeclareRenderTarget()
+void CGraphRenderPass::AddShaderResource(const std::string& resource)
 {
-    //Try to generate an unused id
-    std::srand(static_cast<uint32_t>(std::time(nullptr)));
-    CNodeId id = std::rand();
-    do
+    assert(GetGraph().NameToNodeId.find(resource) != GetGraph().NameToNodeId.end());
+    size_t src = GetGraph().NameToNodeId[GetName()];
+    size_t dst = GetGraph().NameToNodeId[resource];
+    auto usage = GetGraph().AddEdge(src, dst);
+    usage->Type = EResourceUsageType::ShaderResource;
+    usage->bRead = true;
+    usage->bWrite = false;
+    usage->RequiredState = EResourceState::ShaderResource;
+}
+
+CRenderGraph::CRenderGraph()
+{
+    GoalNode = SIZE_MAX;
+    Nodes.reserve(128);
+    AdjLists.reserve(128);
+}
+
+CRenderResource& CRenderGraph::AddTransientResource(const std::string& name, EFormat format)
+{
+    assert(NameToNodeId.find(name) == NameToNodeId.end());
+    auto node = std::make_shared<CRenderResource>(*this, name, format);
+    size_t nextId;
+    if (!FreeNodeIds.empty())
     {
-        //https://burtleburtle.net/bob/hash/integer.html
-        id = (id + 0x7ed55d16) + (id << 12);
-        id = (id ^ 0xc761c23c) ^ (id >> 19);
-        id = (id + 0x165667b1) + (id << 5);
-        id = (id + 0xd3a2646c) ^ (id << 9);
-        id = (id + 0xfd7046c5) + (id << 3);
-        id = (id ^ 0xb55a4f09) ^ (id >> 16);
-        if (id == 0)
-            id++;
-    } while (RenderTargets.find(id) != RenderTargets.end());
-    //Register a new and empty render target
-    RenderTargets.emplace(id, CRenderTargetRef());
-    return id;
+        nextId = FreeNodeIds.front();
+        FreeNodeIds.pop_front();
+        Nodes[nextId] = node;
+    }
+    else
+    {
+        nextId = Nodes.size();
+        Nodes.push_back(node);
+        AdjLists.resize(Nodes.size());
+    }
+    NameToNodeId[name] = nextId;
+    return *node;
 }
 
-CRenderTargetRef& CRenderGraph::GetRenderTarget(CNodeId id)
+CGraphRenderPass& CRenderGraph::AddRenderPass(const std::string& name)
 {
-    auto iter = RenderTargets.find(id);
-    if (iter != RenderTargets.end())
-        return iter->second;
-    throw CRHIRuntimeError("No render target with given id found");
+    assert(NameToNodeId.find(name) == NameToNodeId.end());
+    auto node = std::make_shared<CGraphRenderPass>(*this, name);
+    size_t nextId;
+    if (!FreeNodeIds.empty())
+    {
+        nextId = FreeNodeIds.front();
+        FreeNodeIds.pop_front();
+        Nodes[nextId] = node;
+    }
+    else
+    {
+        nextId = Nodes.size();
+        Nodes.push_back(node);
+        AdjLists.resize(Nodes.size());
+    }
+    NameToNodeId[name] = nextId;
+    return *node;
 }
 
-void CRenderGraph::AddRenderPass(CNodeId id, CRenderPass& pass)
+void CRenderGraph::RemoveRenderPass(const std::string& name)
 {
-    sp<CRenderPass> ptr = &pass;
-    RenderPasses.emplace(id, ptr);
+    assert(NameToNodeId.find(name) != NameToNodeId.end());
+    auto id = NameToNodeId[name];
+    assert(Nodes[id]->GetType() == ERenderNodeType::RenderPass);
+    Nodes[id].reset();
+    AdjLists[id].clear();
+    NameToNodeId.erase(name);
+    FreeNodeIds.push_back(id);
 }
 
-bool CRenderGraph::HasRenderPass(CNodeId id) const
+void CRenderGraph::SetGoal(const std::string& name)
 {
-    if (RenderPasses.find(id) == RenderPasses.end())
+    if (name.empty())
+    {
+        GoalNode = SIZE_MAX;
+        return;
+    }
+    assert(NameToNodeId.find(name) != NameToNodeId.end());
+    GoalNode = NameToNodeId[name];
+}
+
+void CRenderGraph::ValidateDFSRenderPass(size_t nodeId) const
+{
+    assert(nodeId >= 0);
+    assert(nodeId < Nodes.size());
+    assert(Nodes[nodeId]);
+    auto node = Nodes[nodeId];
+    assert(node->GetType() == ERenderNodeType::RenderPass);
+    if (node->_Visited == 1)
+    {
+        // Back-edge
+        ValidateSuccess = false;
+        return;
+    }
+    if (node->_Visited == 2)
+        return; // Cross edge
+    DFSDepth++;
+    node->_Visited = 1;
+    std::cout << std::string(DFSDepth, ' ') << "[" << node->GetName() << "]" << std::endl;
+    PassOrder.push_back(nodeId);
+    for (const auto& pair : AdjLists[nodeId])
+    {
+        // If read-only, must be an input or srv
+        if (pair.second->bRead && !pair.second->bWrite)
+        {
+            ValidateDFSResource(pair.first);
+        }
+    }
+    node->_Visited = 2;
+    DFSDepth--;
+}
+
+void CRenderGraph::ValidateDFSResource(size_t nodeId) const
+{
+    assert(nodeId >= 0);
+    assert(nodeId < Nodes.size());
+    assert(Nodes[nodeId]);
+    auto node = Nodes[nodeId];
+    assert(node->GetType() == ERenderNodeType::RenderResource);
+    if (node->_Visited == 1)
+    {
+        // Back-edge
+        ValidateSuccess = false;
+        return;
+    }
+    if (node->_Visited == 2)
+        return; // Cross edge
+    DFSDepth++;
+    node->_Visited = 1;
+    std::cout << std::string(DFSDepth, ' ') << node->GetName() << std::endl;
+    unsigned writerCount = 0;
+    for (const auto& pair : AdjLists[nodeId])
+    {
+        // Anything that writes me is noteworthy
+        if (pair.second->bWrite)
+        {
+            writerCount++;
+            if (writerCount > 1)
+            {
+                ValidateSuccess = false;
+                std::cout << "Currently does not support a resource having multiple writers."
+                          << std::endl;
+            }
+            ValidateDFSRenderPass(pair.first);
+        }
+    }
+    node->_Visited = 2;
+    DFSDepth--;
+}
+
+bool CRenderGraph::Validate() const
+{
+    if (GoalNode == SIZE_MAX)
         return false;
-    return true;
+    ValidateSuccess = true;
+
+    for (auto node : Nodes)
+        if (node)
+            node->_Visited = 0;
+
+    DFSDepth = 0;
+    PassOrder.clear();
+    ValidateDFSResource(GoalNode);
+
+    return ValidateSuccess;
 }
 
-CRenderPass& CRenderGraph::GetRenderPass(CNodeId id)
+void CRenderGraph::Bake() const
 {
-    auto iter = RenderPasses.find(id);
-    if (iter == RenderPasses.end())
-        throw CRHIRuntimeError("Could not find specified render target");
-    return *iter->second;
-}
+    if (!ValidateSuccess)
+        ;
 
-void CRenderGraph::RemoveRenderPass(CNodeId id)
-{
-    auto iter = RenderPasses.find(id);
-    RenderPasses.erase(iter);
-}
+    std::reverse(PassOrder.begin(), PassOrder.end());
+    size_t index = 0;
+    for (size_t nodeId : PassOrder)
+        Nodes[nodeId]->_PassOrder = index++;
 
-void CRenderGraph::BeginFrame()
-{
-    bIsDuringFrame = true;
+    Transitions.clear();
+    Transitions.resize(PassOrder.size());
 
-    //Go through all the render targets and make sure the swapchains are properly setup
-    for (auto& pair : RenderTargets)
+    for (size_t i = 0; i < Nodes.size(); i++)
     {
-        if (pair.second.IsSwapChain())
-            pair.second.SetImageViewFromSwapChain();
+        auto node = Nodes[i];
+        if (node->GetType() == ERenderNodeType::RenderResource)
+        {
+            // Plan the barriers for this resource, now that we have the pass ordering
+            std::map<size_t, CTransition> transitions;
+            for (const auto& pair : AdjLists[i])
+            {
+                size_t time = Nodes[pair.first]->_PassOrder;
+                CTransition t;
+                t.NodeId = i;
+                t.StateDuring = pair.second->RequiredState;
+                t.StateAfter = t.StateDuring;
+                transitions.emplace(time, t);
+            }
+            auto iter = transitions.begin();
+            while (true)
+            {
+                auto next = iter;
+                std::advance(next, 1);
+                if (next == transitions.end())
+                    break;
+                iter->second.StateAfter = next->second.StateDuring;
+                iter = next;
+            }
+            // Actually store all those transitions
+            for (const auto& tp : transitions)
+                if (!tp.second.IsUnneeded())
+                    Transitions[tp.first].push_back(tp.second);
+        }
     }
 
-    for (const auto& pair : RenderPasses)
+    for (size_t i = 0; i < PassOrder.size(); i++)
     {
-        int width, height;
-        //Find a swap chain so that we know the dimensions
-        pair.second->ForEachColorAttachment([&](CNodeId rtid)
+        size_t nodeId = PassOrder[i];
+        std::cout << Nodes[nodeId]->GetName() << std::endl;
+        for (const auto& tr : Transitions[i])
         {
-            if (rtid != kInvalidNodeId)
-            {
-                auto& rt = GetRenderTarget(rtid);
-                if (rt.IsSwapChain())
-                    rt.GetDimensions(width, height);
-            }
-        });
-
-        if (width == 0 || height == 0)
-            throw CRHIRuntimeError("Render graph unable to automatically deduce render target dimensions");
-
-        pair.second->ForEachColorAttachment([&](CNodeId rtid)
-        {
-            if (rtid == kInvalidNodeId)
-                return;
-            auto& rt = GetRenderTarget(rtid);
-            if (!rt.IsSwapChain())
-                rt.Reinit2D(width, height, ERenderTargetFlags::Color);
-        });
-
-        CNodeId dsid = pair.second->GetDepthStencilAttachment();
-        if (dsid != kInvalidNodeId)
-        {
-            auto& rt = GetRenderTarget(dsid);
-            rt.Reinit2D(width, height, ERenderTargetFlags::DepthStencil);
+            std::cout << Nodes[tr.NodeId]->GetName() << " " << (int)tr.StateDuring << " -> "
+                      << (int)tr.StateAfter << std::endl;
         }
     }
 }
 
-void CRenderGraph::SubmitFrame()
+std::shared_ptr<CResourceUsage> CRenderGraph::AddEdge(size_t src, size_t dst)
 {
-    //TODO: this needs to be multithreaded
-    DFSVisited.clear();
-    TopoSortedPasses.clear();
-    TopoSortedPasses.reserve(RenderPasses.size());
-
-    for (const auto& pair : RenderPasses)
-    {
-        DFSRenderPassTopologicalSort(pair.second.Get());
-    }
-
-    //TODO: this probably only works with legacy rendering APIs as well
-    for (auto iter = TopoSortedPasses.rbegin(); iter != TopoSortedPasses.rend(); ++iter)
-    {
-        (*iter)->Submit();
-    }
-    bIsDuringFrame = false;
+    auto usage = std::make_shared<CResourceUsage>();
+    AdjLists[src][dst] = usage;
+    AdjLists[dst][src] = usage;
+    return usage;
 }
 
-void CRenderGraph::PrepareToResize()
-{
-    assert(!bIsDuringFrame);
-    for (auto& pair : RenderTargets)
-    {
-        if (pair.second.IsSwapChain())
-            pair.second.ClearImageAndView();
-    }
+bool CRenderGraph::CTransition::IsUnneeded() const { return StateDuring == StateAfter; }
+
 }
-
-void CRenderGraph::DFSRenderPassTopologicalSort(CRenderPass* pass)
-{
-    if (DFSVisited.find(pass) != DFSVisited.end())
-    {
-        //Already visited
-        return;
-    }
-
-    DFSVisited.insert(pass);
-    for (CRenderPass* successor : pass->Succ)
-    {
-        DFSRenderPassTopologicalSort(successor);
-    }
-
-    TopoSortedPasses.push_back(pass);
-}
-
-} /* namespace RHI */

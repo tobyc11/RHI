@@ -64,9 +64,9 @@ template <typename TRedir>
 void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, ID3D11DeviceContext* ctx) const
 {
     //Local vars used by the switch statement
-    sp<CBufferD3D11> buf;
-    sp<CImageViewD3D11> view;
-    sp<CSamplerD3D11> sampler;
+    CBufferD3D11::Ref buf;
+    CImageViewD3D11::Ref view;
+    CSamplerD3D11::Ref sampler;
     ID3D11Buffer* bufPtr;
     ComPtr<ID3D11ShaderResourceView> srvPtr;
     ID3D11SamplerState* samplerPtr;
@@ -86,19 +86,19 @@ void CPipelineParamMappingD3D11::BindArguments(const CPipelineArguments& args, I
         {
         //CBuffer
         case 0:
-            buf = static_cast<CBufferD3D11*>(std::get<sp<CBuffer>>(pair.second).Get());
+            buf = static_cast<CBufferD3D11*>(std::get<CBuffer::Ref>(pair.second).Get());
             bufPtr = buf->GetD3D11Buffer();
             ctxWrapper.SetConstantBuffers(paramIter->second, 1, &bufPtr);
             break;
         //CImageView
         case 1:
-            view = static_cast<CImageViewD3D11*>(std::get<sp<CImageView>>(pair.second).Get());
+            view = static_cast<CImageViewD3D11*>(std::get<CImageView::Ref>(pair.second).Get());
             srvPtr = view->GetShaderResourceView();
             ctxWrapper.SetShaderResources(paramIter->second, 1, srvPtr.GetAddressOf());
             break;
         //CSampler
         case 2:
-            sampler = static_cast<CSamplerD3D11*>(std::get<sp<CSampler>>(pair.second).Get());
+            sampler = static_cast<CSamplerD3D11*>(std::get<CSampler::Ref>(pair.second).Get());
             samplerPtr = sampler->GetSamplerState();
             ctxWrapper.SetSamplers(paramIter->second, 1, &samplerPtr);
             break;

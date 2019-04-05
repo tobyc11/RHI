@@ -16,17 +16,17 @@ public:
     CDeviceD3D11(EDeviceCreateHints hints);
     ~CDeviceD3D11();
 
-    sp<CBuffer> CreateBuffer(uint32_t size, EBufferUsageFlags usage, const void* initialData = nullptr);
+    CBuffer::Ref CreateBuffer(uint32_t size, EBufferUsageFlags usage, const void* initialData = nullptr);
 
-    sp<CImage> CreateImage1D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
-    sp<CImage> CreateImage2D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
-    sp<CImage> CreateImage3D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
-    sp<CImageView> CreateImageView(const CImageViewDesc& desc, CImage* image);
+    CImage::Ref CreateImage1D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
+    CImage::Ref CreateImage2D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
+    CImage::Ref CreateImage3D(EFormat format, EImageUsageFlags usage, uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels = 1, uint32_t arrayLayers = 1);
+    CImageView::Ref CreateImageView(const CImageViewDesc& desc, CImage* image);
 
-    sp<CSampler> CreateSampler(const CSamplerDesc& desc);
+    CSampler::Ref CreateSampler(const CSamplerDesc& desc);
 
-    sp<CSwapChain> CreateSwapChain(const CSwapChainCreateInfo& info);
-    sp<CPipelineCache> CreatePipelineCache();
+    CSwapChain::Ref CreateSwapChain(const CSwapChainCreateInfo& info);
+    CPipelineCache::Ref CreatePipelineCache();
 
     CCommandListD3D11* CreateCommandList();
 

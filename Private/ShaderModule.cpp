@@ -4,12 +4,17 @@
 namespace RHI
 {
 
-CShaderModule::CShaderModule(const std::string& sourcePath, const std::string& target, const std::string& entryPoint, HLSLSrc)
-    : bIsDXBC(false), SourcePath(sourcePath), Target(target), EntryPoint(entryPoint)
+CShaderModule::CShaderModule(const std::string& sourcePath, const std::string& target,
+                             const std::string& entryPoint, HLSLSrc)
+    : bIsDXBC(false)
+    , SourcePath(sourcePath)
+    , Target(target)
+    , EntryPoint(entryPoint)
 {
 }
 
-CShaderModule::CShaderModule(const void* data, size_t size, DXBCBlob) : bIsDXBC(true)
+CShaderModule::CShaderModule(const void* data, size_t size, DXBCBlob)
+    : bIsDXBC(true)
 {
     DataBlob.resize(size);
     memcpy(DataBlob.data(), data, size);
@@ -20,7 +25,7 @@ CShaderModule::CShaderModule(const void* data, size_t size, DXBCBlob) : bIsDXBC(
     DataBlobHash = picosha2::bytes_to_hex_string(hash.begin(), hash.end());
 }
 
-bool CShaderModule::operator=(const CShaderModule & rhs) const
+bool CShaderModule::operator=(const CShaderModule& rhs) const
 {
     if (bIsDXBC)
         return DataBlobHash == rhs.DataBlobHash;

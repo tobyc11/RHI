@@ -1,154 +1,79 @@
 #pragma once
-#include "Image.h"
-#include "DrawTemplate.h"
-#include "PipelineCache.h"
-#include "SwapChain.h"
-#include <EnumClass.h>
-#include <array>
-#include <set>
+#include "Resources.h"
+#include <cstdint>
+#include <memory>
+#include <vector>
 
 namespace RHI
 {
 
-//We use an integer type to uniquely identify graph nodes and other sorts objects
-//  __hash should be used to convert a string literal into an integer id.
-using CNodeId = uint64_t;
-const CNodeId kInvalidNodeId = 0;
-
-class CRenderGraph;
-
-enum ERenderTargetFlags
+enum class CAttachmentLoadOp : uint16_t
 {
-    None = 0,
-    Color = 1,
-    DepthStencil = 2
+    Load,
+    Clear,
+    DontCare
 };
 
-DEFINE_ENUM_CLASS_BITWISE_OPERATORS(ERenderTargetFlags)
-
-class CRenderTargetRef
+enum class CAttachmentStoreOp : uint16_t
 {
-public:
-    //Make an undetermined render target
-    CRenderTargetRef();
-    //Render target from swapchain
-    CRenderTargetRef(CSwapChain* swapChain);
-
-    bool IsSwapChain() const { return SwapChain; }
-    bool IsImportedImage() const { return false; }
-    bool IsUndetermined() const { return !IsSwapChain() && !IsImportedImage(); }
-
-    sp<CSwapChain> GetSwapChain() const { return SwapChain; }
-    void GetDimensions(int& outWidth, int& outHeight);
-    void SetDimensions(int width, int height);
-
-    void SetImageViewFromSwapChain();
-    void Reinit2D(int w, int h, ERenderTargetFlags flags);
-
-    sp<CImageView> GetImageView() const { return ImageView; }
-
-    void ClearImageAndView();
-
-private:
-    sp<CSwapChain> SwapChain;
-
-    int Width, Height;
-
-    sp<CImage> Image;
-    sp<CImageView> ImageView;
-
-    ERenderTargetFlags Flags = ERenderTargetFlags::None;
+    Store,
+    DontCare
 };
 
-class CRenderPass : public tc::TLightRefBase<CRenderPass>
+struct CAttachmentDesc
 {
-    friend class CRenderGraph;
+    EFormat Format;
+    uint32_t Samples;
+    CAttachmentLoadOp LoadOp;
+    CAttachmentStoreOp StoreOp;
+    CAttachmentLoadOp StencilLoadOp;
+    CAttachmentStoreOp StencilStoreOp;
+    // Clear value is dynamically specified
+    // Framebuffer is dynamically specified
+};
 
+struct CSubpassDesc
+{
+    static const uint32_t None = ~0U;
+
+    std::vector<uint32_t> InputAttachments;
+    std::vector<uint32_t> ColorAttachments;
+    // uint32_t ResolveAttachment; TODO
+    uint32_t DepthStencilAttachment;
+    // std::vector<uint32_t> PreserveAttachments; TODO
+    // Layouts are deduced from usage
+};
+
+struct CRenderPassDesc
+{
+    std::vector<CAttachmentDesc> Attachments;
+    std::vector<CSubpassDesc> Subpasses;
+    // Dependencies are deduced from usage
+};
+
+class CRenderPass
+{
 public:
-    CRenderPass(CRenderGraph& renderGraph)
-        : RenderGraph(renderGraph)
-    {
-    }
+    typedef std::shared_ptr<CRenderPass> Ref;
 
-    //Rule of 5
-    CRenderPass(const CRenderPass&) = delete;
-    CRenderPass(CRenderPass&&) = delete;
-    CRenderPass& operator=(const CRenderPass&) = delete;
-    CRenderPass& operator=(CRenderPass&&) = delete;
     virtual ~CRenderPass() = default;
-
-    CRenderGraph& GetRenderGraph() const { return RenderGraph; }
-
-    void SetColorAttachment(uint32_t index, CNodeId id);
-    void SetDepthStencilAttachment(CNodeId id);
-
-    template <typename TLambda>
-    void ForEachColorAttachment(const TLambda& lambda) const
-    {
-        for (int i = 0; i < 8; i++)
-            lambda(ColorAttachments[i]);
-    }
-
-    CNodeId GetDepthStencilAttachment() const { return DepthStencilAttachment; }
-
-    void AddDependency(CRenderPass& predecessor);
-    void RemoveDependency(CRenderPass& predecessor);
-
-private:
-    virtual void Submit() const;
-
-private:
-    //Owner
-    CRenderGraph& RenderGraph;
-
-    //Attachments
-    CNodeId ColorAttachments[8] = { 0 };
-    CNodeId DepthStencilAttachment = kInvalidNodeId;
-
-    //Graph adj data
-    std::set<CRenderPass*> Pred;
-    std::set<CRenderPass*> Succ;
 };
 
-class CDrawPassPriv;
+struct CFramebufferDesc
+{
+    CRenderPass::Ref RenderPass;
+    std::vector<CImageView::Ref> Attachments;
+    uint32_t Width;
+    uint32_t Height;
+    uint32_t Layers;
+};
 
-class CDrawPass : public CRenderPass
+class CFramebuffer
 {
 public:
-    CDrawPass(CRenderGraph& renderGraph);
+    typedef std::shared_ptr<CFramebuffer> Ref;
 
-    void BeginRecording();
-    void Record(CPipelineStates states, const CDrawTemplate& drawTemplate);
-    void FinishRecording();
-    void Submit() const override;
-
-private:
-    class Impl;
-    std::unique_ptr<Impl> PImpl;
+    virtual ~CFramebuffer() = default;
 };
 
-class CPresentPass : public CRenderPass
-{
-public:
-    CPresentPass(CRenderGraph& renderGraph);
-
-    void Submit() const override;
-};
-
-class CClearPass : public CRenderPass
-{
-public:
-    CClearPass(CRenderGraph& renderGraph);
-
-    void Submit() const override;
-
-    std::array<float, 4> ClearColors[8];
-    float ClearDepth = 1.0f;
-    uint8_t ClearStencil = 0;
-
-private:
-    class Impl;
-    std::unique_ptr<Impl> PImpl;
-};
-
-} /* namespace RHI */
+}

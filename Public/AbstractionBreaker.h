@@ -1,5 +1,4 @@
 #pragma once
-#include "RenderPass.h"
 #include "RHIInstance.h"
 #ifdef RHI_IMPL_DIRECT3D11
 #include <d3d11_4.h>

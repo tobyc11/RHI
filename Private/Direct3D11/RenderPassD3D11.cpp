@@ -41,9 +41,9 @@ void CDrawPass::Impl::BeginRecording()
         auto& attachment = Owner.GetRenderGraph().GetRenderTarget(id);
         auto imageView = attachment.GetImageView();
         colors.push_back(imageView);
-
-        if (attachment.IsSwapChain())
-            attachment.GetDimensions(vpWidth, vpHeight);
+        
+        //Should we do this to just the first bound target?
+        attachment.GetDimensions(vpWidth, vpHeight);
     });
 
     //Try with default viewport
@@ -72,8 +72,11 @@ void CDrawPass::Impl::FinishRecording()
 void CDrawPass::Impl::Submit()
 {
     //Submit
-    DeviceImpl->ImmediateContext->ExecuteCommandList(CommandList->GetD3DCommandList(), false);
-    CommandList->ClearD3DCommandList();
+    if (CommandList->GetD3DCommandList())
+    {
+        DeviceImpl->ImmediateContext->ExecuteCommandList(CommandList->GetD3DCommandList(), false);
+        CommandList->ClearD3DCommandList();
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////

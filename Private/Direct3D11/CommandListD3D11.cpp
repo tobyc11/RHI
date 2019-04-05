@@ -52,7 +52,7 @@ void CCommandListD3D11::Draw(CPipelineStates states, const CDrawTemplate& draw)
         uint32_t offset = accessor.Offset;
         Context->IASetVertexBuffers(accessor.Binding, 1, &buffer, &stride, &offset);
     }
-    sp<CBuffer> ib = draw.GetIndexBuffer();
+    CBuffer::Ref ib = draw.GetIndexBuffer();
     
     //Update buffers
     for (const auto& req : draw.GetBufferUpdateReqs())

@@ -13,7 +13,8 @@ public:
 class CRHIRuntimeError : public CRHIException
 {
 public:
-    CRHIRuntimeError(const char* msg) : CRHIException(msg)
+    CRHIRuntimeError(const char* msg)
+        : CRHIException(msg)
     {
     }
 };

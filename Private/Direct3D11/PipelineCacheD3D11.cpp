@@ -75,7 +75,7 @@ CPipelineStates CPipelineCacheD3D11::CreatePipelineStates(const CDrawTemplate& d
     //static_assert(sizeof(CViewportDesc) == sizeof(D3D11_VIEWPORT), "D3D11 viewport and CViewportDesc incompatible.");
     //for (const auto& desc : dt.GetViewports())
     //    result->Viewports.push_back(reinterpret_cast<const D3D11_VIEWPORT&>(desc));
-    //static_assert(sizeof(CRectDesc) == sizeof(D3D11_RECT), "D3D11 rect and CRectDecs incompatible.");
+    //static_assert(sizeof(CRect2D) == sizeof(D3D11_RECT), "D3D11 rect and CRect2Ds incompatible.");
     //for (const auto& desc : dt.GetScissors())
     //    result->Scissors.push_back(reinterpret_cast<const D3D11_RECT&>(desc));
 

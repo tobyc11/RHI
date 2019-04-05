@@ -1,22 +1,22 @@
 #pragma once
-#include "Image.h"
+#include "Resources.h"
 
 namespace RHI
 {
-
-using tc::sp;
 
 struct CSwapChainCreateInfo
 {
     void* OSWindowHandle;
 };
 
-class CSwapChain : public tc::CVirtualLightRefBase
+class CSwapChain
 {
 public:
+    typedef std::shared_ptr<CSwapChain> Ref;
+
     virtual ~CSwapChain() = default;
 
-    virtual sp<CImage> GetImage(uint32_t index) = 0;
+    virtual CImage::Ref GetImage(uint32_t index) = 0;
 
     virtual void Resize(int width, int height) = 0;
     virtual void GetSize(int& width, int& height) const = 0;
