@@ -9,6 +9,12 @@ struct COffset2D
 {
     int32_t X;
     int32_t Y;
+
+    void Set(int32_t x, int32_t y)
+    {
+        X = x;
+        Y = y;
+    }
 };
 
 struct COffset3D
@@ -16,12 +22,25 @@ struct COffset3D
     int32_t X;
     int32_t Y;
     int32_t Z;
+
+    void Set(int32_t x, int32_t y, int32_t z)
+    {
+        X = x;
+        Y = y;
+        Z = z;
+    }
 };
 
 struct CExtent2D
 {
     uint32_t Width;
     uint32_t Height;
+
+    void Set(uint32_t w, uint32_t h)
+    {
+        Width = w;
+        Height = h;
+    }
 };
 
 struct CExtent3D
@@ -29,6 +48,13 @@ struct CExtent3D
     uint32_t Width;
     uint32_t Height;
     uint32_t Depth;
+
+    void Set(uint32_t w, uint32_t h, uint32_t d)
+    {
+        Width = w;
+        Height = h;
+        Depth = d;
+    }
 };
 
 struct CRect2D

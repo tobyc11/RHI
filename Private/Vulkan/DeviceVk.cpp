@@ -2,6 +2,7 @@
 
 #include "ImageViewVk.h"
 #include "ImageVk.h"
+#include "PipelineVk.h"
 #include "RenderPassVk.h"
 #include "SamplerVk.h"
 #include "ShaderModuleVk.h"
@@ -18,7 +19,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallback(VkDebugReportFlagsEXT flags,
                                                    int32_t messageCode, const char* pLayerPrefix,
                                                    const char* pMessage, void* pUserData)
 {
-    std::string type = "RHI ";
+    std::string type = "Vk Validation ";
     type += ((flags | VK_DEBUG_REPORT_ERROR_BIT_EXT) ? "Error: " : "Warning: ");
     std::cout << (type + std::string(pMessage) + "\n") << std::endl;
     return VK_FALSE;
@@ -28,13 +29,9 @@ static void initDebugCallback(VkInstance instance, VkDebugReportCallbackEXT* pCa
 {
     VkDebugReportCallbackCreateInfoEXT callbackCreateInfo = {};
     callbackCreateInfo.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT;
-    callbackCreateInfo.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
-#ifdef VK_REPORT_PERF_WARNINGS
-    callbackCreateInfo.flags |= VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
-#endif
-#ifdef DEFAULT_ENABLE_DEBUG_LAYER
+    callbackCreateInfo.flags = VK_DEBUG_REPORT_DEBUG_BIT_EXT | VK_DEBUG_REPORT_ERROR_BIT_EXT
+        | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT;
     callbackCreateInfo.pfnCallback = &debugReportCallback;
-#endif
 
     // Function to create a debug callback has to be dynamically queried from the instance...
     PFN_vkCreateDebugReportCallbackEXT CreateDebugReportCallback = VK_NULL_HANDLE;
@@ -107,28 +104,39 @@ static VkPhysicalDevice selectPhysicalDevice(const std::vector<VkPhysicalDevice>
 
     for (const VkPhysicalDevice& device : devices)
     {
-        VkPhysicalDeviceMemoryProperties properties;
-        vkGetPhysicalDeviceMemoryProperties(device, &properties);
+        VkPhysicalDeviceMemoryProperties memProps;
+        VkPhysicalDeviceProperties properties;
+        vkGetPhysicalDeviceMemoryProperties(device, &memProps);
+        vkGetPhysicalDeviceProperties(device, &properties);
 
         // Get local memory size from device
         uint64_t deviceMemory = 0;
-        for (uint32_t i = 0; i < properties.memoryHeapCount; i++)
+        for (uint32_t i = 0; i < memProps.memoryHeapCount; i++)
         {
-            if ((properties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) > 0)
+            if ((memProps.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) > 0)
             {
-                deviceMemory = properties.memoryHeaps[i].size;
+                deviceMemory = memProps.memoryHeaps[i].size;
                 break;
             }
         }
 
         // Save if best found so far
-        if (bestDevice == VK_NULL_HANDLE || deviceMemory > bestMemory)
+        if (hints == EDeviceCreateHints::NoHint
+            && (bestDevice == VK_NULL_HANDLE || deviceMemory > bestMemory))
         {
             bestDevice = device;
             bestMemory = deviceMemory;
         }
 
-        if (Any(hints, EDeviceCreateHints::Integrated) && deviceMemory < bestMemory)
+        if (Any(hints, EDeviceCreateHints::Integrated)
+            && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+        {
+            bestDevice = device;
+            bestMemory = deviceMemory;
+        }
+
+        if (Any(hints, EDeviceCreateHints::Discrete)
+            && properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
         {
             bestDevice = device;
             bestMemory = deviceMemory;
@@ -159,12 +167,11 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     for (uint32_t i = 0; i < queueFamilyCount; i++)
     {
         VkQueueFlags flags = queueFamilyProperites[i].queueFlags;
-        if ((flags & VK_QUEUE_GRAPHICS_BIT) != 0 && QueueFamilies[GraphicsQueue] == (uint32_t)-1)
+        if ((flags & VK_QUEUE_GRAPHICS_BIT) != 0)
             QueueFamilies[GraphicsQueue] = i;
-        else if ((flags & VK_QUEUE_COMPUTE_BIT) != 0 && QueueFamilies[ComputeQueue] == (uint32_t)-1)
+        if ((flags & VK_QUEUE_COMPUTE_BIT) != 0)
             QueueFamilies[ComputeQueue] = i;
-        else if ((flags & VK_QUEUE_TRANSFER_BIT) != 0
-                 && QueueFamilies[TransferQueue] == (uint32_t)-1)
+        if ((flags & VK_QUEUE_TRANSFER_BIT) != 0)
             QueueFamilies[TransferQueue] = i;
     }
 
@@ -173,25 +180,41 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     vkGetPhysicalDeviceFeatures(pdev, &requiredFeatures);
 
     std::vector<VkDeviceQueueCreateInfo> queueInfos;
-    std::vector<std::vector<float>> queuePriorities;
+    std::vector<float> queuePriorities;
+    queuePriorities.reserve(1024);
 
-    queuePriorities.resize(NumQueueType);
-
-    for (uint32_t type = 0; type < NumQueueType; type++)
     {
-        const uint32_t queueCount = 1; // One queue for now
-        queuePriorities[type].resize(queueCount, 1.0f);
-
-        VkDeviceQueueCreateInfo info = {};
-        info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
+        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[GraphicsQueue]).queueCount;
         info.queueCount = queueCount;
-        info.queueFamilyIndex = QueueFamilies[type];
-        info.pQueuePriorities = queuePriorities[type].data();
-
-        if (info.queueCount > 0)
-        {
-            queueInfos.push_back(info);
-        }
+        info.queueFamilyIndex = QueueFamilies[GraphicsQueue];
+        for (uint32_t unused = 0; unused < queueCount; unused++)
+            queuePriorities.push_back(1.0f);
+        info.pQueuePriorities = &queuePriorities.back() - queueCount + 1;
+        queueInfos.push_back(info);
+    }
+    if (QueueFamilies[ComputeQueue] != QueueFamilies[GraphicsQueue])
+    {
+        VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
+        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[ComputeQueue]).queueCount;
+        info.queueCount = queueCount;
+        info.queueFamilyIndex = QueueFamilies[ComputeQueue];
+        for (uint32_t unused = 0; unused < queueCount; unused++)
+            queuePriorities.push_back(1.0f);
+        info.pQueuePriorities = &queuePriorities.back() - queueCount + 1;
+        queueInfos.push_back(info);
+    }
+    if (QueueFamilies[TransferQueue] != QueueFamilies[ComputeQueue]
+        && QueueFamilies[TransferQueue] != QueueFamilies[GraphicsQueue])
+    {
+        VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
+        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[TransferQueue]).queueCount;
+        info.queueCount = queueCount;
+        info.queueFamilyIndex = QueueFamilies[TransferQueue];
+        for (uint32_t unused = 0; unused < queueCount; unused++)
+            queuePriorities.push_back(1.0f);
+        info.pQueuePriorities = &queuePriorities.back() - queueCount + 1;
+        queueInfos.push_back(info);
     }
 
     std::vector<const char*> extensionNames = { "VK_KHR_swapchain" };
@@ -209,7 +232,9 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 
     for (uint32_t type = 0; type < NumQueueType; type++)
     {
-        for (uint32_t i = 0; i < (uint32_t)Queues[type].size(); i++)
+        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[type]).queueCount;
+        Queues[type].resize(queueCount);
+        for (uint32_t i = 0; i < queueCount; i++)
         {
             vkGetDeviceQueue(Device, QueueFamilies[type], i, &Queues[type][i]);
         }
@@ -229,6 +254,9 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 
 CDeviceVk::~CDeviceVk()
 {
+    DescriptorSetLayoutCache.reset();
+    ImmediateTransferCtx.reset();
+    ImmediateGraphicsCtx.reset();
     vmaDestroyAllocator(Allocator);
     vkDestroyDevice(Device, nullptr);
 }
@@ -288,6 +316,7 @@ CImage::Ref CDeviceVk::CreateImage1D(EFormat format, EImageUsageFlags usage, uin
         imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
         imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        defaultState = EResourceState::CopySource;
     }
 
     VkResult result;
@@ -340,9 +369,8 @@ CImage::Ref CDeviceVk::CreateImage1D(EFormat format, EImageUsageFlags usage, uin
         vkCmdCopyBufferToImage(cmdBuffer, stagingBuffer, handle,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
         vmaDestroyBuffer(Allocator, stagingBuffer, stagingAlloc);
-
-        ctx->TransitionImage(image.get(), defaultState);
     }
+    ctx->TransitionImage(image.get(), defaultState);
     ctx->Flush(true);
     PutImmediateTransferCtx(ctx);
     return std::move(image);
@@ -397,6 +425,7 @@ CImage::Ref CDeviceVk::CreateImage2D(EFormat format, EImageUsageFlags usage, uin
         imageInfo.tiling = VK_IMAGE_TILING_LINEAR;
         imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+        defaultState = EResourceState::CopySource;
     }
 
     VkResult result;
@@ -449,9 +478,8 @@ CImage::Ref CDeviceVk::CreateImage2D(EFormat format, EImageUsageFlags usage, uin
         vkCmdCopyBufferToImage(cmdBuffer, stagingBuffer, handle,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
         vmaDestroyBuffer(Allocator, stagingBuffer, stagingAlloc);
-
-        ctx->TransitionImage(image.get(), defaultState);
     }
+    ctx->TransitionImage(image.get(), defaultState);
     ctx->Flush(true);
     PutImmediateTransferCtx(ctx);
     return std::move(image);
@@ -467,7 +495,7 @@ CImage::Ref CDeviceVk::CreateImage3D(EFormat format, EImageUsageFlags usage, uin
 
 CImageView::Ref CDeviceVk::CreateImageView(const CImageViewDesc& desc, CImage::Ref image)
 {
-    return std::make_shared<CImageViewVk>(CImageViewVk(*this, desc, image));
+    return std::make_shared<CImageViewVk>(*this, desc, image);
 }
 
 CShaderModule::Ref CDeviceVk::CreateShaderModule(size_t size, const void* pCode)
@@ -485,7 +513,10 @@ CFramebuffer::Ref CDeviceVk::CreateFramebuffer(const CFramebufferDesc& desc)
     return std::make_shared<CFramebufferVk>(*this, desc);
 }
 
-CPipeline::Ref CDeviceVk::CreatePipeline(const CPipelineDesc& desc) { throw "unimplemented"; }
+CPipeline::Ref CDeviceVk::CreatePipeline(const CPipelineDesc& desc)
+{
+    return std::make_shared<CPipelineVk>(*this, desc);
+}
 
 CSampler::Ref CDeviceVk::CreateSampler(const CSamplerDesc& desc)
 {

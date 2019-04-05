@@ -26,10 +26,18 @@ struct CAttachmentDesc
     uint32_t Samples;
     CAttachmentLoadOp LoadOp;
     CAttachmentStoreOp StoreOp;
-    CAttachmentLoadOp StencilLoadOp;
-    CAttachmentStoreOp StencilStoreOp;
+    CAttachmentLoadOp StencilLoadOp = CAttachmentLoadOp::DontCare;
+    CAttachmentStoreOp StencilStoreOp = CAttachmentStoreOp::DontCare;
     // Clear value is dynamically specified
     // Framebuffer is dynamically specified
+
+    CAttachmentDesc(EFormat f, uint32_t s, CAttachmentLoadOp l, CAttachmentStoreOp st)
+        : Format(f)
+        , Samples(s)
+        , LoadOp(l)
+        , StoreOp(st)
+    {
+    }
 };
 
 struct CSubpassDesc
@@ -42,6 +50,10 @@ struct CSubpassDesc
     uint32_t DepthStencilAttachment;
     // std::vector<uint32_t> PreserveAttachments; TODO
     // Layouts are deduced from usage
+
+    void AddInputAttachment(uint32_t index) { InputAttachments.push_back(index); }
+    void AddColorAttachment(uint32_t index) { ColorAttachments.push_back(index); }
+    void SetDepthStencilAttachment(uint32_t index) { DepthStencilAttachment = index; }
 };
 
 struct CRenderPassDesc

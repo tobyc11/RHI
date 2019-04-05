@@ -82,6 +82,7 @@ public:
 
     // Vulkan specific getters
     VkDevice GetVkDevice() const { return Device; }
+    const VkPhysicalDeviceLimits& GetVkLimits() const { return Properties.limits; }
     VmaAllocator GetAllocator() const { return Allocator; }
     VkQueue GetVkQueue(uint32_t type) const { return Queues[type][0]; }
     uint32_t GetQueueFamily(uint32_t type) const { return QueueFamilies[type]; }

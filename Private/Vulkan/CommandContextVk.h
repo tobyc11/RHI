@@ -45,6 +45,10 @@ public:
     void Flush(bool wait = false) override;
 
     // Render commands
+    void BeginRenderPass(CRenderPass::Ref renderPass, CFramebuffer::Ref framebuffer,
+                         const std::vector<CClearValue>& clearValues) override;
+    void NextSubpass() override;
+    void EndRenderPass() override;
     void BindPipeline(CPipeline* pipeline) override;
     void BindBuffer(CBuffer* buffer, size_t offset, size_t range, uint32_t set, uint32_t binding,
                     uint32_t index) override;
@@ -81,6 +85,9 @@ protected:
 
     std::mutex GarbageMutex;
     std::vector<VkCommandBuffer> GarbageBuffers;
+
+    // Render states kept track of
+    VkRect2D RenderArea;
 };
 
 } /* namespace RHI */

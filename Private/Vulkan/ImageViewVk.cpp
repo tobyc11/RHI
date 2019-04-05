@@ -33,6 +33,7 @@ static void Convert(VkImageSubresourceRange& dst, const CImageSubresourceRange& 
 
 CImageViewVk::CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImage::Ref image)
     : Parent(p)
+    , Image(image)
 {
     auto* imgVk = static_cast<CImageVk*>(image.get());
 

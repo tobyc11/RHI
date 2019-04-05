@@ -413,7 +413,7 @@ inline VkImageLayout StateToImageLayout(EResourceState state)
     case EResourceState::Present:
         return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     default:
-        throw std::runtime_error("wtf");
+        throw std::runtime_error("Vulkan RHI resource state invalid");
         return VkImageLayout(-1);
     }
 }
@@ -452,7 +452,7 @@ inline VkAccessFlagBits StateToAccessMask(EResourceState state)
     case EResourceState::CopySource:
         return VK_ACCESS_TRANSFER_READ_BIT;
     default:
-        throw std::runtime_error("wtf");
+        throw std::runtime_error("Vulkan RHI resource state invalid");
         return VkAccessFlagBits(-1);
     }
 }
@@ -491,7 +491,7 @@ inline VkPipelineStageFlags StateToShaderStageMask(EResourceState state, bool sr
         return src ? (VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT)
                    : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     default:
-        throw std::runtime_error("wtf");
+        throw std::runtime_error("Vulkan RHI resource state invalid");
         return VK_PIPELINE_STAGE_FLAG_BITS_MAX_ENUM;
     }
 }

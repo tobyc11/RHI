@@ -15,7 +15,7 @@ struct CPipelineDesc
     CShaderModule::Ref DS;
     std::vector<CVertexInputAttributeDesc> VertexAttributes;
     std::vector<CVertexInputBindingDesc> VertexBindings;
-    EPrimitiveTopology PrimitiveTopology;
+    EPrimitiveTopology PrimitiveTopology = EPrimitiveTopology::TriangleList;
     uint32_t PatchControlPoints;
     const CRasterizerDesc* RasterizerState;
     const CMultisampleStateDesc* MultisampleState;

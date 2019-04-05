@@ -40,11 +40,12 @@ static VkPolygonMode VkCast(EPolygonMode r)
 
 static VkCullModeFlagBits VkCast(ECullModeFlags f)
 {
-    if (Any(f, ECullModeFlags::Front) && Any(f, ECullModeFlags::Back))
-        return VK_CULL_MODE_FRONT_AND_BACK;
+    VkFlags result = VK_CULL_MODE_NONE;
     if (Any(f, ECullModeFlags::Front))
-        return VK_CULL_MODE_FRONT_BIT;
-    return VK_CULL_MODE_BACK_BIT;
+        result |= VK_CULL_MODE_FRONT_BIT;
+    if (Any(f, ECullModeFlags::Back))
+        result |= VK_CULL_MODE_BACK_BIT;
+    return static_cast<VkCullModeFlagBits>(result);
 }
 
 static VkBlendFactor VkCast(EBlendMode r)
@@ -101,7 +102,7 @@ static void Convert(VkStencilOpState& dst, const CStencilOpState& src)
     dst.compareOp = VkCast(src.CompareOp);
     dst.compareMask = src.CompareMask;
     dst.writeMask = src.WriteMask;
-    dst.reference = src.Reference;
+    dst.reference = 0; // Dynamic
 }
 
 static void Convert(VkPipelineColorBlendAttachmentState& dst, const CRenderTargetBlendDesc& src)
@@ -119,6 +120,7 @@ static void Convert(VkPipelineColorBlendAttachmentState& dst, const CRenderTarge
 CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     : Parent(p)
 {
+    EntryPoints.resize(5);
     AddShaderModule(desc.VS, VK_SHADER_STAGE_VERTEX_BIT);
     AddShaderModule(desc.PS, VK_SHADER_STAGE_FRAGMENT_BIT);
     AddShaderModule(desc.GS, VK_SHADER_STAGE_GEOMETRY_BIT);
@@ -235,6 +237,14 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
         pipelineInfo.pTessellationState = &tessInfo;
     }
 
+    // Viewport state. Although we use dynamic we still need to specify the number
+    VkPipelineViewportStateCreateInfo viewportInfo = {
+        VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO
+    };
+    viewportInfo.viewportCount = Parent.GetVkLimits().maxViewports;
+    viewportInfo.scissorCount = Parent.GetVkLimits().maxViewports;
+    pipelineInfo.pViewportState = &viewportInfo;
+
     // Rasterization state
     VkPipelineRasterizationStateCreateInfo rastInfo {
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO
@@ -300,6 +310,7 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
                 attachmentBlend[i] = attachmentBlend[0];
             else
                 Convert(attachmentBlend[i], desc.BlendState->RenderTargets[i]);
+        blendInfo.pAttachments = attachmentBlend.data();
         pipelineInfo.pColorBlendState = &blendInfo;
 
         if (blendInfo.attachmentCount > 8)

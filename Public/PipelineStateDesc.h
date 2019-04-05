@@ -208,13 +208,12 @@ enum class EStencilOp
 
 struct CStencilOpState
 {
-    EStencilOp FailOp;
-    EStencilOp PassOp;
-    EStencilOp DepthFailOp;
-    ECompareOp CompareOp;
-    uint32_t CompareMask;
-    uint32_t WriteMask;
-    uint32_t Reference;
+    EStencilOp FailOp = EStencilOp::Keep;
+    EStencilOp PassOp = EStencilOp::Keep;
+    EStencilOp DepthFailOp = EStencilOp::Keep;
+    ECompareOp CompareOp = ECompareOp::Always;
+    uint32_t CompareMask = 255;
+    uint32_t WriteMask = 255;
 
     CStencilOpState& SetFailOp(EStencilOp value)
     {
@@ -246,17 +245,12 @@ struct CStencilOpState
         WriteMask = value;
         return *this;
     }
-    CStencilOpState& SetReference(uint32_t value)
-    {
-        Reference = value;
-        return *this;
-    }
 
     bool operator==(const CStencilOpState& rhs) const
     {
         return FailOp == rhs.FailOp && PassOp == rhs.PassOp && DepthFailOp == rhs.DepthFailOp
             && CompareOp == rhs.CompareOp && CompareMask == rhs.CompareMask
-            && WriteMask == rhs.WriteMask && Reference == rhs.Reference;
+            && WriteMask == rhs.WriteMask;
     }
 
     friend std::size_t hash_value(const CStencilOpState& r)
@@ -272,17 +266,16 @@ struct CStencilOpState
         result <<= 1;
         tc::hash_combine(result, r.CompareMask);
         tc::hash_combine(result, r.WriteMask);
-        tc::hash_combine(result, r.Reference);
         return result;
     }
 };
 
 struct CDepthStencilDesc
 {
-    bool DepthTestEnable;
-    bool DepthWriteEnable;
-    ECompareOp DepthCompareOp;
-    bool StencilTestEnable;
+    bool DepthTestEnable = true;
+    bool DepthWriteEnable = true;
+    ECompareOp DepthCompareOp = ECompareOp::Less;
+    bool StencilTestEnable = false;
     CStencilOpState Front;
     CStencilOpState Back;
 
@@ -462,7 +455,7 @@ struct CRenderTargetBlendDesc
 
 struct CBlendDesc
 {
-    bool IndependentBlendEnable;
+    bool IndependentBlendEnable = false;
     std::array<CRenderTargetBlendDesc, 8> RenderTargets;
 
     CBlendDesc& SetRenderTargets(size_t num, CRenderTargetBlendDesc desc)

@@ -15,7 +15,7 @@ CImageVk::CImageVk(CDeviceVk& p, VkImage image, VmaAllocation alloc,
     , UsageFlags(usage)
     , DefaultState(defaultState)
 {
-    GlobalState = DefaultState;
+    GlobalState = EResourceState::Undefined;
 }
 
 CImageVk::~CImageVk() { vmaDestroyImage(Parent.GetAllocator(), Image, ImageAlloc); }

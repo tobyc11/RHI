@@ -1,6 +1,7 @@
 #include "CommandContextVk.h"
 #include "DeviceVk.h"
 #include "PipelineVk.h"
+#include "RenderPassVk.h"
 #include "VkHelpers.h"
 
 namespace RHI
@@ -32,6 +33,12 @@ CCommandContextVk::CCommandContextVk(CDeviceVk& p, uint32_t qfi, bool deferredCo
 
 CCommandContextVk::~CCommandContextVk()
 {
+    EndBuffer();
+    vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool, 1, &CmdBuffer);
+    std::unique_lock<std::mutex> lk(GarbageMutex);
+    vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool, GarbageBuffers.size(),
+                         GarbageBuffers.data());
+    GarbageBuffers.clear();
     vkDestroyCommandPool(Parent.GetVkDevice(), CmdPool, nullptr);
 }
 
@@ -249,10 +256,59 @@ void CCommandContextVk::Flush(bool wait)
     BeginBuffer();
 }
 
+void CCommandContextVk::BeginRenderPass(CRenderPass::Ref renderPass, CFramebuffer::Ref framebuffer,
+                                        const std::vector<CClearValue>& clearValues)
+{
+    auto rpImpl = std::static_pointer_cast<CRenderPassVk>(renderPass);
+    auto fbImpl = std::static_pointer_cast<CFramebufferVk>(framebuffer);
+    VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+    beginInfo.renderPass = rpImpl->RenderPass;
+    beginInfo.framebuffer = fbImpl->Framebuffer;
+    std::vector<VkClearValue> clear;
+    size_t i = 0;
+    for (const auto& c : clearValues)
+    {
+        VkClearValue vkClear;
+        auto aspect = GetImageAspectFlags(rpImpl->GetAttachmentDesc()[i].format);
+        if (aspect & VK_IMAGE_ASPECT_COLOR_BIT)
+            memcpy(vkClear.color.int32, c.ColorInt32, sizeof(vkClear.color));
+        else
+        {
+            vkClear.depthStencil.depth = c.Depth;
+            vkClear.depthStencil.stencil = c.Stencil;
+		}
+        clear.push_back(vkClear);
+        i++;
+    }
+    beginInfo.clearValueCount = static_cast<uint32_t>(clear.size());
+    beginInfo.pClearValues = clear.data();
+    RenderArea = beginInfo.renderArea = fbImpl->GetArea();
+
+    vkCmdBeginRenderPass(CmdBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void CCommandContextVk::NextSubpass() { throw "unimplemented"; }
+
+void CCommandContextVk::EndRenderPass() { vkCmdEndRenderPass(CmdBuffer); }
+
 void CCommandContextVk::BindPipeline(CPipeline* pipeline)
 {
     auto* pipelineImpl = static_cast<CPipelineVk*>(pipeline);
     vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineImpl->GetHandle());
+
+    // Bind the default viewport and scissors
+    VkViewport vp;
+    vp.x = 0;
+    vp.y = 0;
+    vp.width = RenderArea.extent.width;
+    vp.height = RenderArea.extent.height;
+    vp.minDepth = 0.0f;
+    vp.maxDepth = 1.0f;
+    vkCmdSetViewport(CmdBuffer, 0, 1, &vp);
+    vkCmdSetScissor(CmdBuffer, 0, 1, &RenderArea);
+    const float blendFactor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    vkCmdSetBlendConstants(CmdBuffer, blendFactor);
+    vkCmdSetStencilReference(CmdBuffer, VK_STENCIL_FRONT_AND_BACK, 0);
 }
 
 void CCommandContextVk::BindBuffer(CBuffer* buffer, size_t offset, size_t range, uint32_t set,
@@ -288,7 +344,7 @@ void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer* buffer, size
 void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                              uint32_t firstInstance)
 {
-	//TODO: resolve bindings
+    // TODO: resolve bindings
     vkCmdDraw(CmdBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 }
 

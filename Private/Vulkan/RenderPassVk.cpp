@@ -10,11 +10,10 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
 {
     VkRenderPassCreateInfo passInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
 
-    std::vector<VkAttachmentDescription> attachmentsVk;
     for (const auto& attachment : desc.Attachments)
     {
-        attachmentsVk.push_back(VkAttachmentDescription());
-        VkAttachmentDescription& r = attachmentsVk.back();
+        AttachmentsVk.push_back(VkAttachmentDescription());
+        VkAttachmentDescription& r = AttachmentsVk.back();
         r.flags = 0;
         r.format = static_cast<VkFormat>(attachment.Format);
         r.samples = static_cast<VkSampleCountFlagBits>(attachment.Samples);
@@ -22,8 +21,8 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
         r.storeOp = static_cast<VkAttachmentStoreOp>(attachment.StoreOp);
         r.stencilLoadOp = static_cast<VkAttachmentLoadOp>(attachment.StencilLoadOp);
         r.stencilStoreOp = static_cast<VkAttachmentStoreOp>(attachment.StencilStoreOp);
-        r.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        r.finalLayout = VK_IMAGE_LAYOUT_GENERAL;
+        r.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        r.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     }
 
     std::vector<VkSubpassDescription> subpassDescriptions;
@@ -38,21 +37,21 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
         VkSubpassDescription subpassDescription = {};
         subpassDescription.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 
-        subpassDescription.pInputAttachments =
-            allInputAttachments.data() + allInputAttachments.size();
         for (uint32_t inputIdx : subpass.InputAttachments)
         {
             allInputAttachments.push_back({ inputIdx, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL });
             subpassDescription.inputAttachmentCount++;
         }
+        subpassDescription.pInputAttachments = allInputAttachments.data()
+            + allInputAttachments.size() - subpassDescription.inputAttachmentCount;
 
-        subpassDescription.pColorAttachments =
-            allColorAttachments.data() + allColorAttachments.size();
         for (uint32_t colorIdx : subpass.ColorAttachments)
         {
             allColorAttachments.push_back({ colorIdx, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
             subpassDescription.colorAttachmentCount++;
         }
+        subpassDescription.pColorAttachments = allColorAttachments.data()
+            + allColorAttachments.size() - subpassDescription.colorAttachmentCount;
 
         if (subpass.DepthStencilAttachment != CSubpassDesc::None)
         {
@@ -69,29 +68,29 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
 
     // Let's only handle the situation where there is only one subpass
     // TODO:
-    //std::vector<VkSubpassDependency> dependency(2);
-    //dependency[0].dependencyFlags = 0;
-    //dependency[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-    //dependency[0].dstSubpass = 0;
-    //dependency[0].srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    //dependency[0].srcAccessMask = 0;
-    //dependency[0].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    //dependency[0].dstAccessMask = 0;
-    //dependency[1].dependencyFlags = 0;
-    //dependency[1].srcSubpass = 0;
-    //dependency[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-    //dependency[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    //dependency[1].srcAccessMask =
+    // std::vector<VkSubpassDependency> dependency(2);
+    // dependency[0].dependencyFlags = 0;
+    // dependency[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    // dependency[0].dstSubpass = 0;
+    // dependency[0].srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    // dependency[0].srcAccessMask = 0;
+    // dependency[0].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    // dependency[0].dstAccessMask = 0;
+    // dependency[1].dependencyFlags = 0;
+    // dependency[1].srcSubpass = 0;
+    // dependency[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+    // dependency[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    // dependency[1].srcAccessMask =
     //    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    //dependency[1].dstStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    //dependency[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    // dependency[1].dstStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    // dependency[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    passInfo.attachmentCount = attachmentsVk.size();
-    passInfo.pAttachments = attachmentsVk.data();
+    passInfo.attachmentCount = AttachmentsVk.size();
+    passInfo.pAttachments = AttachmentsVk.data();
     passInfo.subpassCount = subpassDescriptions.size();
     passInfo.pSubpasses = subpassDescriptions.data();
-    //passInfo.dependencyCount = dependency.size();
-    //passInfo.pDependencies = dependency.data();
+    // passInfo.dependencyCount = dependency.size();
+    // passInfo.pDependencies = dependency.data();
 
     vkCreateRenderPass(Parent.GetVkDevice(), &passInfo, nullptr, &RenderPass);
 }
@@ -111,6 +110,10 @@ CFramebufferVk::CFramebufferVk(CDeviceVk& p, const CFramebufferDesc& desc)
     fbInfo.width = desc.Width;
     fbInfo.height = desc.Height;
     fbInfo.layers = desc.Layers;
+
+    Area.offset.x = Area.offset.y = 0;
+    Area.extent.width = fbInfo.width;
+    Area.extent.height = fbInfo.height;
 
     vkCreateFramebuffer(Parent.GetVkDevice(), &fbInfo, nullptr, &Framebuffer);
 }
