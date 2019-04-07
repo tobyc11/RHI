@@ -10,7 +10,7 @@ namespace RHI
 {
 
 template <typename TDerived>
-CBufferBase<TDerived>::CBufferBase(uint32_t size, EBufferUsageFlags usage)
+CBufferBase<TDerived>::CBufferBase(size_t size, EBufferUsageFlags usage)
     : Size(size)
     , Usage(usage)
 {

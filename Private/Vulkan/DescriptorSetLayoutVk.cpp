@@ -54,7 +54,7 @@ CDescriptorSetLayoutVk::CDescriptorSetLayoutVk(CDeviceVk& p, const DescriptorSet
         if (b.ResourceType == EPipelineResourceType::StageInput
             || b.ResourceType == EPipelineResourceType::StageOutput
             || b.ResourceType == EPipelineResourceType::PushConstantBuffer)
-            break;
+            continue;
 
         VkDescriptorSetLayoutBinding bindingInfo;
         bindingInfo.binding = b.Binding;

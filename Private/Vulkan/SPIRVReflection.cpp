@@ -131,7 +131,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         pipelineResource.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
         pipelineResource.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
         pipelineResource.ArraySize = (spirType.array.size() == 0) ? 1 : spirType.array[0];
-        pipelineResource.Size = compiler.get_declared_struct_size(spirType);
+        pipelineResource.Size = static_cast<uint32_t>(compiler.get_declared_struct_size(spirType));
         memcpy(pipelineResource.Name, resource.name.c_str(),
                std::min(sizeof(pipelineResource.Name), resource.name.length()));
         shaderResources.push_back(pipelineResource);
@@ -150,7 +150,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         pipelineResource.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
         pipelineResource.Binding = compiler.get_decoration(resource.id, spv::DecorationBinding);
         pipelineResource.ArraySize = (spirType.array.size() == 0) ? 1 : spirType.array[0];
-        pipelineResource.Size = compiler.get_declared_struct_size(spirType);
+        pipelineResource.Size = static_cast<uint32_t>(compiler.get_declared_struct_size(spirType));
         memcpy(pipelineResource.Name, resource.name.c_str(),
                std::min(sizeof(pipelineResource.Name), resource.name.length()));
         shaderResources.push_back(pipelineResource);
@@ -260,7 +260,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
 
         // Get the start offset of the push constant buffer since this will differ between shader
         // stages.
-        uint32_t offset = ~0;
+        uint32_t offset = ~0U;
         for (auto i = 0U; i < spirType.member_types.size(); ++i)
         {
             auto memberType = compiler.get_type(spirType.member_types[i]);
@@ -273,7 +273,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         pipelineResource.ResourceType = EPipelineResourceType::PushConstantBuffer;
         pipelineResource.Access = VK_ACCESS_SHADER_READ_BIT;
         pipelineResource.Offset = offset;
-        pipelineResource.Size = compiler.get_declared_struct_size(spirType);
+        pipelineResource.Size = static_cast<uint32_t>(compiler.get_declared_struct_size(spirType));
         memcpy(pipelineResource.Name, resource.name.c_str(),
                std::min(sizeof(pipelineResource.Name), resource.name.length()));
         shaderResources.push_back(pipelineResource);

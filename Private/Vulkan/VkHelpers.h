@@ -26,6 +26,7 @@ inline VkSamplerAddressMode VkCast(ESamplerAddressMode r)
     switch (r)
     {
     case ESamplerAddressMode::Wrap:
+    default:
         return VK_SAMPLER_ADDRESS_MODE_REPEAT;
     case ESamplerAddressMode::Mirror:
         return VK_SAMPLER_ADDRESS_MODE_MIRRORED_REPEAT;
@@ -43,6 +44,7 @@ inline VkCompareOp VkCast(ECompareOp r)
     switch (r)
     {
     case ECompareOp::Never:
+    default:
         return VK_COMPARE_OP_NEVER;
     case ECompareOp::Less:
         return VK_COMPARE_OP_LESS;
@@ -66,6 +68,7 @@ inline VkStencilOp VkCast(EStencilOp r)
     switch (r)
     {
     case EStencilOp::Keep:
+    default:
         return VK_STENCIL_OP_KEEP;
     case EStencilOp::Zero:
         return VK_STENCIL_OP_ZERO;
@@ -414,7 +417,6 @@ inline VkImageLayout StateToImageLayout(EResourceState state)
         return VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     default:
         throw std::runtime_error("Vulkan RHI resource state invalid");
-        return VkImageLayout(-1);
     }
 }
 
@@ -453,7 +455,6 @@ inline VkAccessFlagBits StateToAccessMask(EResourceState state)
         return VK_ACCESS_TRANSFER_READ_BIT;
     default:
         throw std::runtime_error("Vulkan RHI resource state invalid");
-        return VkAccessFlagBits(-1);
     }
 }
 
@@ -463,10 +464,9 @@ inline VkPipelineStageFlags StateToShaderStageMask(EResourceState state, bool sr
     {
     case EResourceState::Undefined:
     case EResourceState::PreInitialized:
-    case EResourceState::Common:
         assert(src);
-        return src ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT
-                   : (VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+    case EResourceState::Common:
+        return src ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT : VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     case EResourceState::VertexBuffer:
     case EResourceState::IndexBuffer:
         return VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
@@ -488,11 +488,9 @@ inline VkPipelineStageFlags StateToShaderStageMask(EResourceState state, bool sr
     case EResourceState::ResolveSource:
         return VK_PIPELINE_STAGE_TRANSFER_BIT;
     case EResourceState::Present:
-        return src ? (VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT | VK_PIPELINE_STAGE_ALL_COMMANDS_BIT)
-                   : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        return src ? VK_PIPELINE_STAGE_ALL_COMMANDS_BIT : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     default:
         throw std::runtime_error("Vulkan RHI resource state invalid");
-        return VK_PIPELINE_STAGE_FLAG_BITS_MAX_ENUM;
     }
 }
 

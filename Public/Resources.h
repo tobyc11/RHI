@@ -24,7 +24,7 @@ template <typename TDerived>
 class CBufferBase : public std::enable_shared_from_this<CBufferBase<TDerived>>
 {
 protected:
-    CBufferBase(uint32_t size, EBufferUsageFlags usage);
+    CBufferBase(size_t size, EBufferUsageFlags usage);
 
 public:
     typedef std::shared_ptr<CBufferBase> Ref;
@@ -35,7 +35,7 @@ public:
     void Unmap();
 
 protected:
-    uint32_t Size;
+    size_t Size;
     EBufferUsageFlags Usage;
 };
 
@@ -110,6 +110,14 @@ struct CImageSubresourceRange
     uint32_t LevelCount = 1;
     uint32_t BaseArrayLayer = 0;
     uint32_t LayerCount = 1;
+
+    void Set(uint32_t mip, uint32_t mipCount, uint32_t layer, uint32_t layerCount)
+    {
+        BaseMipLevel = mip;
+        LevelCount = mipCount;
+        BaseArrayLayer = layer;
+        LayerCount = layerCount;
+	}
 };
 
 struct CImageViewDesc

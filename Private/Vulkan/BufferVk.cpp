@@ -77,4 +77,13 @@ CBufferVk::CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const v
 
 CBufferVk::~CBufferVk() { vmaDestroyBuffer(Parent.GetAllocator(), Buffer, Allocation); }
 
+void* CBufferVk::Map(size_t offset, size_t size)
+{
+    void* result;
+    vmaMapMemory(Parent.GetAllocator(), Allocation, &result);
+    return static_cast<uint8_t*>(result) + offset;
+}
+
+void CBufferVk::Unmap() { vmaUnmapMemory(Parent.GetAllocator(), Allocation); }
+
 }

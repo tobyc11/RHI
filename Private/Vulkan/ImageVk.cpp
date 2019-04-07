@@ -1,6 +1,7 @@
 #include "ImageVk.h"
 #include "CommandContextVk.h"
 #include "DeviceVk.h"
+#include "SwapChainVk.h"
 
 namespace RHI
 {
@@ -23,6 +24,12 @@ CImageVk::CImageVk(CDeviceVk& p, CSwapChain::WeakRef swapChain)
     , bIsSwapChainProxy(true)
     , SwapChain(swapChain)
 {
+    auto chain = std::static_pointer_cast<CSwapChainVk>(SwapChain.lock());
+    CreateInfo.format = chain->GetChosenFormat().format;
+    CreateInfo.arrayLayers = 1;
+    CreateInfo.mipLevels = 1;
+    DefaultState = EResourceState::Present;
+    GlobalState = EResourceState::Undefined;
 }
 
 CImageVk::~CImageVk()
@@ -36,15 +43,29 @@ CImageVk::~CImageVk()
         vmaDestroyImage(Parent.GetAllocator(), Image, ImageAlloc);
 }
 
-void CImageVk::CopyFrom(const void* mem) { throw "unimplemented"; }
-
-VkImageCreateInfo CImageVk::GetCreateInfo() const
+VkImage CImageVk::GetVkImage() const
 {
     if (bIsSwapChainProxy)
-        throw "unimplemented";
+    {
+        auto chain = std::static_pointer_cast<CSwapChainVk>(SwapChain.lock());
+        if (chain->AcquiredImages.empty())
+            throw CRHIRuntimeError("Did you forget to acquire image from the swapchain?");
+        return chain->GetVkImages()[chain->AcquiredImages.front().first];
+    }
 
-    return CreateInfo;
+    return Image;
 }
+
+bool CImageVk::IsConcurrentAccess() const
+{
+    if (bIsSwapChainProxy)
+        return false;
+    return CreateInfo.sharingMode;
+}
+
+void CImageVk::CopyFrom(const void* mem) { throw "unimplemented"; }
+
+VkImageCreateInfo CImageVk::GetCreateInfo() const { return CreateInfo; }
 
 EImageUsageFlags CImageVk::GetUsageFlags() const { return UsageFlags; }
 

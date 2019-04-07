@@ -204,15 +204,17 @@ void CSwapChainVk::AcquireNextImage()
 {
     VkSemaphore imageAvailableSemaphore;
     VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    if (vkCreateSemaphore(Parent.GetVkDevice(), &semaphoreInfo, nullptr, &imageAvailableSemaphore)
-        != VK_SUCCESS)
-    {
+    VkResult result;
+    result =
+        vkCreateSemaphore(Parent.GetVkDevice(), &semaphoreInfo, nullptr, &imageAvailableSemaphore);
+    if (result != VK_SUCCESS)
         throw CRHIRuntimeError("failed to create semaphores!");
-    }
 
     uint32_t imageIndex;
-    vkAcquireNextImageKHR(Parent.GetVkDevice(), SwapChainHandle, UINT64_MAX,
-                          imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    result = vkAcquireNextImageKHR(Parent.GetVkDevice(), SwapChainHandle, UINT64_MAX,
+                                   imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+    if (result != VK_SUCCESS)
+        throw CRHIRuntimeError("failed to acquire image!");
 
     AcquiredImages.push(std::make_pair(imageIndex, imageAvailableSemaphore));
 }

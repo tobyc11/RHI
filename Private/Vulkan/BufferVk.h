@@ -8,9 +8,13 @@ namespace RHI
 class CBufferVk : public CBuffer
 {
 public:
-    CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const void* initialData);
+    typedef std::shared_ptr<CBufferVk> Ref;
 
-    ~CBufferVk();
+    CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const void* initialData);
+    ~CBufferVk() override;
+
+    void* Map(size_t offset, size_t size);
+    void Unmap();
 
     VkBuffer Buffer;
     VmaAllocation Allocation;

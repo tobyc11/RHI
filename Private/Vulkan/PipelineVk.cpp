@@ -11,6 +11,7 @@ static VkPrimitiveTopology VkCast(EPrimitiveTopology r)
     switch (r)
     {
     case RHI::EPrimitiveTopology::PointList:
+    default:
         return VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
     case RHI::EPrimitiveTopology::LineList:
         return VK_PRIMITIVE_TOPOLOGY_LINE_LIST;
@@ -22,8 +23,6 @@ static VkPrimitiveTopology VkCast(EPrimitiveTopology r)
         return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP;
     case RHI::EPrimitiveTopology::TriangleFan:
         return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
-    default:
-        break;
     }
 }
 
@@ -32,6 +31,7 @@ static VkPolygonMode VkCast(EPolygonMode r)
     switch (r)
     {
     case RHI::EPolygonMode::Fill:
+    default:
         return VK_POLYGON_MODE_FILL;
     case RHI::EPolygonMode::Wireframe:
         return VK_POLYGON_MODE_LINE;
@@ -53,6 +53,7 @@ static VkBlendFactor VkCast(EBlendMode r)
     switch (r)
     {
     case RHI::EBlendMode::Zero:
+    default:
         return VK_BLEND_FACTOR_ZERO;
     case RHI::EBlendMode::One:
         return VK_BLEND_FACTOR_ONE;
@@ -82,6 +83,7 @@ static VkBlendOp VkCast(EBlendOp r)
     switch (r)
     {
     case RHI::EBlendOp::Add:
+    default:
         return VK_BLEND_OP_ADD;
     case RHI::EBlendOp::Subtract:
         return VK_BLEND_OP_SUBTRACT;
@@ -120,7 +122,7 @@ static void Convert(VkPipelineColorBlendAttachmentState& dst, const CRenderTarge
 CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     : Parent(p)
 {
-    EntryPoints.resize(5);
+    EntryPoints.reserve(5);
     AddShaderModule(desc.VS, VK_SHADER_STAGE_VERTEX_BIT);
     AddShaderModule(desc.PS, VK_SHADER_STAGE_FRAGMENT_BIT);
     AddShaderModule(desc.GS, VK_SHADER_STAGE_GEOMETRY_BIT);
@@ -278,7 +280,7 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
         msInfo.alphaToCoverageEnable = VK_FALSE;
         msInfo.alphaToOneEnable = VK_FALSE;
         pipelineInfo.pMultisampleState = &msInfo;
-		//TODO: implement multisampling
+        // TODO: implement multisampling
     }
 
     // Depth stencil state
@@ -303,12 +305,12 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     VkPipelineColorBlendStateCreateInfo blendInfo {
         VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO
     };
+    blendInfo.logicOpEnable = VK_FALSE;
+    blendInfo.logicOp = VK_LOGIC_OP_CLEAR;
+    blendInfo.attachmentCount = renderpass->SubpassColorAttachmentCount(pipelineInfo.subpass);
     std::vector<VkPipelineColorBlendAttachmentState> attachmentBlend;
-    if (desc.BlendState)
+    if (desc.BlendState && blendInfo.attachmentCount)
     {
-        blendInfo.logicOpEnable = VK_FALSE;
-        blendInfo.logicOp = VK_LOGIC_OP_CLEAR;
-        blendInfo.attachmentCount = renderpass->SubpassColorAttachmentCount(pipelineInfo.subpass);
         attachmentBlend.resize(blendInfo.attachmentCount);
         Convert(attachmentBlend[0], desc.BlendState->RenderTargets[0]);
         for (size_t i = 1; i < attachmentBlend.size(); i++)
@@ -351,6 +353,20 @@ CPipelineVk::~CPipelineVk()
 
     for (auto it : SetLayouts)
         Parent.GetDescriptorSetLayoutCache()->DestroyLayout(it.second);
+}
+
+const std::unordered_map<uint32_t, std::vector<CPipelineResource>>
+CPipelineVk::GetSetBindings() const
+{
+    return SetBindings;
+}
+
+CDescriptorSetLayoutVk* CPipelineVk::GetSetLayout(uint32_t set) const
+{
+    auto iter = SetLayouts.find(set);
+    if (iter == SetLayouts.end())
+        return nullptr;
+    return iter->second;
 }
 
 void CPipelineVk::AddShaderModule(CShaderModule::Ref shaderModule, VkShaderStageFlagBits stage)

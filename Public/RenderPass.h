@@ -45,7 +45,7 @@ struct CSubpassDesc
     std::vector<uint32_t> InputAttachments;
     std::vector<uint32_t> ColorAttachments;
     // uint32_t ResolveAttachment; TODO
-    uint32_t DepthStencilAttachment;
+    uint32_t DepthStencilAttachment = None;
     // std::vector<uint32_t> PreserveAttachments; TODO
     // Layouts are deduced from usage
 

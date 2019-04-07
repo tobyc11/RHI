@@ -2,6 +2,7 @@
 #include "DeviceVk.h"
 #include "ImageViewVk.h"
 #include "SwapChainVk.h"
+#include "VkHelpers.h"
 
 namespace RHI
 {
@@ -36,6 +37,8 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
         r.stencilStoreOp = static_cast<VkAttachmentStoreOp>(attachment.StencilStoreOp);
         r.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         r.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        if (GetImageAspectFlags(r.format) & VK_IMAGE_ASPECT_DEPTH_BIT)
+            r.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         if (viewImpl->bIsSwapChainProxy)
             r.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
@@ -70,11 +73,11 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
 
         if (subpass.DepthStencilAttachment != CSubpassDesc::None)
         {
-            subpassDescription.pDepthStencilAttachment =
-                allDepthStencilAttachments.data() + allDepthStencilAttachments.size();
             allDepthStencilAttachments.push_back(
                 { subpass.DepthStencilAttachment,
                   VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL });
+            subpassDescription.pDepthStencilAttachment =
+                allDepthStencilAttachments.data() + allDepthStencilAttachments.size() - 1;
         }
 
         subpassDescriptions.push_back(subpassDescription);
@@ -100,9 +103,9 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
     // dependency[1].dstStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
     // dependency[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-    passInfo.attachmentCount = AttachmentsVk.size();
+    passInfo.attachmentCount = static_cast<uint32_t>(AttachmentsVk.size());
     passInfo.pAttachments = AttachmentsVk.data();
-    passInfo.subpassCount = subpassDescriptions.size();
+    passInfo.subpassCount = static_cast<uint32_t>(subpassDescriptions.size());
     passInfo.pSubpasses = subpassDescriptions.data();
     // passInfo.dependencyCount = dependency.size();
     // passInfo.pDependencies = dependency.data();
@@ -120,7 +123,7 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
             auto viewImpl = std::static_pointer_cast<CImageViewVk>(attachment.ImageView);
             attachments.push_back(viewImpl->GetVkImageView());
         }
-        fbInfo.attachmentCount = attachments.size();
+        fbInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         fbInfo.pAttachments = attachments.data();
         fbInfo.width = desc.Width;
         fbInfo.height = desc.Height;
@@ -143,7 +146,7 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
             else
                 attachments.push_back(viewImpl->GetVkImageView());
         }
-        fbInfo.attachmentCount = attachments.size();
+        fbInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
         fbInfo.pAttachments = attachments.data();
         fbInfo.width = desc.Width;
         fbInfo.height = desc.Height;

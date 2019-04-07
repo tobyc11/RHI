@@ -49,7 +49,7 @@ CImageViewVk::CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImage::Ref
     }
 
     ViewCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-    ViewCreateInfo.image = imgVk->Image;
+    ViewCreateInfo.image = imgVk->GetVkImage();
     ViewCreateInfo.viewType = ImageToViewType(imgVk->GetCreateInfo().imageType);
     ViewCreateInfo.format = static_cast<VkFormat>(desc.Format);
     Convert(ViewCreateInfo.subresourceRange, desc.Range);

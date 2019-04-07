@@ -40,6 +40,7 @@ public:
 
     // Internal api
     const VkSurfaceFormatKHR& GetChosenFormat() const { return ChosenFormat; }
+    const std::vector<VkImage>& GetVkImages() const { return Images; }
     const std::vector<VkImageView>& GetVkImageViews() const { return ImageViews; }
     std::queue<std::pair<uint32_t, VkSemaphore>> AcquiredImages;
 

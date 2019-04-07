@@ -28,6 +28,7 @@ struct CGPUJobInfo
     std::vector<VkPipelineStageFlags> WaitStages;
     VkSemaphore SignalSemaphore;
     EQueueType QueueType;
+    std::vector<std::function<void()>> DeferredDeleters;
 
     // Don't worry about this
     VkFence Fence;
@@ -50,6 +51,11 @@ class CDeviceVk : public CDevice
 public:
     CDeviceVk(EDeviceCreateHints hints);
     ~CDeviceVk() override;
+
+    CImage::Ref InternalCreateImage(VkImageType type, EFormat format, EImageUsageFlags usage,
+                                    uint32_t width, uint32_t height, uint32_t depth,
+                                    uint32_t mipLevels, uint32_t arrayLayers, uint32_t sampleCount,
+                                    const void* initialData);
 
     // Resources and resource views
     CBuffer::Ref CreateBuffer(size_t size, EBufferUsageFlags usage,

@@ -16,6 +16,9 @@ public:
     CImageVk(CDeviceVk& p, CSwapChain::WeakRef swapChain);
     ~CImageVk();
 
+	VkImage GetVkImage() const;
+    bool IsConcurrentAccess() const;
+
     void CopyFrom(const void* mem);
     EFormat GetFormat() const { return static_cast<EFormat>(GetCreateInfo().format); }
     EImageUsageFlags GetUsageFlags() const;
@@ -32,17 +35,18 @@ public:
     EResourceState GetGlobalState() const;
     void SetGlobalState(EResourceState state);
 
-    VkImage Image;
-    VmaAllocation ImageAlloc;
-
     // The image object could be a mere proxy for a swapchain, and does not hold any real image
     bool bIsSwapChainProxy = false;
     CSwapChain::WeakRef SwapChain;
 
 private:
     CDeviceVk& Parent;
+
+    VkImage Image = VK_NULL_HANDLE;
+    VmaAllocation ImageAlloc = VK_NULL_HANDLE;
+
     VkImageCreateInfo CreateInfo;
-    EImageUsageFlags UsageFlags;
+    EImageUsageFlags UsageFlags {};
     EResourceState DefaultState;
     EResourceState GlobalState;
 };

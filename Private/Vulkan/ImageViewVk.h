@@ -8,6 +8,8 @@ namespace RHI
 class CImageViewVk : public CImageView
 {
 public:
+    typedef std::shared_ptr<CImageViewVk> Ref;
+
     CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImage::Ref image);
     ~CImageViewVk() override;
 
