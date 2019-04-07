@@ -99,6 +99,7 @@ public:
     VkQueue GetVkQueue(uint32_t type) const { return Queues[type][0]; }
     uint32_t GetQueueFamily(uint32_t type) const { return QueueFamilies[type]; }
     void SubmitJob(CGPUJobInfo jobInfo);
+    void FinishOneJob(bool wait = false);
     CCommandContextVk::Ref GetImmediateTransferCtx()
     {
         ImmediateTransferMutex.lock();
@@ -128,7 +129,7 @@ private:
     // A ring buffer contains the jobs currently in flight
     std::mutex JobSubmitMutex;
     std::queue<CGPUJobInfo> JobQueue;
-    static const uint32_t MaxJobsInFlight = 16;
+    static const uint32_t MaxJobsInFlight = 8;
 };
 
 } /* namespace RHI */

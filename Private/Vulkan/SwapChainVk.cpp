@@ -86,6 +86,13 @@ VkPresentModeKHR CSwapChainVk::SelectPresentMode(const CPhysicalDeviceSwapChainC
     }
     for (VkPresentModeKHR mode : caps.PresentModes)
     {
+        if (mode == VK_PRESENT_MODE_FIFO_RELAXED_KHR)
+        {
+            return mode;
+        }
+    }
+    for (VkPresentModeKHR mode : caps.PresentModes)
+    {
         if (mode == VK_PRESENT_MODE_FIFO_KHR)
         {
             return mode;

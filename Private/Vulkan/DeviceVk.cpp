@@ -158,6 +158,7 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     PhysicalDevice = selectPhysicalDevice(physDevice, hints);
 
     vkGetPhysicalDeviceProperties(PhysicalDevice, &Properties);
+    printf("RHI Info: Device name = %s\n", Properties.deviceName);
 
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &queueFamilyCount, nullptr);
@@ -256,18 +257,7 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 CDeviceVk::~CDeviceVk()
 {
     while (!JobQueue.empty())
-    {
-        // Wait for the earliest job if queue full
-        auto& waitJob = JobQueue.front();
-        vkWaitForFences(Device, 1, &waitJob.Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
-        vkDestroyFence(Device, waitJob.Fence, nullptr);
-        vkDestroySemaphore(Device, waitJob.SignalSemaphore, nullptr);
-        for (auto& fn : waitJob.DeferredDeleters)
-            fn();
-        for (size_t i = 0; i < waitJob.CmdBuffersInFlight.size(); i++)
-            waitJob.CmdContexts[i]->DoneWithCmdBuffer(waitJob.CmdBuffersInFlight[i]);
-        JobQueue.pop();
-    }
+        FinishOneJob(true);
 
     DescriptorSetLayoutCache.reset();
     ImmediateTransferCtx.reset();
@@ -494,18 +484,10 @@ void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
     std::unique_lock<std::mutex> lk(JobSubmitMutex);
 
     if (JobQueue.size() >= MaxJobsInFlight)
-    {
-        // Wait for the earliest job if queue full
-        auto& waitJob = JobQueue.front();
-        vkWaitForFences(Device, 1, &waitJob.Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
-        vkDestroyFence(Device, waitJob.Fence, nullptr);
-        vkDestroySemaphore(Device, waitJob.SignalSemaphore, nullptr);
-        for (auto& fn : waitJob.DeferredDeleters)
-            fn();
-        for (size_t i = 0; i < waitJob.CmdBuffersInFlight.size(); i++)
-            waitJob.CmdContexts[i]->DoneWithCmdBuffer(waitJob.CmdBuffersInFlight[i]);
-        JobQueue.pop();
-    }
+        FinishOneJob(true);
+
+    while (!JobQueue.empty() && vkGetFenceStatus(Device, JobQueue.front().Fence) == VK_SUCCESS)
+        FinishOneJob();
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -528,6 +510,20 @@ void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
 
     // Queue up
     JobQueue.push(jobInfo);
+}
+
+void CDeviceVk::FinishOneJob(bool wait)
+{
+    auto& waitJob = JobQueue.front();
+    if (wait)
+        vkWaitForFences(Device, 1, &waitJob.Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+    vkDestroyFence(Device, waitJob.Fence, nullptr);
+    vkDestroySemaphore(Device, waitJob.SignalSemaphore, nullptr);
+    for (auto& fn : waitJob.DeferredDeleters)
+        fn();
+    for (size_t i = 0; i < waitJob.CmdBuffersInFlight.size(); i++)
+        waitJob.CmdContexts[i]->DoneWithCmdBuffer(waitJob.CmdBuffersInFlight[i]);
+    JobQueue.pop();
 }
 
 } /* namespace RHI */
