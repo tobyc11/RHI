@@ -32,6 +32,8 @@ struct CGPUJobInfo
 
     // Don't worry about this
     VkFence Fence;
+    std::vector<std::pair<VkBuffer, VmaAllocation>> PendingDeletionBuffers;
+    std::vector<std::pair<VkImage, VmaAllocation>> PendingDeletionImages;
 
     void AddCommandBuffer(VkCommandBuffer b, CCommandContextVk::Ref ctx)
     {
@@ -130,6 +132,10 @@ private:
     std::mutex JobSubmitMutex;
     std::queue<CGPUJobInfo> JobQueue;
     static const uint32_t MaxJobsInFlight = 8;
+
+    // Every job submission collects those, and deletes them when job is finished
+    std::vector<std::pair<VkBuffer, VmaAllocation>> PendingDeletionBuffers;
+    std::vector<std::pair<VkImage, VmaAllocation>> PendingDeletionImages;
 };
 
 } /* namespace RHI */

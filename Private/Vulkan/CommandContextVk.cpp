@@ -601,7 +601,7 @@ void CCommandContextVk::ResolveBindings()
                             if (bindingInfo.pImageView)
                             {
                                 imageInfo.imageView = bindingInfo.pImageView->GetVkImageView();
-                                imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL; // TODO: fixme
+                                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: fixme
                             }
 
                             imageInfos.push_back(imageInfo);

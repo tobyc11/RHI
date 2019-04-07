@@ -282,9 +282,12 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     imageInfo.samples = static_cast<VkSampleCountFlagBits>(sampleCount);
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // BELOW
     imageInfo.usage = 0; // BELOW
-    imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
-    imageInfo.queueFamilyIndexCount = 3;
-    imageInfo.pQueueFamilyIndices = QueueFamilies;
+    if (QueueFamilies[TransferQueue] != QueueFamilies[GraphicsQueue])
+    {
+        imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
+        imageInfo.queueFamilyIndexCount = 3;
+        imageInfo.pQueueFamilyIndices = QueueFamilies;
+    }
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
     // Allocate memory using the Vulkan Memory Allocator (unless memFlags has the NO_ALLOCATION bit
@@ -338,8 +341,8 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
 
         // Prepare a staging buffer
         VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-        bufferInfo.size =
-            GetUncompressedImageFormatSize(imageInfo.format) * static_cast<size_t>(width);
+        bufferInfo.size = GetUncompressedImageFormatSize(imageInfo.format)
+            * static_cast<size_t>(width) * static_cast<size_t>(height) * static_cast<size_t>(depth);
         bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
         VmaAllocationCreateInfo allocInfo = {};
@@ -367,10 +370,11 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
         region.imageSubresource.layerCount = 1;
 
         region.imageOffset = { 0, 0, 0 };
-        region.imageExtent = { width, 1, 1 };
+        region.imageExtent = { width, height, depth };
         vkCmdCopyBufferToImage(cmdBuffer, stagingBuffer, handle,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-        vmaDestroyBuffer(Allocator, stagingBuffer, stagingAlloc);
+
+        PendingDeletionBuffers.emplace_back(stagingBuffer, stagingAlloc);
     }
     ctx->TransitionImage(image.get(), defaultState);
     ctx->Flush(true);
@@ -509,7 +513,9 @@ void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
     vkQueueSubmit(q, 1, &submitInfo, jobInfo.Fence);
 
     // Queue up
-    JobQueue.push(jobInfo);
+    std::swap(jobInfo.PendingDeletionBuffers, PendingDeletionBuffers);
+    std::swap(jobInfo.PendingDeletionImages, PendingDeletionImages);
+    JobQueue.push(std::move(jobInfo));
 }
 
 void CDeviceVk::FinishOneJob(bool wait)
@@ -521,6 +527,10 @@ void CDeviceVk::FinishOneJob(bool wait)
     vkDestroySemaphore(Device, waitJob.SignalSemaphore, nullptr);
     for (auto& fn : waitJob.DeferredDeleters)
         fn();
+    for (auto& pair : waitJob.PendingDeletionBuffers)
+        vmaDestroyBuffer(Allocator, pair.first, pair.second);
+    for (auto& pair : waitJob.PendingDeletionImages)
+        vmaDestroyImage(Allocator, pair.first, pair.second);
     for (size_t i = 0; i < waitJob.CmdBuffersInFlight.size(); i++)
         waitJob.CmdContexts[i]->DoneWithCmdBuffer(waitJob.CmdBuffersInFlight[i]);
     JobQueue.pop();
