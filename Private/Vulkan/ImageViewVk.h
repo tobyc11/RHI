@@ -11,11 +11,19 @@ public:
     CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImage::Ref image);
     ~CImageViewVk() override;
 
-    VkImageView ImageView;
+    VkImageView GetVkImageView() const;
+
+    VkFormat GetFormat() const;
+
+    // This object could be a mere proxy for a swapchain, and does not hold any real image view
+    bool bIsSwapChainProxy;
+    CSwapChain::WeakRef SwapChain;
 
 private:
     CDeviceVk& Parent;
     CImage::Ref Image;
+    VkImageViewCreateInfo ViewCreateInfo;
+    VkImageView ImageView;
 };
 
 } /* namespace RHI */

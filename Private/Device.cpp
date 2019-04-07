@@ -65,12 +65,6 @@ CRenderPass::Ref CDeviceBase<TDerived>::CreateRenderPass(const CRenderPassDesc& 
 }
 
 template <typename TDerived>
-CFramebuffer::Ref CDeviceBase<TDerived>::CreateFramebuffer(const CFramebufferDesc& desc)
-{
-    return static_cast<TDerived*>(this)->CreateFramebuffer(desc);
-}
-
-template <typename TDerived>
 CPipeline::Ref CDeviceBase<TDerived>::CreatePipeline(const CPipelineDesc& desc)
 {
     return static_cast<TDerived*>(this)->CreatePipeline(desc);
@@ -90,6 +84,13 @@ template <typename TDerived> IRenderContext::Ref CDeviceBase<TDerived>::GetImmed
 template <typename TDerived> IRenderContext::Ref CDeviceBase<TDerived>::CreateDeferredContext()
 {
     return static_cast<TDerived*>(this)->CreateDeferredContext();
+}
+
+template <typename TDerived>
+CSwapChain::Ref CDeviceBase<TDerived>::CreateSwapChain(const CPresentationSurfaceDesc& info,
+                                                       EFormat format)
+{
+    return static_cast<TDerived*>(this)->CreateSwapChain(info, format);
 }
 
 // Explicitly instanciate the wrapper for the chosen implementation

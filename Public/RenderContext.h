@@ -37,7 +37,7 @@ public:
 
     virtual ~IRenderContext() = default;
 
-    virtual void BeginRenderPass(CRenderPass::Ref renderPass, CFramebuffer::Ref framebuffer,
+    virtual void BeginRenderPass(CRenderPass::Ref renderPass,
                                  const std::vector<CClearValue>& clearValues) = 0;
     virtual void NextSubpass() = 0;
     virtual void EndRenderPass() = 0;

@@ -8,5 +8,7 @@ namespace RHI
 
 class CDeviceVk;
 class CCommandContextVk;
+class CImageVk;
+class CImageViewVk;
 
 }

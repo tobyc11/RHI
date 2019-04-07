@@ -6,6 +6,7 @@
 #include "RenderPassVk.h"
 #include "SamplerVk.h"
 #include "ShaderModuleVk.h"
+#include "SwapChainVk.h"
 #include "VkHelpers.h"
 
 #include <vector>
@@ -20,7 +21,7 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debugReportCallback(VkDebugReportFlagsEXT flags,
                                                    const char* pMessage, void* pUserData)
 {
     std::string type = "Vk Validation ";
-    type += ((flags | VK_DEBUG_REPORT_ERROR_BIT_EXT) ? "Error: " : "Warning: ");
+    type += ((flags & VK_DEBUG_REPORT_ERROR_BIT_EXT) ? "Error: " : "Warning: ");
     std::cout << (type + std::string(pMessage) + "\n") << std::endl;
     return VK_FALSE;
 }
@@ -153,14 +154,15 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     vkEnumeratePhysicalDevices(Instance, &physDeviceCount, nullptr);
     physDevice.resize(physDeviceCount);
     vkEnumeratePhysicalDevices(Instance, &physDeviceCount, physDevice.data());
-    VkPhysicalDevice pdev = selectPhysicalDevice(physDevice, hints);
+    PhysicalDevice = selectPhysicalDevice(physDevice, hints);
 
-    vkGetPhysicalDeviceProperties(pdev, &Properties);
+    vkGetPhysicalDeviceProperties(PhysicalDevice, &Properties);
 
     uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(pdev, &queueFamilyCount, nullptr);
+    vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &queueFamilyCount, nullptr);
     std::vector<VkQueueFamilyProperties> queueFamilyProperites(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(pdev, &queueFamilyCount, queueFamilyProperites.data());
+    vkGetPhysicalDeviceQueueFamilyProperties(PhysicalDevice, &queueFamilyCount,
+                                             queueFamilyProperites.data());
 
     for (size_t i = 0; i < NumQueueType; i++)
         QueueFamilies[i] = (uint32_t)-1;
@@ -177,7 +179,7 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 
     // Enable all features
     VkPhysicalDeviceFeatures requiredFeatures;
-    vkGetPhysicalDeviceFeatures(pdev, &requiredFeatures);
+    vkGetPhysicalDeviceFeatures(PhysicalDevice, &requiredFeatures);
 
     std::vector<VkDeviceQueueCreateInfo> queueInfos;
     std::vector<float> queuePriorities;
@@ -228,7 +230,7 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     deviceInfo.ppEnabledExtensionNames = extensionNames.data();
     deviceInfo.pEnabledFeatures = &requiredFeatures;
 
-    vkCreateDevice(pdev, &deviceInfo, nullptr, &Device);
+    vkCreateDevice(PhysicalDevice, &deviceInfo, nullptr, &Device);
 
     for (uint32_t type = 0; type < NumQueueType; type++)
     {
@@ -241,7 +243,7 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     }
 
     VmaAllocatorCreateInfo allocatorInfo = {};
-    allocatorInfo.physicalDevice = pdev;
+    allocatorInfo.physicalDevice = PhysicalDevice;
     allocatorInfo.device = Device;
 
     vmaCreateAllocator(&allocatorInfo, &Allocator);
@@ -508,11 +510,6 @@ CRenderPass::Ref CDeviceVk::CreateRenderPass(const CRenderPassDesc& desc)
     return std::make_shared<CRenderPassVk>(*this, desc);
 }
 
-CFramebuffer::Ref CDeviceVk::CreateFramebuffer(const CFramebufferDesc& desc)
-{
-    return std::make_shared<CFramebufferVk>(*this, desc);
-}
-
 CPipeline::Ref CDeviceVk::CreatePipeline(const CPipelineDesc& desc)
 {
     return std::make_shared<CPipelineVk>(*this, desc);
@@ -529,6 +526,45 @@ IRenderContext::Ref CDeviceVk::CreateDeferredContext()
 {
     return std::make_shared<CCommandContextVk>(*this, GraphicsQueue, true);
 }
+
+CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format)
+{
+    VkSurfaceKHR surface;
+    if (info.Type == EPresentationSurfaceDescType::Win32)
+    {
+
+        PFN_vkCreateWin32SurfaceKHR vkCreateWin32SurfaceKHR =
+            (PFN_vkCreateWin32SurfaceKHR)vkGetInstanceProcAddr(Instance, "vkCreateWin32SurfaceKHR");
+        VkWin32SurfaceCreateInfoKHR createInfo = {
+            VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR
+        };
+        VkResult result;
+
+        if (!vkCreateWin32SurfaceKHR)
+        {
+            throw CRHIException("vkCreateWin32SurfaceKHR is not enabled in the Vulkan instance.");
+        }
+        createInfo.hinstance = info.Win32.Instance;
+        createInfo.hwnd = info.Win32.Window;
+        result = vkCreateWin32SurfaceKHR(Instance, &createInfo, nullptr, &surface);
+        if (result != VK_SUCCESS)
+        {
+            throw CRHIRuntimeError("vkCreateWin32SurfaceKHR failed");
+        }
+    }
+    else
+    {
+        throw CRHIException("CreateSwapChain received invalid presentation surface desc");
+    }
+
+    auto swapchainCaps = CSwapChainVk::GetDeviceSwapChainCaps(surface, PhysicalDevice);
+    if (!swapchainCaps.bIsSuitable)
+        throw CRHIRuntimeError("Device is not suitable for presentation");
+    auto swapchain = std::make_shared<CSwapChainVk>(*this, swapchainCaps);
+    return swapchain;
+}
+
+VkInstance CDeviceVk::GetVkInstance() const { return Instance; }
 
 void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
 {
@@ -553,6 +589,9 @@ void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = static_cast<uint32_t>(jobInfo.CmdBuffersInFlight.size());
     submitInfo.pCommandBuffers = jobInfo.CmdBuffersInFlight.data();
+    submitInfo.waitSemaphoreCount = static_cast<uint32_t>(jobInfo.WaitSemaphores.size());
+    submitInfo.pWaitSemaphores = jobInfo.WaitSemaphores.data();
+    submitInfo.pWaitDstStageMask = jobInfo.WaitStages.data();
 
     VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     vkCreateFence(Device, &fenceInfo, nullptr, &jobInfo.Fence);

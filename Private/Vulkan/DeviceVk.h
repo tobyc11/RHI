@@ -23,6 +23,8 @@ struct CGPUJobInfo
     // Fill out these
     std::vector<VkCommandBuffer> CmdBuffersInFlight;
     std::vector<CCommandContextVk::Ref> CmdContexts;
+    std::vector<VkSemaphore> WaitSemaphores;
+    std::vector<VkPipelineStageFlags> WaitStages;
     EQueueType QueueType;
 
     // Don't worry about this
@@ -72,7 +74,6 @@ public:
 
     // States
     CRenderPass::Ref CreateRenderPass(const CRenderPassDesc& desc);
-    CFramebuffer::Ref CreateFramebuffer(const CFramebufferDesc& desc);
     CPipeline::Ref CreatePipeline(const CPipelineDesc& desc);
     CSampler::Ref CreateSampler(const CSamplerDesc& desc);
 
@@ -80,7 +81,10 @@ public:
     IRenderContext::Ref GetImmediateContext();
     IRenderContext::Ref CreateDeferredContext();
 
+    CSwapChain::Ref CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format);
+
     // Vulkan specific getters
+    VkInstance GetVkInstance() const;
     VkDevice GetVkDevice() const { return Device; }
     const VkPhysicalDeviceLimits& GetVkLimits() const { return Properties.limits; }
     VmaAllocator GetAllocator() const { return Allocator; }
@@ -101,6 +105,7 @@ public:
 private:
     VkDevice Device;
 
+	VkPhysicalDevice PhysicalDevice;
     VkPhysicalDeviceProperties Properties;
     uint32_t QueueFamilies[NumQueueType];
     std::vector<VkQueue> Queues[NumQueueType];

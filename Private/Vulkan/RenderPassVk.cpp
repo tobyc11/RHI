@@ -1,6 +1,7 @@
 #include "RenderPassVk.h"
 #include "DeviceVk.h"
 #include "ImageViewVk.h"
+#include "SwapChainVk.h"
 
 namespace RHI
 {
@@ -10,19 +11,33 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
 {
     VkRenderPassCreateInfo passInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
 
+    std::vector<VkImageView> swapChainViews;
+
     for (const auto& attachment : desc.Attachments)
     {
+        auto viewImpl = std::static_pointer_cast<CImageViewVk>(attachment.ImageView);
+        if (viewImpl->bIsSwapChainProxy)
+        {
+            auto swapChainImpl = std::static_pointer_cast<CSwapChainVk>(viewImpl->SwapChain.lock());
+            swapChainViews = swapChainImpl->GetVkImageViews();
+
+            bIsSwapChainProxy = true;
+            SwapChain = viewImpl->SwapChain;
+        }
+
         AttachmentsVk.push_back(VkAttachmentDescription());
         VkAttachmentDescription& r = AttachmentsVk.back();
         r.flags = 0;
-        r.format = static_cast<VkFormat>(attachment.Format);
-        r.samples = static_cast<VkSampleCountFlagBits>(attachment.Samples);
+        r.format = viewImpl->GetFormat();
+        r.samples = VK_SAMPLE_COUNT_1_BIT; // TODO: FIXME
         r.loadOp = static_cast<VkAttachmentLoadOp>(attachment.LoadOp);
         r.storeOp = static_cast<VkAttachmentStoreOp>(attachment.StoreOp);
         r.stencilLoadOp = static_cast<VkAttachmentLoadOp>(attachment.StencilLoadOp);
         r.stencilStoreOp = static_cast<VkAttachmentStoreOp>(attachment.StencilStoreOp);
-        r.initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        r.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
         r.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        if (viewImpl->bIsSwapChainProxy)
+            r.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
 
     std::vector<VkSubpassDescription> subpassDescriptions;
@@ -93,34 +108,75 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
     // passInfo.pDependencies = dependency.data();
 
     vkCreateRenderPass(Parent.GetVkDevice(), &passInfo, nullptr, &RenderPass);
-}
 
-CRenderPassVk::~CRenderPassVk() { vkDestroyRenderPass(Parent.GetVkDevice(), RenderPass, nullptr); }
-
-CFramebufferVk::CFramebufferVk(CDeviceVk& p, const CFramebufferDesc& desc)
-    : Parent(p)
-{
-    VkFramebufferCreateInfo fbInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-    fbInfo.renderPass = std::static_pointer_cast<CRenderPassVk>(desc.RenderPass)->RenderPass;
-    std::vector<VkImageView> attachments;
-    for (auto view : desc.Attachments)
-        attachments.push_back(std::static_pointer_cast<CImageViewVk>(view)->ImageView);
-    fbInfo.attachmentCount = attachments.size();
-    fbInfo.pAttachments = attachments.data();
-    fbInfo.width = desc.Width;
-    fbInfo.height = desc.Height;
-    fbInfo.layers = desc.Layers;
+    if (swapChainViews.empty())
+    {
+        // Not linking to a swap chain
+        VkFramebufferCreateInfo fbInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+        fbInfo.renderPass = RenderPass;
+        std::vector<VkImageView> attachments;
+        for (auto attachment : desc.Attachments)
+        {
+            auto viewImpl = std::static_pointer_cast<CImageViewVk>(attachment.ImageView);
+            attachments.push_back(viewImpl->GetVkImageView());
+        }
+        fbInfo.attachmentCount = attachments.size();
+        fbInfo.pAttachments = attachments.data();
+        fbInfo.width = desc.Width;
+        fbInfo.height = desc.Height;
+        fbInfo.layers = desc.Layers;
+        VkFramebuffer fb;
+        vkCreateFramebuffer(Parent.GetVkDevice(), &fbInfo, nullptr, &fb);
+        Framebuffer.push_back(fb);
+    }
+    for (VkImageView swapChainView : swapChainViews)
+    {
+        // Links to a swap chain, thus create multiple framebuffers
+        VkFramebufferCreateInfo fbInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+        fbInfo.renderPass = RenderPass;
+        std::vector<VkImageView> attachments;
+        for (auto attachment : desc.Attachments)
+        {
+            auto viewImpl = std::static_pointer_cast<CImageViewVk>(attachment.ImageView);
+            if (viewImpl->bIsSwapChainProxy)
+                attachments.push_back(swapChainView);
+            else
+                attachments.push_back(viewImpl->GetVkImageView());
+        }
+        fbInfo.attachmentCount = attachments.size();
+        fbInfo.pAttachments = attachments.data();
+        fbInfo.width = desc.Width;
+        fbInfo.height = desc.Height;
+        fbInfo.layers = desc.Layers;
+        VkFramebuffer fb;
+        vkCreateFramebuffer(Parent.GetVkDevice(), &fbInfo, nullptr, &fb);
+        Framebuffer.push_back(fb);
+    }
 
     Area.offset.x = Area.offset.y = 0;
-    Area.extent.width = fbInfo.width;
-    Area.extent.height = fbInfo.height;
-
-    vkCreateFramebuffer(Parent.GetVkDevice(), &fbInfo, nullptr, &Framebuffer);
+    Area.extent.width = desc.Width;
+    Area.extent.height = desc.Height;
 }
 
-CFramebufferVk::~CFramebufferVk()
+CRenderPassVk::~CRenderPassVk()
 {
-    vkDestroyFramebuffer(Parent.GetVkDevice(), Framebuffer, nullptr);
+    for (auto fb : Framebuffer)
+    {
+        vkDestroyFramebuffer(Parent.GetVkDevice(), fb, nullptr);
+    }
+    vkDestroyRenderPass(Parent.GetVkDevice(), RenderPass, nullptr);
+}
+
+std::pair<VkFramebuffer, VkSemaphore> CRenderPassVk::GetNextFramebuffer()
+{
+    if (Framebuffer.size() == 1)
+        return std::pair<VkFramebuffer, VkSemaphore>(Framebuffer[0], VK_NULL_HANDLE);
+
+    auto swapChainImpl = std::static_pointer_cast<CSwapChainVk>(SwapChain.lock());
+    if (swapChainImpl->AcquiredImages.empty())
+        throw CRHIException("Did not acquire any image from the swap chain");
+    return std::make_pair(Framebuffer[swapChainImpl->AcquiredImages.front().first],
+                          swapChainImpl->AcquiredImages.front().second);
 }
 
 }

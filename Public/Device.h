@@ -6,9 +6,12 @@
 #include "Resources.h"
 #include "Sampler.h"
 #include "ShaderModule.h"
+#include "SwapChain.h"
 
 namespace RHI
 {
+
+struct CPresentationSurfaceDesc;
 
 enum class EDeviceCreateHints
 {
@@ -44,7 +47,6 @@ public:
 
     // States
     CRenderPass::Ref CreateRenderPass(const CRenderPassDesc& desc);
-    CFramebuffer::Ref CreateFramebuffer(const CFramebufferDesc& desc);
     CPipeline::Ref CreatePipeline(const CPipelineDesc& desc);
     CSampler::Ref CreateSampler(const CSamplerDesc& desc);
 
@@ -52,9 +54,8 @@ public:
     IRenderContext::Ref GetImmediateContext();
     IRenderContext::Ref CreateDeferredContext();
 
-    // Other stuff
-    // CSwapChain::Ref CreateSwapChain(const CSwapChainCreateInfo& info);
-    // CPipelineCache::Ref CreatePipelineCache();
+    // Windowing system interface
+    CSwapChain::Ref CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format);
 
 protected:
     CDeviceBase() = default;

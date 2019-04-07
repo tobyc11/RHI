@@ -61,6 +61,9 @@ void CCommandContextVk::BeginBuffer()
     if (!bIsDeferred)
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(CmdBuffer, &beginInfo);
+
+    WaitSemaphores.clear();
+    WaitStages.clear();
 }
 
 void CCommandContextVk::EndBuffer() { vkEndCommandBuffer(CmdBuffer); }
@@ -231,6 +234,9 @@ void CCommandContextVk::Flush(bool wait)
         VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
         submitInfo.commandBufferCount = 1;
         submitInfo.pCommandBuffers = &CmdBuffer;
+        submitInfo.waitSemaphoreCount = static_cast<uint32_t>(WaitSemaphores.size());
+        submitInfo.pWaitSemaphores = WaitSemaphores.data();
+        submitInfo.pWaitDstStageMask = WaitStages.data();
 
         VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         VkFence fence;
@@ -250,20 +256,23 @@ void CCommandContextVk::Flush(bool wait)
         CGPUJobInfo job;
         job.QueueType = static_cast<EQueueType>(QueueType);
         job.AddCommandBuffer(CmdBuffer, this->shared_from_this());
+        job.WaitSemaphores = WaitSemaphores;
+        job.WaitStages = WaitStages;
         Parent.SubmitJob(std::move(job));
     }
 
     BeginBuffer();
 }
 
-void CCommandContextVk::BeginRenderPass(CRenderPass::Ref renderPass, CFramebuffer::Ref framebuffer,
+void CCommandContextVk::BeginRenderPass(CRenderPass::Ref renderPass,
                                         const std::vector<CClearValue>& clearValues)
 {
     auto rpImpl = std::static_pointer_cast<CRenderPassVk>(renderPass);
-    auto fbImpl = std::static_pointer_cast<CFramebufferVk>(framebuffer);
     VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     beginInfo.renderPass = rpImpl->RenderPass;
-    beginInfo.framebuffer = fbImpl->Framebuffer;
+    beginInfo.framebuffer = rpImpl->GetNextFramebuffer().first;
+    WaitSemaphores.emplace_back(rpImpl->GetNextFramebuffer().second);
+    WaitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     std::vector<VkClearValue> clear;
     size_t i = 0;
     for (const auto& c : clearValues)
@@ -276,13 +285,13 @@ void CCommandContextVk::BeginRenderPass(CRenderPass::Ref renderPass, CFramebuffe
         {
             vkClear.depthStencil.depth = c.Depth;
             vkClear.depthStencil.stencil = c.Stencil;
-		}
+        }
         clear.push_back(vkClear);
         i++;
     }
     beginInfo.clearValueCount = static_cast<uint32_t>(clear.size());
     beginInfo.pClearValues = clear.data();
-    RenderArea = beginInfo.renderArea = fbImpl->GetArea();
+    RenderArea = beginInfo.renderArea = rpImpl->GetArea();
 
     vkCmdBeginRenderPass(CmdBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
@@ -314,21 +323,25 @@ void CCommandContextVk::BindPipeline(CPipeline* pipeline)
 void CCommandContextVk::BindBuffer(CBuffer* buffer, size_t offset, size_t range, uint32_t set,
                                    uint32_t binding, uint32_t index)
 {
+    throw "unimplemented";
 }
 
 void CCommandContextVk::BindBufferView(CBufferView* bufferView, uint32_t set, uint32_t binding,
                                        uint32_t index)
 {
+    throw "unimplemented";
 }
 
 void CCommandContextVk::BindImageView(CImageView* imageView, uint32_t set, uint32_t binding,
                                       uint32_t index)
 {
+    throw "unimplemented";
 }
 
 void CCommandContextVk::BindSampler(CSampler* sampler, uint32_t set, uint32_t binding,
                                     uint32_t index)
 {
+    throw "unimplemented";
 }
 
 void CCommandContextVk::BindIndexBuffer(CBuffer* buffer, size_t offset, EFormat format)

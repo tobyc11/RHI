@@ -1,7 +1,9 @@
 #pragma once
 #include "RHICommon.h"
 #include "Resources.h"
+#include "SwapChain.h"
 #include "VkCommon.h"
+#include <queue>
 
 namespace RHI
 {
@@ -11,6 +13,7 @@ class CImageVk : public CImage
 public:
     CImageVk(CDeviceVk& p, VkImage image, VmaAllocation alloc, const VkImageCreateInfo& createInfo,
              EImageUsageFlags usage, EResourceState defaultState);
+    CImageVk(CDeviceVk& p, CSwapChain::WeakRef swapChain);
     ~CImageVk();
 
     void CopyFrom(const void* mem);
@@ -31,6 +34,10 @@ public:
 
     VkImage Image;
     VmaAllocation ImageAlloc;
+
+    // The image object could be a mere proxy for a swapchain, and does not hold any real image
+    bool bIsSwapChainProxy = false;
+    CSwapChain::WeakRef SwapChain;
 
 private:
     CDeviceVk& Parent;

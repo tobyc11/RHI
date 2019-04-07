@@ -241,8 +241,8 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     VkPipelineViewportStateCreateInfo viewportInfo = {
         VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO
     };
-    viewportInfo.viewportCount = Parent.GetVkLimits().maxViewports;
-    viewportInfo.scissorCount = Parent.GetVkLimits().maxViewports;
+    viewportInfo.viewportCount = 1;
+    viewportInfo.scissorCount = 1;
     pipelineInfo.pViewportState = &viewportInfo;
 
     // Rasterization state
@@ -252,7 +252,7 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     if (desc.RasterizerState)
     {
         rastInfo.depthClampEnable = desc.RasterizerState->DepthClampEnable;
-        rastInfo.rasterizerDiscardEnable = VK_TRUE;
+        rastInfo.rasterizerDiscardEnable = VK_FALSE;
         rastInfo.polygonMode = VkCast(desc.RasterizerState->PolygonMode);
         rastInfo.cullMode = VkCast(desc.RasterizerState->CullMode);
         rastInfo.frontFace = desc.RasterizerState->FrontFaceCCW ? VK_FRONT_FACE_COUNTER_CLOCKWISE
@@ -271,8 +271,14 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     };
     if (desc.MultisampleState)
     {
-        // pipelineInfo.pMultisampleState = &msInfo;
-        // TODO
+        msInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+        msInfo.sampleShadingEnable = VK_FALSE;
+        msInfo.minSampleShading = 1.0f;
+        msInfo.pSampleMask = nullptr;
+        msInfo.alphaToCoverageEnable = VK_FALSE;
+        msInfo.alphaToOneEnable = VK_FALSE;
+        pipelineInfo.pMultisampleState = &msInfo;
+		//TODO: implement multisampling
     }
 
     // Depth stencil state

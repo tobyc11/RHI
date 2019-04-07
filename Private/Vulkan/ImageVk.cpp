@@ -18,11 +18,33 @@ CImageVk::CImageVk(CDeviceVk& p, VkImage image, VmaAllocation alloc,
     GlobalState = EResourceState::Undefined;
 }
 
-CImageVk::~CImageVk() { vmaDestroyImage(Parent.GetAllocator(), Image, ImageAlloc); }
+CImageVk::CImageVk(CDeviceVk& p, CSwapChain::WeakRef swapChain)
+    : Parent(p)
+    , bIsSwapChainProxy(true)
+    , SwapChain(swapChain)
+{
+}
+
+CImageVk::~CImageVk()
+{
+    if (bIsSwapChainProxy)
+        return;
+
+    if (!ImageAlloc)
+        vkDestroyImage(Parent.GetVkDevice(), Image, nullptr);
+    else
+        vmaDestroyImage(Parent.GetAllocator(), Image, ImageAlloc);
+}
 
 void CImageVk::CopyFrom(const void* mem) { throw "unimplemented"; }
 
-VkImageCreateInfo CImageVk::GetCreateInfo() const { return CreateInfo; }
+VkImageCreateInfo CImageVk::GetCreateInfo() const
+{
+    if (bIsSwapChainProxy)
+        throw "unimplemented";
+
+    return CreateInfo;
+}
 
 EImageUsageFlags CImageVk::GetUsageFlags() const { return UsageFlags; }
 

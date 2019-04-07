@@ -22,8 +22,7 @@ enum class CAttachmentStoreOp : uint16_t
 
 struct CAttachmentDesc
 {
-    EFormat Format;
-    uint32_t Samples;
+    CImageView::Ref ImageView;
     CAttachmentLoadOp LoadOp;
     CAttachmentStoreOp StoreOp;
     CAttachmentLoadOp StencilLoadOp = CAttachmentLoadOp::DontCare;
@@ -31,9 +30,8 @@ struct CAttachmentDesc
     // Clear value is dynamically specified
     // Framebuffer is dynamically specified
 
-    CAttachmentDesc(EFormat f, uint32_t s, CAttachmentLoadOp l, CAttachmentStoreOp st)
-        : Format(f)
-        , Samples(s)
+    CAttachmentDesc(CImageView::Ref imageView, CAttachmentLoadOp l, CAttachmentStoreOp st)
+        : ImageView(imageView)
         , LoadOp(l)
         , StoreOp(st)
     {
@@ -60,6 +58,10 @@ struct CRenderPassDesc
 {
     std::vector<CAttachmentDesc> Attachments;
     std::vector<CSubpassDesc> Subpasses;
+    uint32_t Width;
+    uint32_t Height;
+    uint32_t Layers;
+
     // Dependencies are deduced from usage
 };
 
@@ -69,23 +71,6 @@ public:
     typedef std::shared_ptr<CRenderPass> Ref;
 
     virtual ~CRenderPass() = default;
-};
-
-struct CFramebufferDesc
-{
-    CRenderPass::Ref RenderPass;
-    std::vector<CImageView::Ref> Attachments;
-    uint32_t Width;
-    uint32_t Height;
-    uint32_t Layers;
-};
-
-class CFramebuffer
-{
-public:
-    typedef std::shared_ptr<CFramebuffer> Ref;
-
-    virtual ~CFramebuffer() = default;
 };
 
 }

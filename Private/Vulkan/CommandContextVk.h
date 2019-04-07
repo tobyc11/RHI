@@ -45,7 +45,7 @@ public:
     void Flush(bool wait = false) override;
 
     // Render commands
-    void BeginRenderPass(CRenderPass::Ref renderPass, CFramebuffer::Ref framebuffer,
+    void BeginRenderPass(CRenderPass::Ref renderPass,
                          const std::vector<CClearValue>& clearValues) override;
     void NextSubpass() override;
     void EndRenderPass() override;
@@ -88,6 +88,8 @@ protected:
 
     // Render states kept track of
     VkRect2D RenderArea;
+    std::vector<VkSemaphore> WaitSemaphores;
+    std::vector<VkPipelineStageFlags> WaitStages;
 };
 
 } /* namespace RHI */
