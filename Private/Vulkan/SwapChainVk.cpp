@@ -219,12 +219,13 @@ void CSwapChainVk::AcquireNextImage()
 
 void CSwapChainVk::Present(const CSwapChainPresentInfo& info)
 {
-    auto ctx = Parent.GetImmediateContext();
-    ctx->Flush(true);
+    auto ctx = std::static_pointer_cast<CCommandContextVk>(Parent.GetImmediateContext());
+    VkSemaphore renderJobDone = ctx->GetSignalSemaphore();
+    ctx->Flush();
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
-    presentInfo.waitSemaphoreCount = 0;
-    presentInfo.pWaitSemaphores = nullptr;
+    presentInfo.waitSemaphoreCount = 1;
+    presentInfo.pWaitSemaphores = &renderJobDone;
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &SwapChainHandle;
     presentInfo.pImageIndices = &AcquiredImages.front().first;
@@ -233,7 +234,6 @@ void CSwapChainVk::Present(const CSwapChainPresentInfo& info)
 
     vkDestroySemaphore(Parent.GetVkDevice(), AcquiredImages.front().second, nullptr);
     AcquiredImages.pop();
-    vkDeviceWaitIdle(Parent.GetVkDevice());
 }
 
 }

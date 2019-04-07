@@ -34,6 +34,7 @@ CCommandContextVk::CCommandContextVk(CDeviceVk& p, uint32_t qfi, bool deferredCo
 CCommandContextVk::~CCommandContextVk()
 {
     EndBuffer();
+    vkDestroySemaphore(Parent.GetVkDevice(), SignalSemaphore, nullptr);
     vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool, 1, &CmdBuffer);
     std::unique_lock<std::mutex> lk(GarbageMutex);
     vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool, GarbageBuffers.size(),
@@ -64,6 +65,8 @@ void CCommandContextVk::BeginBuffer()
 
     WaitSemaphores.clear();
     WaitStages.clear();
+	VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+    vkCreateSemaphore(Parent.GetVkDevice(), &semaphoreInfo, nullptr, &SignalSemaphore);
 }
 
 void CCommandContextVk::EndBuffer() { vkEndCommandBuffer(CmdBuffer); }
@@ -237,6 +240,8 @@ void CCommandContextVk::Flush(bool wait)
         submitInfo.waitSemaphoreCount = static_cast<uint32_t>(WaitSemaphores.size());
         submitInfo.pWaitSemaphores = WaitSemaphores.data();
         submitInfo.pWaitDstStageMask = WaitStages.data();
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = &SignalSemaphore;
 
         VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         VkFence fence;
@@ -247,6 +252,7 @@ void CCommandContextVk::Flush(bool wait)
         vkWaitForFences(Parent.GetVkDevice(), 1, &fence, VK_TRUE,
                         std::numeric_limits<uint64_t>::max());
         vkDestroyFence(Parent.GetVkDevice(), fence, nullptr);
+        vkDestroySemaphore(Parent.GetVkDevice(), SignalSemaphore, nullptr);
 
         DoneWithCmdBuffer(CmdBuffer);
     }
@@ -258,6 +264,7 @@ void CCommandContextVk::Flush(bool wait)
         job.AddCommandBuffer(CmdBuffer, this->shared_from_this());
         job.WaitSemaphores = WaitSemaphores;
         job.WaitStages = WaitStages;
+        job.SignalSemaphore = SignalSemaphore;
         Parent.SubmitJob(std::move(job));
     }
 
@@ -268,11 +275,15 @@ void CCommandContextVk::BeginRenderPass(CRenderPass::Ref renderPass,
                                         const std::vector<CClearValue>& clearValues)
 {
     auto rpImpl = std::static_pointer_cast<CRenderPassVk>(renderPass);
+    auto framebufferInfo = rpImpl->GetNextFramebuffer();
     VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     beginInfo.renderPass = rpImpl->RenderPass;
-    beginInfo.framebuffer = rpImpl->GetNextFramebuffer().first;
-    WaitSemaphores.emplace_back(rpImpl->GetNextFramebuffer().second);
-    WaitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+    beginInfo.framebuffer = framebufferInfo.first;
+    if (framebufferInfo.second != VK_NULL_HANDLE)
+    {
+        WaitSemaphores.emplace_back(rpImpl->GetNextFramebuffer().second);
+        WaitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+	}
     std::vector<VkClearValue> clear;
     size_t i = 0;
     for (const auto& c : clearValues)

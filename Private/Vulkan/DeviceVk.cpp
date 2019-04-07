@@ -256,6 +256,18 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 
 CDeviceVk::~CDeviceVk()
 {
+    while (!JobQueue.empty())
+    {
+        // Wait for the earliest job if queue full
+        auto& waitJob = JobQueue.front();
+        vkWaitForFences(Device, 1, &waitJob.Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+        vkDestroyFence(Device, waitJob.Fence, nullptr);
+        vkDestroySemaphore(Device, waitJob.SignalSemaphore, nullptr);
+        for (size_t i = 0; i < waitJob.CmdBuffersInFlight.size(); i++)
+            waitJob.CmdContexts[i]->DoneWithCmdBuffer(waitJob.CmdBuffersInFlight[i]);
+        JobQueue.pop();
+	}
+
     DescriptorSetLayoutCache.reset();
     ImmediateTransferCtx.reset();
     ImmediateGraphicsCtx.reset();
@@ -570,19 +582,16 @@ void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
 {
     std::unique_lock<std::mutex> lk(JobSubmitMutex);
 
-    if (bIsJobsFull)
+    if (JobQueue.size() >= MaxJobsInFlight)
     {
         // Wait for the earliest job if queue full
-        auto& waitJob = JobsInFlight[JobsTail];
+        auto& waitJob = JobQueue.front();
         vkWaitForFences(Device, 1, &waitJob.Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
         vkDestroyFence(Device, waitJob.Fence, nullptr);
+        vkDestroySemaphore(Device, waitJob.SignalSemaphore, nullptr);
         for (size_t i = 0; i < waitJob.CmdBuffersInFlight.size(); i++)
             waitJob.CmdContexts[i]->DoneWithCmdBuffer(waitJob.CmdBuffersInFlight[i]);
-        waitJob.Reset();
-
-        bIsJobsFull = false;
-        JobsTail++;
-        JobsTail %= JobsInFlight.size();
+        JobQueue.pop();
     }
 
     VkSubmitInfo submitInfo = {};
@@ -592,6 +601,11 @@ void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
     submitInfo.waitSemaphoreCount = static_cast<uint32_t>(jobInfo.WaitSemaphores.size());
     submitInfo.pWaitSemaphores = jobInfo.WaitSemaphores.data();
     submitInfo.pWaitDstStageMask = jobInfo.WaitStages.data();
+    if (jobInfo.SignalSemaphore)
+    {
+        submitInfo.signalSemaphoreCount = 1;
+        submitInfo.pSignalSemaphores = &jobInfo.SignalSemaphore;
+    }
 
     VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     vkCreateFence(Device, &fenceInfo, nullptr, &jobInfo.Fence);
@@ -600,11 +614,7 @@ void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
     vkQueueSubmit(q, 1, &submitInfo, jobInfo.Fence);
 
     // Queue up
-    JobsInFlight[JobsHead] = std::move(jobInfo);
-    JobsHead++;
-    JobsHead %= JobsInFlight.size();
-    if (JobsHead == JobsTail)
-        bIsJobsFull = true;
+    JobQueue.push(jobInfo);
 }
 
 } /* namespace RHI */

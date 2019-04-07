@@ -26,6 +26,7 @@ public:
 
     // For internal use only
     VkCommandBuffer GetBuffer() const { return CmdBuffer; }
+    VkSemaphore GetSignalSemaphore() const { return SignalSemaphore; }
 
     void TransitionImage(CImage* image, EResourceState newState);
 
@@ -90,6 +91,7 @@ protected:
     VkRect2D RenderArea;
     std::vector<VkSemaphore> WaitSemaphores;
     std::vector<VkPipelineStageFlags> WaitStages;
+    VkSemaphore SignalSemaphore;
 };
 
 } /* namespace RHI */

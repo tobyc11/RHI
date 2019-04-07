@@ -6,6 +6,7 @@
 #include "VkCommon.h"
 
 #include <mutex>
+#include <queue>
 
 namespace RHI
 {
@@ -25,6 +26,7 @@ struct CGPUJobInfo
     std::vector<CCommandContextVk::Ref> CmdContexts;
     std::vector<VkSemaphore> WaitSemaphores;
     std::vector<VkPipelineStageFlags> WaitStages;
+    VkSemaphore SignalSemaphore;
     EQueueType QueueType;
 
     // Don't worry about this
@@ -105,7 +107,7 @@ public:
 private:
     VkDevice Device;
 
-	VkPhysicalDevice PhysicalDevice;
+    VkPhysicalDevice PhysicalDevice;
     VkPhysicalDeviceProperties Properties;
     uint32_t QueueFamilies[NumQueueType];
     std::vector<VkQueue> Queues[NumQueueType];
@@ -119,10 +121,8 @@ private:
 
     // A ring buffer contains the jobs currently in flight
     std::mutex JobSubmitMutex;
-    std::array<CGPUJobInfo, 32> JobsInFlight;
-    size_t JobsHead = 0;
-    size_t JobsTail = 0;
-    bool bIsJobsFull = false;
+    std::queue<CGPUJobInfo> JobQueue;
+    static const uint32_t MaxJobsInFlight = 16;
 };
 
 } /* namespace RHI */
