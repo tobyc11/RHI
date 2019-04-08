@@ -10,10 +10,11 @@ class CImageViewVk : public CImageView
 public:
     typedef std::shared_ptr<CImageViewVk> Ref;
 
-    CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImage::Ref image);
+    CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImageVk::Ref image);
     ~CImageViewVk() override;
 
     VkImageView GetVkImageView() const;
+    CImageVk::Ref GetImage() const;
 
     VkFormat GetFormat() const;
 
@@ -23,7 +24,7 @@ public:
 
 private:
     CDeviceVk& Parent;
-    CImage::Ref Image;
+    CImageVk::Ref Image;
     VkImageViewCreateInfo ViewCreateInfo;
     VkImageView ImageView;
 };

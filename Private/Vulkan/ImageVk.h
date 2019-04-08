@@ -11,6 +11,8 @@ namespace RHI
 class CImageVk : public CImage
 {
 public:
+    typedef std::shared_ptr<CImageVk> Ref;
+
     CImageVk(CDeviceVk& p, VkImage image, VmaAllocation alloc, const VkImageCreateInfo& createInfo,
              EImageUsageFlags usage, EResourceState defaultState);
     CImageVk(CDeviceVk& p, CSwapChain::WeakRef swapChain);

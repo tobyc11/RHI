@@ -414,7 +414,7 @@ CImage::Ref CDeviceVk::CreateImage3D(EFormat format, EImageUsageFlags usage, uin
 
 CImageView::Ref CDeviceVk::CreateImageView(const CImageViewDesc& desc, CImage::Ref image)
 {
-    return std::make_shared<CImageViewVk>(*this, desc, image);
+    return std::make_shared<CImageViewVk>(*this, desc, std::static_pointer_cast<CImageVk>(image));
 }
 
 CShaderModule::Ref CDeviceVk::CreateShaderModule(size_t size, const void* pCode)

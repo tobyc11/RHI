@@ -32,7 +32,7 @@ static void Convert(VkImageSubresourceRange& dst, const CImageSubresourceRange& 
     dst.levelCount = src.LevelCount;
 }
 
-CImageViewVk::CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImage::Ref image)
+CImageViewVk::CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImageVk::Ref image)
     : Parent(p)
     , Image(image)
     , bIsSwapChainProxy(false)
@@ -71,6 +71,13 @@ VkImageView CImageViewVk::GetVkImageView() const
     if (bIsSwapChainProxy)
         throw CRHIException("Proxy image view does not have actual view");
     return ImageView;
+}
+
+CImageVk::Ref CImageViewVk::GetImage() const
+{
+    if (bIsSwapChainProxy)
+        throw CRHIException("Proxy image view does not have actual image");
+    return Image;
 }
 
 VkFormat CImageViewVk::GetFormat() const

@@ -429,6 +429,7 @@ void CCommandContextVk::BindImageView(CImageView::Ref imageView, uint32_t set, u
                                       uint32_t index)
 {
     auto impl = std::static_pointer_cast<CImageViewVk>(imageView);
+    assert(impl->GetImage()->GetGlobalState() == EResourceState::ShaderResource);
     CurrBindings.BindImageView(impl, VK_NULL_HANDLE, set, binding, index);
 }
 
@@ -440,12 +441,15 @@ void CCommandContextVk::BindSampler(CSampler::Ref sampler, uint32_t set, uint32_
 
 void CCommandContextVk::BindIndexBuffer(CBuffer::Ref buffer, size_t offset, EFormat format)
 {
-    throw "unimplemented";
+    auto bufferImpl = std::static_pointer_cast<CBufferVk>(buffer);
+    vkCmdBindIndexBuffer(CmdBuffer, bufferImpl->Buffer, offset,
+                         format == EFormat::R16_UINT ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32);
 }
 
 void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer::Ref buffer, size_t offset)
 {
-    throw "unimplemented";
+    auto bufferImpl = std::static_pointer_cast<CBufferVk>(buffer);
+    vkCmdBindVertexBuffers(CmdBuffer, binding, 1, &bufferImpl->Buffer, &offset);
 }
 
 void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
@@ -601,7 +605,8 @@ void CCommandContextVk::ResolveBindings()
                             if (bindingInfo.pImageView)
                             {
                                 imageInfo.imageView = bindingInfo.pImageView->GetVkImageView();
-                                imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: fixme
+                                imageInfo.imageLayout =
+                                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: fixme
                             }
 
                             imageInfos.push_back(imageInfo);
