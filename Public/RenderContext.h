@@ -43,6 +43,7 @@ public:
     virtual void EndRenderPass() = 0;
 
     virtual void BindPipeline(CPipeline::Ref pipeline) = 0;
+	//Set Viewport Scissor BlendFactor StencilRef
     virtual void BindBuffer(CBuffer::Ref buffer, size_t offset, size_t range, uint32_t set,
                             uint32_t binding, uint32_t index) = 0;
     virtual void BindBufferView(CBufferView::Ref bufferView, uint32_t set, uint32_t binding,

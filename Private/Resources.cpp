@@ -1,6 +1,7 @@
 #include "Resources.h"
 #ifdef RHI_IMPL_DIRECT3D11
 #include "Direct3D11/BufferD3D11.h"
+#include "Direct3D11/ImageD3D11.h"
 #elif defined(RHI_IMPL_VULKAN)
 #include "Vulkan/BufferVk.h"
 #include "Vulkan/ImageVk.h"

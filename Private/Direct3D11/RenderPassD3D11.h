@@ -1,38 +1,33 @@
 #pragma once
+#include "D3D11Platform.h"
+#include "ImageD3D11.h"
+#include "RenderContext.h"
 #include "RenderPass.h"
-#include "DeviceD3D11.h"
-#include "CommandListD3D11.h"
-#include <unordered_map>
+#include <vector>
 
 namespace RHI
 {
 
-class CDrawPass::Impl
+struct CSubpassInfo
 {
-public:
-    Impl(CDrawPass& owner);
-
-    void BeginRecording();
-    void Record(CPipelineStates states, const CDrawTemplate& drawTemplate);
-    void FinishRecording();
-    void Submit();
-
-private:
-    CDrawPass& Owner;
-    CDeviceD3D11* DeviceImpl;
-    std::unique_ptr<CCommandListD3D11> CommandList;
+    std::vector<ComPtr<ID3D11RenderTargetView>> RTVs;
+    ComPtr<ID3D11DepthStencilView> DSV;
 };
 
-class CClearPass::Impl
+class CRenderPassD3D11 : public CRenderPass
 {
 public:
-    Impl(CClearPass& owner);
+    CRenderPassD3D11(CDeviceD3D11& p, const CRenderPassDesc& desc);
 
-    void Submit();
+    void Bind(ID3D11DeviceContext* ctx, size_t subpass,
+              const std::vector<CClearValue>& clearValues);
 
 private:
-    CClearPass& Owner;
-    CDeviceD3D11* DeviceImpl;
+    CDeviceD3D11& Parent;
+    std::vector<CImageViewD3D11::Ref> Attachments;
+    std::vector<uint32_t> AttachmentInfo;
+    std::vector<CSubpassInfo> Subpasses;
+    float Width, Height;
 };
 
-} /* namespace RHI */
+}

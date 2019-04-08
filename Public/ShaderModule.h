@@ -103,9 +103,6 @@ struct HLSLSrc
 struct DXBCBlob
 {
 };
-struct SPIRVBlob
-{
-};
 
 //"ShaderModule" may not be the most appropriate name for this class, since it merely represents an
 // uncompiled shader
@@ -124,7 +121,6 @@ public:
     CShaderModule(const std::string& sourcePath, const std::string& target,
                   const std::string& entryPoint, HLSLSrc);
     CShaderModule(const void* data, size_t size, DXBCBlob);
-    CShaderModule(const void* data, size_t size, SPIRVBlob);
 
     virtual ~CShaderModule() = default;
 

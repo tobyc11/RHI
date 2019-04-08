@@ -1,20 +1,22 @@
 #pragma once
-#include "ShaderModule.h"
 #include "D3D11Platform.h"
+#include "SPIRVToHLSL.h"
+#include "ShaderModule.h"
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include <variant>
 
 namespace RHI
 {
 
-//Mapping from user-facing parameters to pipeline slots for a single shader stage
+// Mapping from user-facing parameters to pipeline slots for a single shader stage
 class CVSRedir;
 class CPSRedir;
 class CPipelineParamMappingD3D11
 {
 public:
-    //Id to slot
+    // Id to slot
     std::map<uint32_t, uint32_t> Mappings;
 
     template <typename TRedir>
@@ -24,7 +26,7 @@ public:
 class CShaderD3D11
 {
 public:
-    CShaderD3D11(CShaderModule& fromSrc);
+    CShaderD3D11(CDeviceD3D11& p, CShaderModule& fromSrc);
 
     const CVertexShaderInputSignature& GetVSInputSignature() const;
     const CPipelineParamMappingD3D11& GetParamMappings() const { return Mappings; }
@@ -37,10 +39,12 @@ public:
 private:
     void GenMappings();
 
-    //Code
+    CDeviceD3D11& Parent;
+
+    // Code
     ComPtr<ID3DBlob> CodeBlob;
 
-    //Reflection data
+    // Reflection data
     CVertexShaderInputSignature InputSig;
     CPipelineParamMappingD3D11 Mappings;
 
@@ -71,17 +75,32 @@ public:
         return iter->second;
     }
 
-    void PutShader(const std::string& key, CShaderD3D11* shader)
-    {
-        ShaderCache[key] = shader;
-    }
+    void PutShader(const std::string& key, CShaderD3D11* shader) { ShaderCache[key] = shader; }
 
-    //CShaderD3D11* LoadFromDisk(const std::string& key);
-    //void SaveAllToDisk();
+    // CShaderD3D11* LoadFromDisk(const std::string& key);
+    // void SaveAllToDisk();
 
 private:
-    //Owns all those shaders also
+    // Owns all those shaders also
     std::unordered_map<std::string, CShaderD3D11*> ShaderCache;
+};
+
+class CShaderModuleD3D11 : public CShaderModule
+{
+public:
+    CShaderModuleD3D11(CDeviceD3D11& p, std::vector<uint32_t> spirvBinary);
+
+    CSPIRVToHLSL* GetSPIRVCompiler() const { return SPIRVCompiler.get(); }
+    ComPtr<ID3D11VertexShader> GetVS() const { return VS; }
+    ComPtr<ID3D11PixelShader> GetPS() const { return PS; }
+
+private:
+    CDeviceD3D11& Parent;
+
+    std::unique_ptr<CSPIRVToHLSL> SPIRVCompiler;
+
+    ComPtr<ID3D11VertexShader> VS;
+    ComPtr<ID3D11PixelShader> PS;
 };
 
 } /* namespace RHI */

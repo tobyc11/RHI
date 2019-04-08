@@ -4,8 +4,7 @@
 namespace RHI
 {
 
-static DXGI_FORMAT FormatMappingTable[] =
-{
+static DXGI_FORMAT FormatMappingTable[] = {
     DXGI_FORMAT_UNKNOWN, /* UNDEFINED */
     DXGI_FORMAT_UNKNOWN, /* R4G4_UNORM_PACK8 */
     DXGI_FORMAT_UNKNOWN, /* R4G4B4A4_UNORM_PACK16 */
@@ -195,14 +194,17 @@ static DXGI_FORMAT FormatMappingTable[] =
 
 DXGI_FORMAT Convert(EFormat format)
 {
-    //TODO: potentiall warn if return UNKNOWN?
+    // TODO: potentiall warn if return UNKNOWN?
     return FormatMappingTable[static_cast<size_t>(format)];
 }
 
 D3D11_TEXTURE_ADDRESS_MODE Convert(ESamplerAddressMode mode)
 {
-    static_assert(D3D11_TEXTURE_ADDRESS_WRAP == static_cast<uint32_t>(ESamplerAddressMode::Wrap), "def mismatch");
-    static_assert(D3D11_TEXTURE_ADDRESS_MIRROR_ONCE == static_cast<uint32_t>(ESamplerAddressMode::MirrorOnce), "def mismatch");
+    static_assert(D3D11_TEXTURE_ADDRESS_WRAP == static_cast<uint32_t>(ESamplerAddressMode::Wrap),
+                  "def mismatch");
+    static_assert(D3D11_TEXTURE_ADDRESS_MIRROR_ONCE
+                      == static_cast<uint32_t>(ESamplerAddressMode::MirrorOnce),
+                  "def mismatch");
     return static_cast<D3D11_TEXTURE_ADDRESS_MODE>(mode);
 }
 
@@ -348,7 +350,7 @@ D3D11_PRIMITIVE_TOPOLOGY Convert(EPrimitiveTopology op)
     }
 }
 
-D3D11_SHADER_RESOURCE_VIEW_DESC ConvertDescToSRV(const CImageViewDesc & desc)
+D3D11_SHADER_RESOURCE_VIEW_DESC ConvertDescToSRV(const CImageViewDesc& desc)
 {
     D3D11_SHADER_RESOURCE_VIEW_DESC d;
     d.Format = Convert(desc.Format);
@@ -393,7 +395,7 @@ D3D11_SHADER_RESOURCE_VIEW_DESC ConvertDescToSRV(const CImageViewDesc & desc)
         d.TextureCubeArray.MostDetailedMip = desc.Range.BaseMipLevel;
         d.TextureCubeArray.MipLevels = desc.Range.LevelCount;
         d.TextureCubeArray.First2DArrayFace = desc.Range.BaseArrayLayer;
-        d.TextureCubeArray.NumCubes = desc.Range.LayerCount / 6; //TODO: confirm this
+        d.TextureCubeArray.NumCubes = desc.Range.LayerCount / 6; // TODO: confirm this
         break;
     default:
         throw CRHIRuntimeError("EImageViewType unrecognized");
@@ -401,7 +403,7 @@ D3D11_SHADER_RESOURCE_VIEW_DESC ConvertDescToSRV(const CImageViewDesc & desc)
     return d;
 }
 
-D3D11_RENDER_TARGET_VIEW_DESC ConvertDescToRTV(const CImageViewDesc & desc)
+D3D11_RENDER_TARGET_VIEW_DESC ConvertDescToRTV(const CImageViewDesc& desc)
 {
     D3D11_RENDER_TARGET_VIEW_DESC d;
     d.Format = Convert(desc.Format);
@@ -439,7 +441,7 @@ D3D11_RENDER_TARGET_VIEW_DESC ConvertDescToRTV(const CImageViewDesc & desc)
     return d;
 }
 
-D3D11_DEPTH_STENCIL_VIEW_DESC ConvertDescToDSV(const CImageViewDesc & desc)
+D3D11_DEPTH_STENCIL_VIEW_DESC ConvertDescToDSV(const CImageViewDesc& desc)
 {
     D3D11_DEPTH_STENCIL_VIEW_DESC d;
     d.Format = Convert(desc.Format);

@@ -8,6 +8,8 @@ namespace RHI
 class CSamplerD3D11 : public CSampler
 {
 public:
+    typedef std::shared_ptr<CSamplerD3D11> Ref;
+
     CSamplerD3D11(ID3D11SamplerState* state);
 
     ID3D11SamplerState* GetSamplerState() const { return SamplerState.Get(); }

@@ -8,4 +8,6 @@ namespace RHI
 
 using Microsoft::WRL::ComPtr;
 
+class CDeviceD3D11;
+
 } /* namespace RHI */

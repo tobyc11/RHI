@@ -6,32 +6,22 @@
 namespace RHI
 {
 
-CSwapChainD3D11::CSwapChainD3D11(IDXGISwapChain* inSwapChain)
-    : SwapChain(inSwapChain)
+CSwapChainD3D11::CSwapChainD3D11(CDeviceD3D11& parent, IDXGISwapChain* inSwapChain)
+    : Parent(parent)
+    , SwapChain(inSwapChain)
 {
 }
 
-CSwapChainD3D11::~CSwapChainD3D11()
-{
-    SwapChain->Release();
-}
+CSwapChainD3D11::~CSwapChainD3D11() { SwapChain->Release(); }
 
-CImage::Ref CSwapChainD3D11::GetImage(uint32_t index)
-{
-    ComPtr<ID3D11Texture2D> pBackBuffer;
-    SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(pBackBuffer.GetAddressOf()));
-    auto* devImpl = static_cast<CDeviceD3D11*>(CInstance::Get().GetCurrDevice());
-    return new CImageD3D11(*devImpl, pBackBuffer);
-}
-
-void CSwapChainD3D11::Resize(int width, int height)
+void CSwapChainD3D11::Resize(uint32_t width, uint32_t height)
 {
     DXGI_SWAP_CHAIN_DESC desc;
     SwapChain->GetDesc(&desc);
     SwapChain->ResizeBuffers(desc.BufferCount, width, height, desc.BufferDesc.Format, 0);
 }
 
-void CSwapChainD3D11::GetSize(int& width, int& height) const
+void CSwapChainD3D11::GetSize(uint32_t& width, uint32_t& height) const
 {
     DXGI_SWAP_CHAIN_DESC desc;
     SwapChain->GetDesc(&desc);
@@ -39,9 +29,16 @@ void CSwapChainD3D11::GetSize(int& width, int& height) const
     height = desc.BufferDesc.Height;
 }
 
-void CSwapChainD3D11::Present()
+CImage::Ref CSwapChainD3D11::GetImage()
 {
-    SwapChain->Present(0, 0);
+    ComPtr<ID3D11Texture2D> pBackBuffer;
+    SwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D),
+                         reinterpret_cast<void**>(pBackBuffer.GetAddressOf()));
+    return std::make_shared<CImageD3D11>(Parent, pBackBuffer);
 }
+
+void CSwapChainD3D11::AcquireNextImage() {}
+
+void CSwapChainD3D11::Present(const CSwapChainPresentInfo& info) { SwapChain->Present(0, 0); }
 
 } /* namespace RHI */

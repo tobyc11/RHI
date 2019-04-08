@@ -12,6 +12,7 @@ if(RHI_BACKEND_DIRECT3D11)
     target_compile_definitions(Backend INTERFACE RHI_IMPL_DIRECT3D11)
     add_library(BackendPriv INTERFACE)
     target_link_libraries(BackendPriv INTERFACE d3d11.lib d3dcompiler.lib dxgi.lib dxguid.lib)
+    target_link_libraries(BackendPriv INTERFACE spirv-cross-hlsl)
 elseif(RHI_BACKEND_VULKAN)
     find_package(Vulkan REQUIRED)
 
