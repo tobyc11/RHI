@@ -9,8 +9,7 @@ class CSwapChainD3D11 : public CSwapChain
 {
 public:
     // Only for internal use
-    CSwapChainD3D11(CDeviceD3D11& parent, IDXGISwapChain* inSwapChain);
-    ~CSwapChainD3D11();
+    CSwapChainD3D11(CDeviceD3D11& parent, ComPtr<IDXGISwapChain> inSwapChain);
 
     // Inherited via CSwapChain
     void Resize(uint32_t width, uint32_t height) override;
@@ -18,12 +17,13 @@ public:
 
     CImage::Ref GetImage() override;
 
-    void AcquireNextImage() override;
+    bool AcquireNextImage() override;
     void Present(const CSwapChainPresentInfo& info) override;
 
 private:
     CDeviceD3D11& Parent;
-    IDXGISwapChain* SwapChain;
+    ComPtr<IDXGISwapChain> SwapChain;
+    bool bNeedResize = false;
 };
 
 } /* namespace RHI */

@@ -346,7 +346,9 @@ CSwapChain::Ref CDeviceD3D11::CreateSwapChain(const CPresentationSurfaceDesc& in
     if (FAILED(hr))
         throw CRHIException("CreateSwapChain failed");
 
-    CSwapChain::Ref result = std::make_shared<CSwapChainD3D11>(*this, pSwapChain);
+    ComPtr<IDXGISwapChain> swapChainPtr(pSwapChain);
+    CSwapChain::Ref result = std::make_shared<CSwapChainD3D11>(*this, swapChainPtr);
+    pSwapChain->Release();
     if (pSwapChain1)
         pSwapChain1->Release();
     return result;

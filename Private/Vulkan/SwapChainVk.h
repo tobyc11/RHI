@@ -12,6 +12,7 @@ namespace RHI
 struct CPhysicalDeviceSwapChainCaps
 {
     bool bIsSuitable;
+    VkPhysicalDevice PhysicalDevice;
     VkSurfaceKHR AssociatedSurface;
     VkSurfaceCapabilitiesKHR Capabilities;
     std::vector<VkSurfaceFormatKHR> SurfaceFormats;
@@ -27,7 +28,7 @@ public:
     static VkSurfaceFormatKHR SelectImageFormat(const CPhysicalDeviceSwapChainCaps& caps);
     static VkPresentModeKHR SelectPresentMode(const CPhysicalDeviceSwapChainCaps& caps);
     static VkExtent2D SelectSurfaceExtent(const CPhysicalDeviceSwapChainCaps& caps);
-	
+
     CSwapChainVk(CDeviceVk& device, const CPhysicalDeviceSwapChainCaps& caps);
     ~CSwapChainVk() override;
 
@@ -35,22 +36,26 @@ public:
     void GetSize(uint32_t& width, uint32_t& height) const override;
 
     CImage::Ref GetImage() override;
-    void AcquireNextImage() override;
+    bool AcquireNextImage() override;
     void Present(const CSwapChainPresentInfo& info) override;
 
     // Internal api
-    const VkSurfaceFormatKHR& GetChosenFormat() const { return ChosenFormat; }
+    const VkFormat& GetChosenFormat() const { return CreateInfo.imageFormat; }
     const std::vector<VkImage>& GetVkImages() const { return Images; }
     const std::vector<VkImageView>& GetVkImageViews() const { return ImageViews; }
     std::queue<std::pair<uint32_t, VkSemaphore>> AcquiredImages;
+#ifdef _DEBUG
+    uint32_t Version = 0;
+#endif
 
 private:
-    CDeviceVk& Parent;
-    VkSurfaceKHR Surface;
+    void ReleaseSwapChainAndImages(bool dontDeleteSwapchain = false);
+    void CreateSwapChainAndImages();
 
-    VkSurfaceFormatKHR ChosenFormat;
-    VkPresentModeKHR ChosenPresentMode;
-    VkExtent2D CurrentExtent;
+    CDeviceVk& Parent;
+    VkPhysicalDevice PhysicalDevice;
+    VkSwapchainCreateInfoKHR CreateInfo;
+    bool bNeedResize = false;
 
     VkSwapchainKHR SwapChainHandle;
     std::vector<VkImage> Images;

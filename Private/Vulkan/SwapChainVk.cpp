@@ -11,6 +11,7 @@ CPhysicalDeviceSwapChainCaps CSwapChainVk::GetDeviceSwapChainCaps(VkSurfaceKHR s
 {
     CPhysicalDeviceSwapChainCaps caps;
     caps.AssociatedSurface = surface;
+    caps.PhysicalDevice = device;
 
     VkBool32 presentSupported;
     uint32_t queueFamilyCount = 0;
@@ -134,70 +135,67 @@ VkExtent2D CSwapChainVk::SelectSurfaceExtent(const CPhysicalDeviceSwapChainCaps&
 
 CSwapChainVk::CSwapChainVk(CDeviceVk& device, const CPhysicalDeviceSwapChainCaps& caps)
     : Parent(device)
-    , Surface(caps.AssociatedSurface)
+    , PhysicalDevice(caps.PhysicalDevice)
 {
-    ChosenFormat = SelectImageFormat(caps);
+    auto chosenFormat = SelectImageFormat(caps);
 
-    VkSwapchainCreateInfoKHR createInfo;
-    createInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-    createInfo.pNext = nullptr;
-    createInfo.flags = 0;
-    createInfo.surface = Surface;
-    createInfo.minImageCount = caps.Capabilities.minImageCount + 1;
-    createInfo.imageFormat = ChosenFormat.format;
-    createInfo.imageColorSpace = ChosenFormat.colorSpace;
-    createInfo.imageExtent = CurrentExtent = SelectSurfaceExtent(caps);
-    createInfo.imageArrayLayers = 1;
-    createInfo.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-    createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    createInfo.queueFamilyIndexCount = 0;
-    createInfo.pQueueFamilyIndices = nullptr;
-    createInfo.preTransform = caps.Capabilities.currentTransform;
-    createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    createInfo.presentMode = ChosenPresentMode = SelectPresentMode(caps);
-    createInfo.clipped = VK_TRUE;
-    createInfo.oldSwapchain = VK_NULL_HANDLE;
-    vkCreateSwapchainKHR(Parent.GetVkDevice(), &createInfo, nullptr, &SwapChainHandle);
+    CreateInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    CreateInfo.pNext = nullptr;
+    CreateInfo.flags = 0;
+    CreateInfo.surface = caps.AssociatedSurface;
+    CreateInfo.minImageCount = caps.Capabilities.minImageCount + 1;
+    CreateInfo.imageFormat = chosenFormat.format;
+    CreateInfo.imageColorSpace = chosenFormat.colorSpace;
+    CreateInfo.imageExtent = SelectSurfaceExtent(caps);
+    CreateInfo.imageArrayLayers = 1;
+    CreateInfo.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    CreateInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    CreateInfo.queueFamilyIndexCount = 0;
+    CreateInfo.pQueueFamilyIndices = nullptr;
+    CreateInfo.preTransform = caps.Capabilities.currentTransform;
+    CreateInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    CreateInfo.presentMode = SelectPresentMode(caps);
+    CreateInfo.clipped = VK_TRUE;
+    CreateInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    // Get the images
-    uint32_t imageCount;
-    vkGetSwapchainImagesKHR(Parent.GetVkDevice(), SwapChainHandle, &imageCount, nullptr);
-    Images.resize(imageCount);
-    vkGetSwapchainImagesKHR(Parent.GetVkDevice(), SwapChainHandle, &imageCount, Images.data());
-
-    // Create a view for each image
-    VkImageViewCreateInfo viewInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
-    viewInfo.image = VK_NULL_HANDLE;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = ChosenFormat.format;
-    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.levelCount = 1;
-    viewInfo.subresourceRange.layerCount = 1;
-    for (uint32_t i = 0; i < imageCount; i++)
-    {
-        VkImageView view;
-        viewInfo.image = Images[i];
-        vkCreateImageView(Parent.GetVkDevice(), &viewInfo, nullptr, &view);
-        ImageViews.push_back(view);
-    }
+    CreateSwapChainAndImages();
 }
 
 CSwapChainVk::~CSwapChainVk()
 {
-    for (auto iv : ImageViews)
-        vkDestroyImageView(Parent.GetVkDevice(), iv, nullptr);
-    vkDestroySwapchainKHR(Parent.GetVkDevice(), SwapChainHandle, nullptr);
-    vkDestroySurfaceKHR(Parent.GetVkInstance(), Surface, nullptr);
+    ReleaseSwapChainAndImages();
+    vkDestroySurfaceKHR(Parent.GetVkInstance(), CreateInfo.surface, nullptr);
 }
 
-void CSwapChainVk::Resize(uint32_t width, uint32_t height) { throw "unimplemented"; }
+void CSwapChainVk::Resize(uint32_t width, uint32_t height)
+{
+    vkDeviceWaitIdle(Parent.GetVkDevice());
+
+    CreateInfo.imageExtent.width = width;
+    CreateInfo.imageExtent.height = height;
+    CreateInfo.oldSwapchain = SwapChainHandle;
+
+    if (width == UINT32_MAX && height == UINT32_MAX)
+    {
+        VkSurfaceCapabilitiesKHR caps;
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(PhysicalDevice, CreateInfo.surface, &caps);
+        CreateInfo.imageExtent = caps.currentExtent;
+    }
+
+    ReleaseSwapChainAndImages(true);
+    CreateSwapChainAndImages();
+    vkDestroySwapchainKHR(Parent.GetVkDevice(), CreateInfo.oldSwapchain, nullptr);
+    CreateInfo.oldSwapchain = VK_NULL_HANDLE;
+
+#ifdef _DEBUG
+    Version++;
+#endif
+}
 
 void CSwapChainVk::GetSize(uint32_t& width, uint32_t& height) const
 {
-    width = CurrentExtent.width;
-    height = CurrentExtent.height;
+    width = CreateInfo.imageExtent.width;
+    height = CreateInfo.imageExtent.height;
 }
 
 CImage::Ref CSwapChainVk::GetImage()
@@ -207,7 +205,7 @@ CImage::Ref CSwapChainVk::GetImage()
     return ProxyImage;
 }
 
-void CSwapChainVk::AcquireNextImage()
+bool CSwapChainVk::AcquireNextImage()
 {
     VkSemaphore imageAvailableSemaphore;
     VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
@@ -221,9 +219,14 @@ void CSwapChainVk::AcquireNextImage()
     result = vkAcquireNextImageKHR(Parent.GetVkDevice(), SwapChainHandle, UINT64_MAX,
                                    imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
     if (result != VK_SUCCESS)
-        throw CRHIRuntimeError("failed to acquire image!");
+    {
+        if (result == VK_ERROR_OUT_OF_DATE_KHR)
+            bNeedResize = true;
+        return false;
+    }
 
     AcquiredImages.push(std::make_pair(imageIndex, imageAvailableSemaphore));
+    return true;
 }
 
 void CSwapChainVk::Present(const CSwapChainPresentInfo& info)
@@ -243,6 +246,47 @@ void CSwapChainVk::Present(const CSwapChainPresentInfo& info)
 
     vkDestroySemaphore(Parent.GetVkDevice(), AcquiredImages.front().second, nullptr);
     AcquiredImages.pop();
+}
+
+void CSwapChainVk::ReleaseSwapChainAndImages(bool dontDeleteSwapchain)
+{
+    for (auto iv : ImageViews)
+        vkDestroyImageView(Parent.GetVkDevice(), iv, nullptr);
+    ImageViews.clear();
+    Images.clear();
+    if (!dontDeleteSwapchain)
+        vkDestroySwapchainKHR(Parent.GetVkDevice(), SwapChainHandle, nullptr);
+    ProxyImage.reset();
+}
+
+void CSwapChainVk::CreateSwapChainAndImages()
+{
+    // Create swapchain object
+    vkCreateSwapchainKHR(Parent.GetVkDevice(), &CreateInfo, nullptr, &SwapChainHandle);
+
+    // Get the images
+    uint32_t imageCount;
+    vkGetSwapchainImagesKHR(Parent.GetVkDevice(), SwapChainHandle, &imageCount, nullptr);
+    Images.resize(imageCount);
+    vkGetSwapchainImagesKHR(Parent.GetVkDevice(), SwapChainHandle, &imageCount, Images.data());
+
+    // Create a view for each image
+    VkImageViewCreateInfo viewInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    viewInfo.image = VK_NULL_HANDLE;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = CreateInfo.imageFormat;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.baseMipLevel = 0;
+    viewInfo.subresourceRange.baseArrayLayer = 0;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.layerCount = 1;
+    for (uint32_t i = 0; i < imageCount; i++)
+    {
+        VkImageView view;
+        viewInfo.image = Images[i];
+        vkCreateImageView(Parent.GetVkDevice(), &viewInfo, nullptr, &view);
+        ImageViews.push_back(view);
+    }
 }
 
 }

@@ -21,9 +21,16 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
         {
             auto swapChainImpl = std::static_pointer_cast<CSwapChainVk>(viewImpl->SwapChain.lock());
             swapChainViews = swapChainImpl->GetVkImageViews();
+#ifdef _DEBUG
+            SwapChainVersion = swapChainImpl->Version;
+#endif
 
             bIsSwapChainProxy = true;
             SwapChain = viewImpl->SwapChain;
+        }
+        else
+        {
+            AttachmentViews.push_back(attachment.ImageView);
         }
 
         AttachmentsVk.push_back(VkAttachmentDescription());
@@ -168,6 +175,7 @@ CRenderPassVk::~CRenderPassVk()
         vkDestroyFramebuffer(Parent.GetVkDevice(), fb, nullptr);
     }
     vkDestroyRenderPass(Parent.GetVkDevice(), RenderPass, nullptr);
+    AttachmentViews.clear();
 }
 
 std::pair<VkFramebuffer, VkSemaphore> CRenderPassVk::GetNextFramebuffer()
@@ -178,6 +186,10 @@ std::pair<VkFramebuffer, VkSemaphore> CRenderPassVk::GetNextFramebuffer()
     auto swapChainImpl = std::static_pointer_cast<CSwapChainVk>(SwapChain.lock());
     if (swapChainImpl->AcquiredImages.empty())
         throw CRHIException("Did not acquire any image from the swap chain");
+#ifdef _DEBUG
+    if (SwapChainVersion != swapChainImpl->Version)
+        throw CRHIException("Framebuffer (renderpass) outdated with respect to swap chain");
+#endif
     return std::make_pair(Framebuffer[swapChainImpl->AcquiredImages.front().first],
                           swapChainImpl->AcquiredImages.front().second);
 }

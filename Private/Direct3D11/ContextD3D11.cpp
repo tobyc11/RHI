@@ -65,7 +65,6 @@ void CContextD3D11::NextSubpass()
     std::static_pointer_cast<CRenderPassD3D11>(CurrPass)->Bind(Imm(), CurrSubpass++, {});
     // clear states to match vulkan behavior
     Imm()->ClearState();
-    CurrPass.reset();
     CurrPipeline.reset();
     VSBoundLayouts.clear();
     PSBoundLayouts.clear();

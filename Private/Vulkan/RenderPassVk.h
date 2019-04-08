@@ -25,12 +25,16 @@ public:
 
     bool bIsSwapChainProxy;
     CSwapChain::WeakRef SwapChain;
+#ifdef _DEBUG
+    uint32_t SwapChainVersion = 0;
+#endif
     std::pair<VkFramebuffer, VkSemaphore> GetNextFramebuffer();
 
 private:
     CDeviceVk& Parent;
     uint32_t ColorAttachmentCount = 0;
     std::vector<VkAttachmentDescription> AttachmentsVk;
+    std::vector<CImageView::Ref> AttachmentViews; // Sole purpose is to hold images alive
     VkRect2D Area;
 };
 

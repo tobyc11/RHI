@@ -25,7 +25,7 @@ CImageVk::CImageVk(CDeviceVk& p, CSwapChain::WeakRef swapChain)
     , SwapChain(swapChain)
 {
     auto chain = std::static_pointer_cast<CSwapChainVk>(SwapChain.lock());
-    CreateInfo.format = chain->GetChosenFormat().format;
+    CreateInfo.format = chain->GetChosenFormat();
     CreateInfo.arrayLayers = 1;
     CreateInfo.mipLevels = 1;
     DefaultState = EResourceState::Present;

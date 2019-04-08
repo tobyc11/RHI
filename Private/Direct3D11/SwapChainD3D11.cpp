@@ -6,19 +6,27 @@
 namespace RHI
 {
 
-CSwapChainD3D11::CSwapChainD3D11(CDeviceD3D11& parent, IDXGISwapChain* inSwapChain)
+CSwapChainD3D11::CSwapChainD3D11(CDeviceD3D11& parent, ComPtr<IDXGISwapChain> inSwapChain)
     : Parent(parent)
     , SwapChain(inSwapChain)
 {
 }
 
-CSwapChainD3D11::~CSwapChainD3D11() { SwapChain->Release(); }
-
 void CSwapChainD3D11::Resize(uint32_t width, uint32_t height)
 {
     DXGI_SWAP_CHAIN_DESC desc;
     SwapChain->GetDesc(&desc);
-    SwapChain->ResizeBuffers(desc.BufferCount, width, height, desc.BufferDesc.Format, 0);
+    if (width == UINT32_MAX && height == UINT32_MAX)
+    {
+        RECT rect;
+        GetClientRect(desc.OutputWindow, &rect);
+        UINT wndWidth = rect.right;
+        UINT wndHeight = rect.bottom;
+        SwapChain->ResizeBuffers(desc.BufferCount, wndWidth, wndHeight, desc.BufferDesc.Format, 0);
+    }
+    else
+        SwapChain->ResizeBuffers(desc.BufferCount, width, height, desc.BufferDesc.Format, 0);
+    bNeedResize = false;
 }
 
 void CSwapChainD3D11::GetSize(uint32_t& width, uint32_t& height) const
@@ -37,8 +45,24 @@ CImage::Ref CSwapChainD3D11::GetImage()
     return std::make_shared<CImageD3D11>(Parent, pBackBuffer);
 }
 
-void CSwapChainD3D11::AcquireNextImage() {}
+bool CSwapChainD3D11::AcquireNextImage() { return !bNeedResize; }
 
-void CSwapChainD3D11::Present(const CSwapChainPresentInfo& info) { SwapChain->Present(0, 0); }
+void CSwapChainD3D11::Present(const CSwapChainPresentInfo& info)
+{
+    HRESULT hr = SwapChain->Present(0, 0);
+    if (hr == DXGI_STATUS_OCCLUDED)
+    {
+        // TODO: wait a bit
+    }
+
+    DXGI_SWAP_CHAIN_DESC desc;
+    SwapChain->GetDesc(&desc);
+    RECT rect;
+    GetClientRect(desc.OutputWindow, &rect);
+    UINT wndWidth = rect.right;
+    UINT wndHeight = rect.bottom;
+    if (wndWidth != desc.BufferDesc.Width || wndHeight != desc.BufferDesc.Height)
+        bNeedResize = true;
+}
 
 } /* namespace RHI */

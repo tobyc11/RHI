@@ -83,7 +83,7 @@ CImageVk::Ref CImageViewVk::GetImage() const
 VkFormat CImageViewVk::GetFormat() const
 {
     if (bIsSwapChainProxy)
-        return std::static_pointer_cast<CSwapChainVk>(SwapChain.lock())->GetChosenFormat().format;
+        return std::static_pointer_cast<CSwapChainVk>(SwapChain.lock())->GetChosenFormat();
     return ViewCreateInfo.format;
 }
 

@@ -6,6 +6,8 @@
 namespace RHI
 {
 
+// TODO make arguments weak references. It's awkward if a desc holds a strong reference and we can't
+// release that object in time
 struct CPipelineDesc
 {
     CShaderModule::Ref VS;

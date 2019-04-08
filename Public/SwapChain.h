@@ -22,7 +22,7 @@ public:
 
 	virtual CImage::Ref GetImage() = 0;
 
-    virtual void AcquireNextImage() = 0;
+    virtual bool AcquireNextImage() = 0;
     virtual void Present(const CSwapChainPresentInfo& info) = 0;
 };
 
