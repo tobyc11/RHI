@@ -130,7 +130,7 @@ void CContextD3D11::BindSampler(CSampler::Ref sampler, uint32_t set, uint32_t bi
 void CContextD3D11::BindIndexBuffer(CBuffer::Ref buffer, size_t offset, EFormat format)
 {
     auto impl = std::static_pointer_cast<CBufferD3D11>(buffer);
-    Imm()->IASetIndexBuffer(impl->GetD3D11Buffer(), Convert(format), offset);
+    Imm()->IASetIndexBuffer(impl->GetD3D11Buffer(), Convert(format), static_cast<UINT>(offset));
 }
 
 void CContextD3D11::BindVertexBuffer(uint32_t binding, CBuffer::Ref buffer, size_t offset)
@@ -138,7 +138,7 @@ void CContextD3D11::BindVertexBuffer(uint32_t binding, CBuffer::Ref buffer, size
     auto impl = std::static_pointer_cast<CBufferD3D11>(buffer);
     ID3D11Buffer* buf = impl->GetD3D11Buffer();
     uint32_t stride = CurrPipeline->BindingToStride[binding];
-    uint32_t off = offset;
+    UINT off = static_cast<UINT>(offset);
     Imm()->IASetVertexBuffers(binding, 1, &buf, &stride, &off);
 }
 

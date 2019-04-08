@@ -67,8 +67,8 @@ public:
                 inDesc.DepthWriteEnable ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
             desc.DepthFunc = Convert(inDesc.DepthCompareOp);
             desc.StencilEnable = inDesc.StencilTestEnable;
-            desc.StencilReadMask = inDesc.Front.CompareMask;
-            desc.StencilWriteMask = inDesc.Front.WriteMask;
+            desc.StencilReadMask = static_cast<UINT8>(inDesc.Front.CompareMask);
+            desc.StencilWriteMask = static_cast<UINT8>(inDesc.Front.WriteMask);
             desc.FrontFace.StencilFailOp = Convert(inDesc.Front.FailOp);
             desc.FrontFace.StencilDepthFailOp = Convert(inDesc.Front.DepthFailOp);
             desc.FrontFace.StencilPassOp = Convert(inDesc.Front.PassOp);

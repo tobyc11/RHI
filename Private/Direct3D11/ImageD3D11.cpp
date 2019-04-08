@@ -74,7 +74,7 @@ void CImageD3D11::CreateFromMem(const void* mem) const
         srv.Format = Desc2D.Format;
         srv.ViewDimension = D3D_SRV_DIMENSION_TEXTURE2D;
         srv.Texture2D.MostDetailedMip = 0;
-        srv.Texture2D.MipLevels = -1;
+        srv.Texture2D.MipLevels = static_cast<UINT>(-1);
         ComPtr<ID3D11ShaderResourceView> srvPtr;
         Parent.D3dDevice->CreateShaderResourceView(tex.Get(), &srv, srvPtr.GetAddressOf());
         Parent.ImmediateContext->GenerateMips(srvPtr.Get());
