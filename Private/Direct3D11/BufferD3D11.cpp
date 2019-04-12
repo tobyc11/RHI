@@ -25,7 +25,7 @@ CBufferD3D11::CBufferD3D11(ID3D11Device* d3dDevice, size_t size, EBufferUsageFla
 
     D3D11_BUFFER_DESC bd = {};
     bd.Usage = D3dUsage;
-    bd.ByteWidth = size;
+    bd.ByteWidth = static_cast<UINT>(size);
     bd.BindFlags = bindFlags;
     bd.CPUAccessFlags = accessFlags;
 

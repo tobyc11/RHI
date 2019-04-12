@@ -88,7 +88,7 @@ public:
 
 private:
     spirv_cross::CompilerHLSL hlsl;
-    char ShaderStage;
+    char ShaderStage = 'x';
     std::unordered_map<uint32_t, CDescriptorSetRemap> DescSetRemaps;
     ComPtr<ID3DBlob> DXBCBlob;
 
