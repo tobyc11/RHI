@@ -5,6 +5,10 @@ set(MODULE_NAME RHI)
 
 set(CMAKE_CXX_STANDARD 17)
 
+if(NOT TARGET spirv-cross-glsl)
+    message(WARNING "RHI cannot find target spirv-cross-glsl. Build will likely fail. Is SPIRV-Cross included with your project?")
+endif()
+
 if(RHI_BACKEND_DIRECT3D11)
     file(GLOB RHI_PRIVATE_DIRECT3D11_SOURCES Private/Direct3D11/*.h Private/Direct3D11/*.cpp)
     source_group(Private\\Direct3D11 FILES ${RHI_PRIVATE_DIRECT3D11_SOURCES})
