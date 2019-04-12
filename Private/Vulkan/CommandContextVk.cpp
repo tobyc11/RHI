@@ -384,13 +384,18 @@ void CCommandContextVk::BeginRenderPass(CRenderPass::Ref renderPass,
     beginInfo.clearValueCount = static_cast<uint32_t>(clear.size());
     beginInfo.pClearValues = clear.data();
     RenderArea = beginInfo.renderArea = rpImpl->GetArea();
+    bIsInRenderPass = true;
 
     vkCmdBeginRenderPass(CmdBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 }
 
 void CCommandContextVk::NextSubpass() { throw "unimplemented"; }
 
-void CCommandContextVk::EndRenderPass() { vkCmdEndRenderPass(CmdBuffer); }
+void CCommandContextVk::EndRenderPass()
+{
+    bIsInRenderPass = false;
+    vkCmdEndRenderPass(CmdBuffer);
+}
 
 void CCommandContextVk::BindPipeline(CPipeline::Ref pipeline)
 {

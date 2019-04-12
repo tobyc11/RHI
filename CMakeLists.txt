@@ -12,7 +12,7 @@ if(RHI_BACKEND_DIRECT3D11)
     target_compile_definitions(Backend INTERFACE RHI_IMPL_DIRECT3D11)
     add_library(BackendPriv INTERFACE)
     target_link_libraries(BackendPriv INTERFACE d3d11.lib d3dcompiler.lib dxgi.lib dxguid.lib)
-    target_link_libraries(BackendPriv INTERFACE spirv-cross-hlsl)
+    target_link_libraries(BackendPriv INTERFACE spirv-cross-hlsl) #spirv must be included in the project
 elseif(RHI_BACKEND_VULKAN)
     find_package(Vulkan REQUIRED)
 
@@ -22,7 +22,7 @@ elseif(RHI_BACKEND_VULKAN)
     target_compile_definitions(Backend INTERFACE RHI_IMPL_VULKAN)
     add_library(BackendPriv INTERFACE)
     target_link_libraries(BackendPriv INTERFACE Vulkan::Vulkan)
-    target_link_libraries(BackendPriv INTERFACE spirv-cross-glsl)
+    target_link_libraries(BackendPriv INTERFACE spirv-cross-glsl) #spirv must be included in the project
 endif()
 
 file(GLOB RHI_PRIVATE_SOURCES Private/*.h Private/*.cpp)
@@ -47,4 +47,6 @@ generate_export_header(${MODULE_NAME} EXPORT_MACRO_NAME RHI_API EXPORT_FILE_NAME
 
 #Dependencies on other modules
 target_link_libraries(${MODULE_NAME} PUBLIC Foundation)
-target_link_libraries(${MODULE_NAME} PUBLIC Math)
+if (TARGET imgui)
+	target_link_libraries(${MODULE_NAME} PUBLIC imgui)
+endif()

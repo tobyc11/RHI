@@ -92,30 +92,31 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
     ColorAttachmentCount = subpassDescriptions[0].colorAttachmentCount;
 
     // Let's only handle the situation where there is only one subpass
-    // TODO:
-    // std::vector<VkSubpassDependency> dependency(2);
-    // dependency[0].dependencyFlags = 0;
-    // dependency[0].srcSubpass = VK_SUBPASS_EXTERNAL;
-    // dependency[0].dstSubpass = 0;
-    // dependency[0].srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    // dependency[0].srcAccessMask = 0;
-    // dependency[0].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    // dependency[0].dstAccessMask = 0;
-    // dependency[1].dependencyFlags = 0;
-    // dependency[1].srcSubpass = 0;
-    // dependency[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-    // dependency[1].srcStageMask = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
-    // dependency[1].srcAccessMask =
-    //    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    // dependency[1].dstStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-    // dependency[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    std::vector<VkSubpassDependency> dependency(2);
+    dependency[0].dependencyFlags = 0;
+    dependency[0].srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency[0].dstSubpass = 0;
+    dependency[0].srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    dependency[0].srcAccessMask = 0;
+    dependency[0].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    dependency[0].dstAccessMask = 0;
+    dependency[1].dependencyFlags = 0;
+    dependency[1].srcSubpass = 0;
+    dependency[1].dstSubpass = VK_SUBPASS_EXTERNAL;
+    dependency[1].srcStageMask = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
+    dependency[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+        | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    dependency[1].dstStageMask =
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dependency[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
+    // TODO: barrier too aggresive?
 
     passInfo.attachmentCount = static_cast<uint32_t>(AttachmentsVk.size());
     passInfo.pAttachments = AttachmentsVk.data();
     passInfo.subpassCount = static_cast<uint32_t>(subpassDescriptions.size());
     passInfo.pSubpasses = subpassDescriptions.data();
-    // passInfo.dependencyCount = dependency.size();
-    // passInfo.pDependencies = dependency.data();
+    passInfo.dependencyCount = static_cast<uint32_t>(dependency.size());
+    passInfo.pDependencies = dependency.data();
 
     vkCreateRenderPass(Parent.GetVkDevice(), &passInfo, nullptr, &RenderPass);
 

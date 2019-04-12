@@ -37,6 +37,7 @@ public:
     // For internal use only
     VkCommandBuffer GetBuffer() const { return CmdBuffer; }
     VkSemaphore GetSignalSemaphore() const { return SignalSemaphore; }
+    bool IsInRenderPass() const { return bIsInRenderPass; }
 
     void TransitionImage(CImage* image, EResourceState newState);
 
@@ -93,6 +94,7 @@ private:
     std::vector<VkCommandBuffer> GarbageBuffers;
 
     // Render states kept track of
+    bool bIsInRenderPass = false;
     VkRect2D RenderArea {};
 
     CPipelineVk* CurrPipeline = nullptr;

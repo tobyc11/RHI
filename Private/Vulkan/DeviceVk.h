@@ -51,6 +51,8 @@ struct CGPUJobInfo
 class CDeviceVk : public CDevice
 {
 public:
+    typedef std::shared_ptr<CDeviceVk> Ref;
+
     CDeviceVk(EDeviceCreateHints hints);
     ~CDeviceVk() override;
 
@@ -96,6 +98,7 @@ public:
     // Vulkan specific getters
     VkInstance GetVkInstance() const;
     VkDevice GetVkDevice() const { return Device; }
+    VkPhysicalDevice GetVkPhysicalDevice() const { return PhysicalDevice; }
     const VkPhysicalDeviceLimits& GetVkLimits() const { return Properties.limits; }
     VmaAllocator GetAllocator() const { return Allocator; }
     VkQueue GetVkQueue(uint32_t type) const { return Queues[type][0]; }
@@ -131,7 +134,7 @@ private:
     // A ring buffer contains the jobs currently in flight
     std::mutex JobSubmitMutex;
     std::queue<CGPUJobInfo> JobQueue;
-    static const uint32_t MaxJobsInFlight = 8;
+    static const uint32_t MaxJobsInFlight = 2;
 
     // Every job submission collects those, and deletes them when job is finished
     std::vector<std::pair<VkBuffer, VmaAllocation>> PendingDeletionBuffers;
