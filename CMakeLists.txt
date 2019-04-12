@@ -53,4 +53,5 @@ generate_export_header(${MODULE_NAME} EXPORT_MACRO_NAME RHI_API EXPORT_FILE_NAME
 target_link_libraries(${MODULE_NAME} PUBLIC Foundation)
 if (TARGET imgui)
 	target_link_libraries(${MODULE_NAME} PUBLIC imgui)
+	target_compile_definitions(${MODULE_NAME} PRIVATE RHI_HAS_IMGUI)
 endif()

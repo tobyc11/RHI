@@ -41,6 +41,10 @@ CSPIRVToHLSL::CSPIRVToHLSL(std::vector<uint32_t> spirvBinary)
     options.support_nonzero_base_vertex_base_instance = false;
     options.shader_model = 40;
     hlsl.set_hlsl_options(options);
+
+    spirv_cross::CompilerGLSL::Options commonOptions;
+    commonOptions.vertex.flip_vert_y = true;
+    hlsl.set_common_options(commonOptions);
 }
 
 std::string CSPIRVToHLSL::Compile()

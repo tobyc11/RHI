@@ -1,3 +1,5 @@
+#ifdef RHI_HAS_IMGUI
+
 #include "CommandContextVk.h"
 #include "DeviceVk.h"
 #include "RHIImGuiBackend.h"
@@ -103,3 +105,5 @@ void CRHIImGuiBackend::RenderDrawData(ImDrawData* draw_data, IRenderContext::Ref
 }
 
 }
+
+#endif
