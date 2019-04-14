@@ -18,6 +18,7 @@ struct CBoundResource
     ID3D11SamplerState* Sampler;
 
     ComPtr<ID3D11Buffer> TransientCBuffer;
+    uint32_t TransientCBufferSize;
 
     void SetBuffer(ID3D11Buffer* buffer, size_t offset, size_t range)
     {

@@ -15,13 +15,14 @@ void CContextD3D11::CopyBuffer(CBuffer* src, CBuffer* dst, const std::vector<CBu
     for (const auto& region : regions)
     {
         D3D11_BOX srcBox;
-        srcBox.left = region.SrcOffset;
-        srcBox.right = region.SrcOffset + region.Size;
+        srcBox.left = static_cast<UINT>(region.SrcOffset);
+        srcBox.right = static_cast<UINT>(region.SrcOffset) + static_cast<UINT>(region.Size);
         srcBox.top = 0;
         srcBox.bottom = 1;
         srcBox.front = 0;
         srcBox.back = 1;
-        Imm()->CopySubresourceRegion(dstImpl->GetD3D11Buffer(), 0, region.DstOffset, 0, 0,
+        Imm()->CopySubresourceRegion(dstImpl->GetD3D11Buffer(), 0,
+                                     static_cast<UINT>(region.DstOffset), 0, 0,
                                      srcImpl->GetD3D11Buffer(), 0, &srcBox);
     }
 }
@@ -124,6 +125,7 @@ void CContextD3D11::BindBuffer(CBuffer::Ref buffer, size_t offset, size_t range,
         iter->second.SetBuffer(std::static_pointer_cast<CBufferD3D11>(buffer)->GetD3D11Buffer(),
                                offset, range);
     }
+    assert(offset == 0); // D3D11.0 does not support offset in cbuffer binding
 }
 
 void CContextD3D11::BindBufferView(CBufferView::Ref bufferView, uint32_t set, uint32_t binding,
@@ -140,12 +142,16 @@ void RHI::CContextD3D11::BindConstants(const void* pData, size_t size, uint32_t 
     if (iter == BoundResources.end())
     {
         CBoundResource bound {};
+        // Create a transient (no really) constant buffer for this slot
         D3D11_BUFFER_DESC bd = {};
-        bd.ByteWidth = static_cast<UINT>(size);
+        bd.ByteWidth = static_cast<UINT>(size) * 2;
         bd.Usage = D3D11_USAGE_DYNAMIC;
         bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
         bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
         Parent.D3dDevice->CreateBuffer(&bd, nullptr, bound.TransientCBuffer.GetAddressOf());
+        bound.TransientCBufferSize = bd.ByteWidth;
+
+        // Set buffer and record the binding
         bound.Buffer = bound.TransientCBuffer.Get();
         D3D11_MAPPED_SUBRESOURCE mapped;
         Imm()->Map(bound.TransientCBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
@@ -155,6 +161,19 @@ void RHI::CContextD3D11::BindConstants(const void* pData, size_t size, uint32_t 
     }
     else
     {
+        if (iter->second.TransientCBufferSize < size)
+        {
+            // Recreate the buffer since it's too small
+            iter->second.TransientCBuffer.Reset();
+            D3D11_BUFFER_DESC bd = {};
+            bd.ByteWidth = static_cast<UINT>(size) * 2;
+            bd.Usage = D3D11_USAGE_DYNAMIC;
+            bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+            bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+            Parent.D3dDevice->CreateBuffer(&bd, nullptr,
+                                           iter->second.TransientCBuffer.GetAddressOf());
+            iter->second.TransientCBufferSize = bd.ByteWidth;
+        }
         D3D11_MAPPED_SUBRESOURCE mapped;
         Imm()->Map(iter->second.TransientCBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
         memcpy(mapped.pData, pData, size);
