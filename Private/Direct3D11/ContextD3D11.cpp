@@ -109,11 +109,21 @@ void CContextD3D11::BindPipeline(CPipeline::Ref pipeline)
 void CContextD3D11::BindBuffer(CBuffer::Ref buffer, size_t offset, size_t range, uint32_t set,
                                uint32_t binding, uint32_t index)
 {
-    CBoundResource bound {};
-    bound.Buffer = std::static_pointer_cast<CBufferD3D11>(buffer)->GetD3D11Buffer();
-    bound.Offset = offset;
-    bound.Range = range;
-    BoundResources[MakeTriple(set, binding, index)] = bound;
+    auto location = MakeTriple(set, binding, index);
+    auto iter = BoundResources.find(location);
+    if (iter == BoundResources.end())
+    {
+        CBoundResource bound {};
+        bound.Buffer = std::static_pointer_cast<CBufferD3D11>(buffer)->GetD3D11Buffer();
+        bound.Offset = offset;
+        bound.Range = range;
+        BoundResources[MakeTriple(set, binding, index)] = bound;
+    }
+    else
+    {
+        iter->second.SetBuffer(std::static_pointer_cast<CBufferD3D11>(buffer)->GetD3D11Buffer(),
+                               offset, range);
+    }
 }
 
 void CContextD3D11::BindBufferView(CBufferView::Ref bufferView, uint32_t set, uint32_t binding,
@@ -122,21 +132,72 @@ void CContextD3D11::BindBufferView(CBufferView::Ref bufferView, uint32_t set, ui
     throw "unimplemented";
 }
 
+void RHI::CContextD3D11::BindConstants(const void* pData, size_t size, uint32_t set,
+                                       uint32_t binding, uint32_t index)
+{
+    auto location = MakeTriple(set, binding, index);
+    auto iter = BoundResources.find(location);
+    if (iter == BoundResources.end())
+    {
+        CBoundResource bound {};
+        D3D11_BUFFER_DESC bd = {};
+        bd.ByteWidth = static_cast<UINT>(size);
+        bd.Usage = D3D11_USAGE_DYNAMIC;
+        bd.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+        bd.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+        Parent.D3dDevice->CreateBuffer(&bd, nullptr, bound.TransientCBuffer.GetAddressOf());
+        bound.Buffer = bound.TransientCBuffer.Get();
+        D3D11_MAPPED_SUBRESOURCE mapped;
+        Imm()->Map(bound.TransientCBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        memcpy(mapped.pData, pData, size);
+        Imm()->Unmap(bound.TransientCBuffer.Get(), 0);
+        BoundResources.emplace(location, std::move(bound));
+    }
+    else
+    {
+        D3D11_MAPPED_SUBRESOURCE mapped;
+        Imm()->Map(iter->second.TransientCBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        memcpy(mapped.pData, pData, size);
+        Imm()->Unmap(iter->second.TransientCBuffer.Get(), 0);
+        iter->second.SetBuffer(iter->second.TransientCBuffer.Get(), 0, 0);
+    }
+}
+
 void CContextD3D11::BindImageView(CImageView::Ref imageView, uint32_t set, uint32_t binding,
                                   uint32_t index)
 {
-    CBoundResource bound {};
-    bound.ImageView =
-        std::static_pointer_cast<CImageViewD3D11>(imageView)->GetShaderResourceView().Get();
-    BoundResources[MakeTriple(set, binding, index)] = bound;
+    auto location = MakeTriple(set, binding, index);
+    auto iter = BoundResources.find(location);
+    if (iter == BoundResources.end())
+    {
+        CBoundResource bound {};
+        bound.ImageView =
+            std::static_pointer_cast<CImageViewD3D11>(imageView)->GetShaderResourceView().Get();
+        BoundResources[MakeTriple(set, binding, index)] = bound;
+    }
+    else
+    {
+        iter->second.SetImageView(
+            std::static_pointer_cast<CImageViewD3D11>(imageView)->GetShaderResourceView().Get());
+    }
 }
 
 void CContextD3D11::BindSampler(CSampler::Ref sampler, uint32_t set, uint32_t binding,
                                 uint32_t index)
 {
-    CBoundResource bound {};
-    bound.Sampler = std::static_pointer_cast<CSamplerD3D11>(sampler)->GetSamplerState();
-    BoundResources[MakeTriple(set, binding, index)] = bound;
+    auto location = MakeTriple(set, binding, index);
+    auto iter = BoundResources.find(location);
+    if (iter == BoundResources.end())
+    {
+        CBoundResource bound {};
+        bound.SetSampler(std::static_pointer_cast<CSamplerD3D11>(sampler)->GetSamplerState());
+        BoundResources[MakeTriple(set, binding, index)] = bound;
+    }
+    else
+    {
+        iter->second.SetSampler(
+            std::static_pointer_cast<CSamplerD3D11>(sampler)->GetSamplerState());
+    }
 }
 
 void CContextD3D11::BindIndexBuffer(CBuffer::Ref buffer, size_t offset, EFormat format)

@@ -16,6 +16,31 @@ struct CBoundResource
     size_t Range;
     ID3D11ShaderResourceView* ImageView;
     ID3D11SamplerState* Sampler;
+
+    ComPtr<ID3D11Buffer> TransientCBuffer;
+
+    void SetBuffer(ID3D11Buffer* buffer, size_t offset, size_t range)
+    {
+        Buffer = buffer;
+        Offset = offset;
+        Range = range;
+        ImageView = nullptr;
+        Sampler = nullptr;
+    }
+
+    void SetImageView(ID3D11ShaderResourceView* srv)
+    {
+        Buffer = nullptr;
+        ImageView = srv;
+        Sampler = nullptr;
+    }
+
+    void SetSampler(ID3D11SamplerState* sampler)
+    {
+        Buffer = nullptr;
+        ImageView = nullptr;
+        Sampler = sampler;
+    }
 };
 
 class CContextD3D11 : public IRenderContext
@@ -50,6 +75,8 @@ public:
                     uint32_t binding, uint32_t index) override;
     void BindBufferView(CBufferView::Ref bufferView, uint32_t set, uint32_t binding,
                         uint32_t index) override;
+    void BindConstants(const void* pData, size_t size, uint32_t set, uint32_t binding,
+                       uint32_t index) override;
     void BindImageView(CImageView::Ref imageView, uint32_t set, uint32_t binding,
                        uint32_t index) override;
     void BindSampler(CSampler::Ref sampler, uint32_t set, uint32_t binding,
