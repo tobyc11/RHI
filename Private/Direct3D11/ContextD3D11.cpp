@@ -10,7 +10,20 @@ namespace RHI
 
 void CContextD3D11::CopyBuffer(CBuffer* src, CBuffer* dst, const std::vector<CBufferCopy>& regions)
 {
-    throw "unimplemented";
+    auto srcImpl = std::static_pointer_cast<CBufferD3D11>(src->shared_from_this());
+    auto dstImpl = std::static_pointer_cast<CBufferD3D11>(dst->shared_from_this());
+    for (const auto& region : regions)
+    {
+        D3D11_BOX srcBox;
+        srcBox.left = region.SrcOffset;
+        srcBox.right = region.SrcOffset + region.Size;
+        srcBox.top = 0;
+        srcBox.bottom = 1;
+        srcBox.front = 0;
+        srcBox.back = 1;
+        Imm()->CopySubresourceRegion(dstImpl->GetD3D11Buffer(), 0, region.DstOffset, 0, 0,
+                                     srcImpl->GetD3D11Buffer(), 0, &srcBox);
+    }
 }
 
 void CContextD3D11::CopyImage(CImage* src, CImage* dst, const std::vector<CImageCopy>& regions)
