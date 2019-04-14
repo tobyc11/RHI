@@ -42,7 +42,9 @@ target_link_libraries(${MODULE_NAME} PUBLIC BackendPriv)
 
 target_include_directories(${MODULE_NAME} PRIVATE Private)
 target_include_directories(${MODULE_NAME} PUBLIC Public)
-target_compile_options(${MODULE_NAME} ${DEFAULT_COMPILE_OPTIONS})
+if(DEFAULT_COMPILE_OPTIONS)
+    target_compile_options(${MODULE_NAME} ${DEFAULT_COMPILE_OPTIONS})
+endif()
 
 #Generate dll linkage header
 include(GenerateExportHeader)
