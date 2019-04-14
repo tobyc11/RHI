@@ -119,6 +119,8 @@ public:
 private:
     VkDevice Device;
 
+    // NOTE: according to some AMD doc https://gpuopen.com/concurrent-execution-asynchronous-queues/
+    //   it's best to stick to one queue per family for current GPUs
     VkPhysicalDevice PhysicalDevice;
     VkPhysicalDeviceProperties Properties;
     uint32_t QueueFamilies[NumQueueType];
