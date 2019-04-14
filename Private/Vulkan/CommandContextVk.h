@@ -67,6 +67,8 @@ public:
                     uint32_t binding, uint32_t index) override;
     void BindBufferView(CBufferView::Ref bufferView, uint32_t set, uint32_t binding,
                         uint32_t index) override;
+    void BindConstants(const void* pData, size_t size, uint32_t set, uint32_t binding,
+                       uint32_t index) override;
     void BindImageView(CImageView::Ref imageView, uint32_t set, uint32_t binding,
                        uint32_t index) override;
     void BindSampler(CSampler::Ref sampler, uint32_t set, uint32_t binding,

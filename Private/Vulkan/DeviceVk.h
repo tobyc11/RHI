@@ -116,6 +116,7 @@ public:
     {
         return DescriptorSetLayoutCache.get();
     }
+    CPersistentMappedRingBuffer* GetHugeConstantBuffer() const { return HugeConstantBuffer.get(); }
 
 private:
     VkDevice Device;
@@ -133,13 +134,14 @@ private:
 
     VmaAllocator Allocator;
     std::unique_ptr<CDescriptorSetLayoutCacheVk> DescriptorSetLayoutCache;
+    std::unique_ptr<CPersistentMappedRingBuffer> HugeConstantBuffer;
 
     // A ring buffer contains the jobs currently in flight
     std::mutex JobSubmitMutex;
     std::queue<CGPUJobInfo> JobQueue;
     uint32_t FrameJobCount = 0;
     static const uint32_t MaxJobsInFlight = 8;
-    static const uint32_t MaxFramesInFlight = 1;
+    static const uint32_t MaxFramesInFlight = 2;
 
     // Every job submission collects those, and deletes them when job is finished
     std::vector<std::pair<VkBuffer, VmaAllocation>> PendingDeletionBuffers;

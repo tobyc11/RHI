@@ -333,6 +333,7 @@ void CCommandContextVk::Flush(bool wait, bool isPresent)
         vkDestroySemaphore(Parent.GetVkDevice(), SignalSemaphore, nullptr);
         for (auto& fn : DeferredDeleters)
             fn();
+        DeferredDeleters.clear();
 
         DoneWithCmdBuffer(CmdBuffer);
     }
@@ -345,7 +346,7 @@ void CCommandContextVk::Flush(bool wait, bool isPresent)
         job.WaitSemaphores = WaitSemaphores;
         job.WaitStages = WaitStages;
         job.SignalSemaphore = SignalSemaphore;
-        job.DeferredDeleters = DeferredDeleters;
+        job.DeferredDeleters = std::move(DeferredDeleters);
         job.bIsFrame = isPresent;
         Parent.SubmitJob(std::move(job));
     }
@@ -422,13 +423,24 @@ void CCommandContextVk::BindBuffer(CBuffer::Ref buffer, size_t offset, size_t ra
                                    uint32_t binding, uint32_t index)
 {
     auto bufferImpl = std::static_pointer_cast<CBufferVk>(buffer);
-    CurrBindings.BindBuffer(bufferImpl, offset, range, set, binding, index);
+    CurrBindings.BindBuffer(bufferImpl->Buffer, offset, range, set, binding, index);
 }
 
 void CCommandContextVk::BindBufferView(CBufferView::Ref bufferView, uint32_t set, uint32_t binding,
                                        uint32_t index)
 {
     throw "unimplemented";
+}
+
+void CCommandContextVk::BindConstants(const void* pData, size_t size, uint32_t set,
+                                      uint32_t binding, uint32_t index)
+{
+    auto* bufferImpl = Parent.GetHugeConstantBuffer();
+    size_t offset;
+    size_t minAlignment = Parent.GetVkLimits().minUniformBufferOffsetAlignment;
+    void* bufferData = bufferImpl->Allocate(size, minAlignment, offset);
+    memcpy(bufferData, pData, size);
+    CurrBindings.BindBuffer(bufferImpl->GetHandle(), offset, size, set, binding, index);
 }
 
 void CCommandContextVk::BindImageView(CImageView::Ref imageView, uint32_t set, uint32_t binding,
@@ -488,7 +500,7 @@ void CCommandContextVk::ResolveBindings()
     {
         std::unordered_set<uint32_t> setConflicts;
         const auto& pipelineBindings = CurrPipeline->GetSetBindings();
-        for (auto it : pipelineBindings)
+        for (const auto& it : pipelineBindings)
         {
             // For given set index, if descriptor set layouts differ, store set index in conflicts
             // map.
@@ -517,7 +529,7 @@ void CCommandContextVk::ResolveBindings()
             CurrBindings.ClearDirtyBit();
 
             // Iterate over each set binding.
-            for (auto setBindingsItr : CurrBindings.GetSetBindings())
+            for (auto& setBindingsItr : CurrBindings.GetSetBindings())
             {
                 // Skip if no bindings having changes.
                 auto set = setBindingsItr.first;
@@ -546,7 +558,7 @@ void CCommandContextVk::ResolveBindings()
                 std::vector<VkDescriptorBufferInfo> bufferInfos;
                 std::vector<VkDescriptorImageInfo> imageInfos;
                 std::vector<VkWriteDescriptorSet> descriptorWrites;
-                for (auto bindingItr : setBindings.Bindings)
+                for (const auto& bindingItr : setBindings.Bindings)
                 {
                     // Get layout binding for given binding index.
                     auto binding = bindingItr.first;
@@ -573,7 +585,7 @@ void CCommandContextVk::ResolveBindings()
 
                     // Iterate over all array elements.
                     auto& arrayElementBindings = bindingItr.second;
-                    for (auto arrayElementItr : arrayElementBindings)
+                    for (const auto& arrayElementItr : arrayElementBindings)
                     {
                         // Get the binding info.
                         auto arrayElement = arrayElementItr.first;
@@ -589,10 +601,10 @@ void CCommandContextVk::ResolveBindings()
                         dsWrite.descriptorCount = 1;
 
                         // Handle buffers.
-                        if (bindingInfo.pBuffer)
+                        if (bindingInfo.BufferHandle)
                         {
                             VkDescriptorBufferInfo bufferInfo = {};
-                            bufferInfo.buffer = bindingInfo.pBuffer->Buffer;
+                            bufferInfo.buffer = bindingInfo.BufferHandle;
                             bufferInfo.offset = bindingInfo.offset;
                             bufferInfo.range = bindingInfo.range;
                             bufferInfos.push_back(bufferInfo);

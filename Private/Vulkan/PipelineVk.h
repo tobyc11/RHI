@@ -16,7 +16,7 @@ public:
     VkPipeline GetHandle() const { return PipelineHandle; }
 
 	VkPipelineLayout GetPipelineLayout() const { return PipelineLayout; }
-    const std::unordered_map<uint32_t, std::vector<CPipelineResource>> GetSetBindings() const;
+    const std::unordered_map<uint32_t, std::vector<CPipelineResource>>& GetSetBindings() const;
     CDescriptorSetLayoutVk* GetSetLayout(uint32_t set) const;
 
 private:

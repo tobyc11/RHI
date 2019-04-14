@@ -33,7 +33,7 @@ struct BindingInfo
 {
     VkDeviceSize offset;
     VkDeviceSize range;
-    CBufferVk::Ref pBuffer;
+    VkBuffer BufferHandle;
     CImageViewVk::Ref pImageView;
     VkSampler sampler;
 };
@@ -51,7 +51,7 @@ class ResourceBindings
 public:
     bool IsDirty() const { return bDirty; }
 
-    const std::unordered_map<uint32_t, SetBindings>& GetSetBindings() { return BindingsBySet; }
+    std::unordered_map<uint32_t, SetBindings>& GetSetBindings() { return BindingsBySet; }
 
     void ClearDirtyBit() { bDirty = false; }
 
@@ -59,7 +59,7 @@ public:
 
     void Reset();
 
-    void BindBuffer(CBufferVk::Ref pBuffer, VkDeviceSize offset, VkDeviceSize range, uint32_t set,
+    void BindBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range, uint32_t set,
                     uint32_t binding, uint32_t arrayElement);
     void BindImageView(CImageViewVk::Ref pImageView, VkSampler sampler, uint32_t set,
                        uint32_t binding, uint32_t arrayElement);

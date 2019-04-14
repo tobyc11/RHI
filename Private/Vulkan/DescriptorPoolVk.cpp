@@ -68,7 +68,7 @@ CDescriptorPoolVk::~CDescriptorPoolVk()
 VkDescriptorSet CDescriptorPoolVk::AllocateDescriptorSet()
 {
     // Safe guard access to internal resources across threads.
-    std::unique_lock<std::mutex> lk(Lock);
+    SpinLock.Lock();
 
     // Find the next pool to allocate from.
     while (true)
@@ -121,6 +121,7 @@ VkDescriptorSet CDescriptorPoolVk::AllocateDescriptorSet()
     // This is used when FreeDescriptorSet is called downstream.
     AllocatedDescriptorSets.emplace(handle, CurrentAllocationPoolIndex);
 
+    SpinLock.Unlock();
     // Return descriptor set handle.
     return handle;
 }
@@ -128,7 +129,7 @@ VkDescriptorSet CDescriptorPoolVk::AllocateDescriptorSet()
 VkResult CDescriptorPoolVk::FreeDescriptorSet(VkDescriptorSet descriptorSet)
 {
     // Safe guard access to internal resources across threads.
-    std::unique_lock<std::mutex> lk(Lock);
+    SpinLock.Lock();
 
     // Get the index of the descriptor pool the descriptor set was allocated from.
     auto it = AllocatedDescriptorSets.find(descriptorSet);
@@ -146,8 +147,9 @@ VkResult CDescriptorPoolVk::FreeDescriptorSet(VkDescriptorSet descriptorSet)
     --AllocatedSets[poolIndex];
 
     // Set the next allocation to use this pool index.
-    CurrentAllocationPoolIndex = poolIndex;
+    CurrentAllocationPoolIndex = std::min(CurrentAllocationPoolIndex, poolIndex);
 
+    SpinLock.Unlock();
     // Return success.
     return VK_SUCCESS;
 }

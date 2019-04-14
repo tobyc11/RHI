@@ -355,7 +355,7 @@ CPipelineVk::~CPipelineVk()
         Parent.GetDescriptorSetLayoutCache()->DestroyLayout(it.second);
 }
 
-const std::unordered_map<uint32_t, std::vector<CPipelineResource>>
+const std::unordered_map<uint32_t, std::vector<CPipelineResource>>&
 CPipelineVk::GetSetBindings() const
 {
     return SetBindings;
@@ -382,7 +382,7 @@ void CPipelineVk::AddShaderModule(CShaderModule::Ref shaderModule, VkShaderStage
         VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO
     };
     stageInfo.stage = stage;
-    stageInfo.module = std::static_pointer_cast<CShaderModuleVk>(shaderModule)->GetVkModule();
+    stageInfo.module = smImpl->GetVkModule();
     stageInfo.pName = EntryPoints.back().c_str();
     stageInfo.pSpecializationInfo = nullptr;
 

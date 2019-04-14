@@ -11,11 +11,11 @@ void ResourceBindings::Reset()
     bDirty = false;
 }
 
-void ResourceBindings::BindBuffer(CBufferVk::Ref pBuffer, VkDeviceSize offset, VkDeviceSize range,
+void ResourceBindings::BindBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
                                   uint32_t set, uint32_t binding, uint32_t arrayElement)
 {
     Bind(set, binding, arrayElement,
-         BindingInfo { offset, range, pBuffer, VK_NULL_HANDLE, VK_NULL_HANDLE });
+         BindingInfo { offset, range, buffer, VK_NULL_HANDLE, VK_NULL_HANDLE });
 }
 
 void ResourceBindings::BindImageView(CImageViewVk::Ref pImageView, VkSampler sampler, uint32_t set,
@@ -34,7 +34,7 @@ void ResourceBindings::Bind(uint32_t set, uint32_t binding, uint32_t arrayElemen
                             const BindingInfo& info)
 {
     // If resource is being removed from binding, erase the entry.
-    if (info.pBuffer == VK_NULL_HANDLE && info.pImageView == VK_NULL_HANDLE
+    if (info.BufferHandle == VK_NULL_HANDLE && info.pImageView == VK_NULL_HANDLE
         && info.sampler == VK_NULL_HANDLE)
     {
         auto it = BindingsBySet.find(set);

@@ -274,6 +274,7 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     ImmediateGraphicsCtx = std::make_shared<CCommandContextVk>(*this, GraphicsQueue, false);
 
     DescriptorSetLayoutCache = std::make_unique<CDescriptorSetLayoutCacheVk>(*this);
+    HugeConstantBuffer = std::make_unique<CPersistentMappedRingBuffer>(*this, 33554432); // 32M
 }
 
 CDeviceVk::~CDeviceVk()
@@ -281,6 +282,7 @@ CDeviceVk::~CDeviceVk()
     while (!JobQueue.empty())
         FinishOneJob(true);
 
+    HugeConstantBuffer.reset();
     DescriptorSetLayoutCache.reset();
     ImmediateTransferCtx.reset();
     ImmediateGraphicsCtx.reset();
@@ -532,7 +534,10 @@ void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
         FinishOneJob();
 
     if (jobInfo.bIsFrame)
+    {
+        HugeConstantBuffer->MarkBlockEnd();
         FrameJobCount++;
+    }
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -565,7 +570,10 @@ void CDeviceVk::FinishOneJob(bool wait)
     if (wait)
         vkWaitForFences(Device, 1, &waitJob.Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
     if (waitJob.bIsFrame)
+    {
+        HugeConstantBuffer->FreeBlock();
         FrameJobCount--;
+    }
     vkDestroyFence(Device, waitJob.Fence, nullptr);
     vkDestroySemaphore(Device, waitJob.SignalSemaphore, nullptr);
     for (auto& fn : waitJob.DeferredDeleters)
