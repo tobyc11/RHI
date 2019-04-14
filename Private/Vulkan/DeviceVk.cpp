@@ -55,17 +55,37 @@ void InitRHIInstance()
     appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     appInfo.apiVersion = VK_API_VERSION_1_0;
 
+    // Enumerate supported extensions
+    uint32_t extensionCount;
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+    std::vector<VkExtensionProperties> extensionProps(extensionCount);
+    vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensionProps.data());
+    std::cout << "Supported instance extensions on this machine" << std::endl;
+    for (const auto& extProp : extensionProps)
+        std::cout << extProp.extensionName << std::endl;
+
+    // Enumerate supported layers
+    uint32_t layerCount;
+    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    std::vector<VkLayerProperties> supportedLayers(layerCount);
+    vkEnumerateInstanceLayerProperties(&layerCount, supportedLayers.data());
+    std::cout << "Supported instance layers on this machine" << std::endl;
+    for (const auto& prop : supportedLayers)
+        std::cout << prop.layerName << std::endl;
+
     std::vector<const char*> requiredExtensions = { "VK_KHR_surface", "VK_EXT_debug_report",
 #ifdef _WIN32
                                                     "VK_KHR_win32_surface"
-#else
+#elif TC_OS == TC_OS_LINUX
                                                     "VK_KHR_xlib_surface"
+#elif TC_OS == TC_OS_MAC_OS_X
+                                                    "VK_MVK_macos_surface"
 #endif
     };
 
     const std::vector<const char*> validationLayers = { "VK_LAYER_LUNARG_standard_validation" };
 
-#ifdef NDEBUG
+#if defined(NDEBUG)
     const bool enableValidationLayers = false;
 #else
     const bool enableValidationLayers = true;
@@ -82,7 +102,9 @@ void InitRHIInstance()
         createInfo.ppEnabledLayerNames = validationLayers.data();
     }
 
-    vkCreateInstance(&createInfo, nullptr, &Instance);
+    VkResult result = vkCreateInstance(&createInfo, nullptr, &Instance);
+    if (result != VK_SUCCESS)
+        throw CRHIRuntimeError("Could not create vulkan instance");
     initDebugCallback(Instance, &DebugRptCallback);
 }
 
@@ -474,6 +496,15 @@ CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info,
 #ifdef VK_USE_PLATFORM_MACOS_MVK
     if (info.Type == EPresentationSurfaceDescType::MacOS)
     {
+        VkMacOSSurfaceCreateInfoMVK createInfo;
+        createInfo.sType = VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK;
+        createInfo.pNext = nullptr;
+        createInfo.flags = 0;
+        createInfo.pView = info.MacOS.View;
+        VkResult result;
+        result = vkCreateMacOSSurfaceMVK(Instance, &createInfo, nullptr, &surface);
+        if (result != VK_SUCCESS)
+            throw CRHIRuntimeError("vkCreateMacOSSurfaceMVK failed");
     }
 #endif
     else
@@ -485,7 +516,7 @@ CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info,
     if (!swapchainCaps.bIsSuitable)
         throw CRHIRuntimeError("Device is not suitable for presentation");
     auto swapchain = std::make_shared<CSwapChainVk>(*this, swapchainCaps);
-    return swapchain;
+    return std::move(swapchain);
 }
 
 VkInstance CDeviceVk::GetVkInstance() const { return Instance; }

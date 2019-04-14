@@ -13,21 +13,30 @@ enum class EPresentationSurfaceDescType
     MacOS
 };
 
-#ifdef _WIN32
 struct CPresentationSurfaceDescWin32
 {
+#ifdef _WIN32
     HINSTANCE Instance;
     HWND Window;
-};
 #endif
+};
+
+struct CPresentationSurfaceDescMacOS
+{
+#ifdef __APPLE__
+#include <Availability.h>
+#ifdef __MAC_OS_X_VERSION_MAX_ALLOWED
+    const void* View;
+#endif
+#endif
+};
 
 struct CPresentationSurfaceDesc
 {
     EPresentationSurfaceDescType Type;
     union {
-#ifdef _WIN32
         CPresentationSurfaceDescWin32 Win32;
-#endif
+        CPresentationSurfaceDescMacOS MacOS;
     };
 };
 
