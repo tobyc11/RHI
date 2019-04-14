@@ -7,14 +7,14 @@
 namespace RHI
 {
 
-enum class CAttachmentLoadOp : uint16_t
+enum class EAttachmentLoadOp : uint16_t
 {
     Load,
     Clear,
     DontCare
 };
 
-enum class CAttachmentStoreOp : uint16_t
+enum class EAttachmentStoreOp : uint16_t
 {
     Store,
     DontCare
@@ -23,14 +23,14 @@ enum class CAttachmentStoreOp : uint16_t
 struct CAttachmentDesc
 {
     CImageView::Ref ImageView;
-    CAttachmentLoadOp LoadOp;
-    CAttachmentStoreOp StoreOp;
-    CAttachmentLoadOp StencilLoadOp = CAttachmentLoadOp::DontCare;
-    CAttachmentStoreOp StencilStoreOp = CAttachmentStoreOp::DontCare;
+    EAttachmentLoadOp LoadOp;
+    EAttachmentStoreOp StoreOp;
+    EAttachmentLoadOp StencilLoadOp = EAttachmentLoadOp::DontCare;
+    EAttachmentStoreOp StencilStoreOp = EAttachmentStoreOp::DontCare;
     // Clear value is dynamically specified
     // Framebuffer is dynamically specified
 
-    CAttachmentDesc(CImageView::Ref imageView, CAttachmentLoadOp l, CAttachmentStoreOp st)
+    CAttachmentDesc(CImageView::Ref imageView, EAttachmentLoadOp l, EAttachmentStoreOp st)
         : ImageView(imageView)
         , LoadOp(l)
         , StoreOp(st)

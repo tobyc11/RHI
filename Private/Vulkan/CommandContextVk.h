@@ -54,7 +54,8 @@ public:
 
     void ExecuteCommandList(CCommandList* commandList) override;
     CCommandList::Ref FinishCommandList() override;
-    void Flush(bool wait = false) override;
+    void Flush(bool wait = false) override { Flush(wait, false); }
+    void Flush(bool wait, bool isPresent);
 
     // Render commands
     void BeginRenderPass(CRenderPass::Ref renderPass,

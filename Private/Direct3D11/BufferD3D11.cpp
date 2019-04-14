@@ -51,7 +51,7 @@ void* CBufferD3D11::Map(size_t offset, size_t size)
 {
     // TODO: write performance opt
     D3D11_MAPPED_SUBRESOURCE mapped;
-	D3D11_MAP mapMethod = D3D11_MAP_WRITE;
+    D3D11_MAP mapMethod = D3D11_MAP_WRITE;
     if (D3dUsage == D3D11_USAGE_DYNAMIC)
         mapMethod = D3D11_MAP_WRITE_DISCARD;
     ImmediateContext->Map(BufferPtr.Get(), 0, mapMethod, 0, &mapped);

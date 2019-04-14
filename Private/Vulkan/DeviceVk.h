@@ -22,6 +22,7 @@ enum EQueueType
 struct CGPUJobInfo
 {
     // Fill out these
+    bool bIsFrame = false; // Whether this job is for a present
     std::vector<VkCommandBuffer> CmdBuffersInFlight;
     std::vector<CCommandContextVk::Ref> CmdContexts;
     std::vector<VkSemaphore> WaitSemaphores;
@@ -136,7 +137,9 @@ private:
     // A ring buffer contains the jobs currently in flight
     std::mutex JobSubmitMutex;
     std::queue<CGPUJobInfo> JobQueue;
-    static const uint32_t MaxJobsInFlight = 2;
+    uint32_t FrameJobCount = 0;
+    static const uint32_t MaxJobsInFlight = 8;
+    static const uint32_t MaxFramesInFlight = 1;
 
     // Every job submission collects those, and deletes them when job is finished
     std::vector<std::pair<VkBuffer, VmaAllocation>> PendingDeletionBuffers;

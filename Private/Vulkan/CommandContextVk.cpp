@@ -306,7 +306,7 @@ CCommandList::Ref CCommandContextVk::FinishCommandList()
     return ptr;
 }
 
-void CCommandContextVk::Flush(bool wait)
+void CCommandContextVk::Flush(bool wait, bool isPresent)
 {
     EndBuffer();
 
@@ -346,6 +346,7 @@ void CCommandContextVk::Flush(bool wait)
         job.WaitStages = WaitStages;
         job.SignalSemaphore = SignalSemaphore;
         job.DeferredDeleters = DeferredDeleters;
+        job.bIsFrame = isPresent;
         Parent.SubmitJob(std::move(job));
     }
 

@@ -233,7 +233,7 @@ void CSwapChainVk::Present(const CSwapChainPresentInfo& info)
 {
     auto ctx = std::static_pointer_cast<CCommandContextVk>(Parent.GetImmediateContext());
     VkSemaphore renderJobDone = ctx->GetSignalSemaphore();
-    ctx->Flush();
+    ctx->Flush(false, true);
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     presentInfo.waitSemaphoreCount = 1;

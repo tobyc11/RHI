@@ -507,10 +507,7 @@ CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info,
             throw CRHIRuntimeError("vkCreateMacOSSurfaceMVK failed");
     }
 #endif
-    else
-    {
-        throw CRHIException("CreateSwapChain received invalid presentation surface desc");
-    }
+    else { throw CRHIException("CreateSwapChain received invalid presentation surface desc"); }
 
     auto swapchainCaps = CSwapChainVk::GetDeviceSwapChainCaps(surface, PhysicalDevice);
     if (!swapchainCaps.bIsSuitable)
@@ -525,11 +522,17 @@ void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
 {
     std::unique_lock<std::mutex> lk(JobSubmitMutex);
 
-    if (JobQueue.size() >= MaxJobsInFlight)
+    while (JobQueue.size() >= MaxJobsInFlight)
+        FinishOneJob(true);
+
+    while (jobInfo.bIsFrame && FrameJobCount >= MaxFramesInFlight)
         FinishOneJob(true);
 
     while (!JobQueue.empty() && vkGetFenceStatus(Device, JobQueue.front().Fence) == VK_SUCCESS)
         FinishOneJob();
+
+    if (jobInfo.bIsFrame)
+        FrameJobCount++;
 
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -561,6 +564,8 @@ void CDeviceVk::FinishOneJob(bool wait)
     auto& waitJob = JobQueue.front();
     if (wait)
         vkWaitForFences(Device, 1, &waitJob.Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
+    if (waitJob.bIsFrame)
+        FrameJobCount--;
     vkDestroyFence(Device, waitJob.Fence, nullptr);
     vkDestroySemaphore(Device, waitJob.SignalSemaphore, nullptr);
     for (auto& fn : waitJob.DeferredDeleters)
