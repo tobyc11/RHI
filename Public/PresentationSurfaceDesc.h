@@ -9,7 +9,8 @@ namespace RHI
 
 enum class EPresentationSurfaceDescType
 {
-    Win32
+    Win32,
+    MacOS
 };
 
 #ifdef _WIN32

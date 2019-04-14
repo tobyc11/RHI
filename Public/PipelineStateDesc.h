@@ -423,11 +423,11 @@ struct CRenderTargetBlendDesc
     bool operator==(const CRenderTargetBlendDesc& rhs) const
     {
         return (BlendEnable == false && rhs.BlendEnable == false)
-            || BlendEnable == rhs.BlendEnable && SrcBlend == rhs.SrcBlend
+            || (BlendEnable == rhs.BlendEnable && SrcBlend == rhs.SrcBlend
             && DestBlend == rhs.DestBlend && BlendOp == rhs.BlendOp
             && SrcBlendAlpha == rhs.SrcBlendAlpha && DestBlendAlpha == rhs.DestBlendAlpha
             && BlendOpAlpha == rhs.BlendOpAlpha
-            && RenderTargetWriteMask == rhs.RenderTargetWriteMask;
+            && RenderTargetWriteMask == rhs.RenderTargetWriteMask);
     }
 
     friend std::size_t hash_value(const CRenderTargetBlendDesc& r)
@@ -461,6 +461,7 @@ struct CBlendDesc
     CBlendDesc& SetRenderTargets(size_t num, CRenderTargetBlendDesc desc)
     {
         RenderTargets[num] = desc;
+        return *this;
     }
 
     CBlendDesc& SetRenderTargets(const std::vector<CRenderTargetBlendDesc>& value)
@@ -470,6 +471,7 @@ struct CBlendDesc
         {
             RenderTargets[i] = value[i];
         }
+        return *this;
     }
 
     bool operator==(const CBlendDesc& rhs) const

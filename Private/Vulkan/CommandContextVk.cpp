@@ -454,7 +454,9 @@ void CCommandContextVk::BindIndexBuffer(CBuffer::Ref buffer, size_t offset, EFor
 void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer::Ref buffer, size_t offset)
 {
     auto bufferImpl = std::static_pointer_cast<CBufferVk>(buffer);
-    vkCmdBindVertexBuffers(CmdBuffer, binding, 1, &bufferImpl->Buffer, &offset);
+    // On macOS, size_t is 32 bit and VkDeviceSize is 64
+    VkDeviceSize offsetDevice = offset;
+    vkCmdBindVertexBuffers(CmdBuffer, binding, 1, &bufferImpl->Buffer, &offsetDevice);
 }
 
 void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,

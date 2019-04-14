@@ -447,6 +447,7 @@ IRenderContext::Ref CDeviceVk::CreateDeferredContext()
 CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format)
 {
     VkSurfaceKHR surface;
+#ifdef VK_USE_PLATFORM_WIN32_KHR
     if (info.Type == EPresentationSurfaceDescType::Win32)
     {
 
@@ -469,6 +470,12 @@ CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info,
             throw CRHIRuntimeError("vkCreateWin32SurfaceKHR failed");
         }
     }
+#endif
+#ifdef VK_USE_PLATFORM_MACOS_MVK
+    if (info.Type == EPresentationSurfaceDescType::MacOS)
+    {
+    }
+#endif
     else
     {
         throw CRHIException("CreateSwapChain received invalid presentation surface desc");
