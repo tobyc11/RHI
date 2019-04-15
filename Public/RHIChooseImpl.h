@@ -25,14 +25,12 @@ template <template <typename> typename TBaseClass> struct TChooseImpl;
 
 #ifdef RHI_IMPL_DIRECT3D11
 DEFINE_IMPL(CBuffer, CBufferD3D11)
-DEFINE_IMPL(CImage, CImageD3D11)
 
 DEFINE_IMPL(CDevice, CDeviceD3D11)
 
 #elif defined(RHI_IMPL_VULKAN)
 // Resources
 DEFINE_IMPL(CBuffer, CBufferVk)
-DEFINE_IMPL(CImage, CImageVk)
 
 DEFINE_IMPL(CDevice, CDeviceVk)
 

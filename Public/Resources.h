@@ -69,26 +69,25 @@ enum class EImageUsageFlags
 
 DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EImageUsageFlags);
 
-template <typename TDerived>
-class CImageBase : public std::enable_shared_from_this<CImageBase<TDerived>>
+class CImage : public std::enable_shared_from_this<CImage>
 {
 public:
-    typedef std::shared_ptr<CImageBase> Ref;
+    typedef std::shared_ptr<CImage> Ref;
 
-    virtual ~CImageBase() = default;
+    virtual ~CImage() = default;
 
-    void CopyFrom(const void* mem);
-    EFormat GetFormat() const;
-    EImageUsageFlags GetUsageFlags() const;
-    uint32_t GetWidth() const;
-    uint32_t GetHeight() const;
-    uint32_t GetDepth() const;
-    uint32_t GetMipLevels() const;
-    uint32_t GetArrayLayers() const;
-    uint32_t GetSampleCount() const;
+    virtual void CopyFrom(const void* mem) = 0;
+    virtual EFormat GetFormat() const = 0;
+    virtual EImageUsageFlags GetUsageFlags() const = 0;
+    virtual uint32_t GetWidth() const = 0;
+    virtual uint32_t GetHeight() const = 0;
+    virtual uint32_t GetDepth() const = 0;
+    virtual uint32_t GetMipLevels() const = 0;
+    virtual uint32_t GetArrayLayers() const = 0;
+    virtual uint32_t GetSampleCount() const = 0;
 
 protected:
-    CImageBase() = default;
+    CImage() = default;
 };
 
 // Image View
@@ -117,7 +116,7 @@ struct CImageSubresourceRange
         LevelCount = mipCount;
         BaseArrayLayer = layer;
         LayerCount = layerCount;
-	}
+    }
 };
 
 struct CImageViewDesc

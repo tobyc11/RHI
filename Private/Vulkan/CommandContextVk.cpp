@@ -371,6 +371,9 @@ void CCommandContextVk::BeginRenderPass(CRenderPass::Ref renderPass,
     size_t i = 0;
     for (const auto& c : clearValues)
     {
+        if (i >= rpImpl->GetAttachmentDesc().size())
+            break;
+
         VkClearValue vkClear;
         auto aspect = GetImageAspectFlags(rpImpl->GetAttachmentDesc()[i].format);
         if (aspect & VK_IMAGE_ASPECT_COLOR_BIT)

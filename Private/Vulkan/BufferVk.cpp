@@ -146,7 +146,7 @@ void CPersistentMappedRingBuffer::FreeBlock()
 {
     const auto& firstBlock = AllocatedBlocks.front();
     size_t blockSize = firstBlock.End - firstBlock.Begin;
-    if (firstBlock.End <= firstBlock.Begin)
+    if (firstBlock.End < firstBlock.Begin)
         blockSize = firstBlock.End - firstBlock.Begin + TotalSize;
     Remaining += blockSize;
     assert(Remaining <= TotalSize);

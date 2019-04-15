@@ -25,17 +25,8 @@ struct CAttachmentDesc
     CImageView::Ref ImageView;
     EAttachmentLoadOp LoadOp;
     EAttachmentStoreOp StoreOp;
-    EAttachmentLoadOp StencilLoadOp = EAttachmentLoadOp::DontCare;
-    EAttachmentStoreOp StencilStoreOp = EAttachmentStoreOp::DontCare;
-    // Clear value is dynamically specified
-    // Framebuffer is dynamically specified
-
-    CAttachmentDesc(CImageView::Ref imageView, EAttachmentLoadOp l, EAttachmentStoreOp st)
-        : ImageView(imageView)
-        , LoadOp(l)
-        , StoreOp(st)
-    {
-    }
+    EAttachmentLoadOp StencilLoadOp;
+    EAttachmentStoreOp StencilStoreOp;
 };
 
 struct CSubpassDesc
@@ -49,9 +40,23 @@ struct CSubpassDesc
     // std::vector<uint32_t> PreserveAttachments; TODO
     // Layouts are deduced from usage
 
-    void AddInputAttachment(uint32_t index) { InputAttachments.push_back(index); }
-    void AddColorAttachment(uint32_t index) { ColorAttachments.push_back(index); }
-    void SetDepthStencilAttachment(uint32_t index) { DepthStencilAttachment = index; }
+    CSubpassDesc& AddInputAttachment(uint32_t index)
+    {
+        InputAttachments.push_back(index);
+        return *this;
+    }
+
+    CSubpassDesc& AddColorAttachment(uint32_t index)
+    {
+        ColorAttachments.push_back(index);
+        return *this;
+    }
+
+    CSubpassDesc& SetDepthStencilAttachment(uint32_t index)
+    {
+        DepthStencilAttachment = index;
+        return *this;
+    }
 };
 
 struct CRenderPassDesc
@@ -62,7 +67,32 @@ struct CRenderPassDesc
     uint32_t Height;
     uint32_t Layers;
 
-    // Dependencies are deduced from usage
+    void AddAttachment(CImageView::Ref imageView, EAttachmentLoadOp loadOp,
+                       EAttachmentStoreOp storeOp,
+                       EAttachmentLoadOp stencilLoadOp = EAttachmentLoadOp::DontCare,
+                       EAttachmentStoreOp stencilStoreOp = EAttachmentStoreOp::DontCare)
+    {
+        CAttachmentDesc desc;
+        desc.ImageView = imageView;
+        desc.LoadOp = loadOp;
+        desc.StoreOp = storeOp;
+        desc.StencilLoadOp = stencilLoadOp;
+        desc.StencilStoreOp = stencilStoreOp;
+        Attachments.push_back(std::move(desc));
+    }
+
+    CSubpassDesc& NextSubpass()
+    {
+        Subpasses.emplace_back();
+        return Subpasses.back();
+    }
+
+    void SetExtent(uint32_t width, uint32_t height, uint32_t layers = 1)
+    {
+        Width = width;
+        Height = height;
+        Layers = layers;
+    }
 };
 
 class CRenderPass
