@@ -324,7 +324,7 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     allocCreateInfo.flags = 0;
 
     // Determine memory flags based on usage
-    EResourceState defaultState = EResourceState::Common; // BELOW
+    EResourceState defaultState = EResourceState::General; // BELOW
     if (Any(usage, EImageUsageFlags::Sampled))
     {
         imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -338,7 +338,7 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     if (Any(usage, EImageUsageFlags::DepthStencil))
     {
         imageInfo.usage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-        defaultState = EResourceState::DepthStencil;
+        defaultState = EResourceState::DepthWrite;
     }
     if (Any(usage, EImageUsageFlags::Staging))
     {

@@ -1,4 +1,5 @@
 #pragma once
+#include "RHIModuleAPI.h"
 #include <cstdint>
 #include <memory>
 
@@ -84,28 +85,25 @@ struct CRect2D
     }
 };
 
+// Signify the GPU's access to a resource: the when, how, and format
 enum class EResourceState : uint32_t
 {
     Undefined,
     PreInitialized,
-    Common,
+    General,
+    IndirectArg,
+    IndexBuffer,
     VertexBuffer,
     ConstantBuffer,
-    IndexBuffer,
     RenderTarget,
     UnorderedAccess,
-    DepthStencil,
+    DepthRead,
+    DepthWrite,
     ShaderResource,
-    StreamOut,
-    IndirectArg,
+    PixelShaderResource,
     CopyDest,
     CopySource,
-    ResolveDest,
-    ResolveSource,
-    Present,
-    GenericRead,
-    Predication,
-    NonPixelShader
+    Present
 };
 
 } /* namespace RHI */

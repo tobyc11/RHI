@@ -374,22 +374,6 @@ inline uint32_t GetUncompressedImageFormatSize(VkFormat format)
     }
 }
 
-// Resource state enums come from Falcor
-/***************************************************************************
-# Copyright (c) 2017, NVIDIA CORPORATION. All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions
-# are met:
-#  * Redistributions of source code must retain the above copyright
-#    notice, this list of conditions and the following disclaimer.
-#  * Redistributions in binary form must reproduce the above copyright
-#    notice, this list of conditions and the following disclaimer in the
-#    documentation and/or other materials provided with the distribution.
-#  * Neither the name of NVIDIA CORPORATION nor the names of its
-#    contributors may be used to endorse or promote products derived
-#    from this software without specific prior written permission. */
-
 inline VkImageLayout StateToImageLayout(EResourceState state)
 {
     switch (state)
@@ -398,19 +382,20 @@ inline VkImageLayout StateToImageLayout(EResourceState state)
         return VK_IMAGE_LAYOUT_UNDEFINED;
     case EResourceState::PreInitialized:
         return VK_IMAGE_LAYOUT_PREINITIALIZED;
-    case EResourceState::Common:
+    case EResourceState::General:
     case EResourceState::UnorderedAccess:
         return VK_IMAGE_LAYOUT_GENERAL;
     case EResourceState::RenderTarget:
         return VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    case EResourceState::DepthStencil:
+    case EResourceState::DepthRead:
+        return VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    case EResourceState::DepthWrite:
         return VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
     case EResourceState::ShaderResource:
+    case EResourceState::PixelShaderResource:
         return VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    case EResourceState::ResolveDest:
     case EResourceState::CopyDest:
         return VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-    case EResourceState::ResolveSource:
     case EResourceState::CopySource:
         return VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     case EResourceState::Present:
@@ -420,39 +405,41 @@ inline VkImageLayout StateToImageLayout(EResourceState state)
     }
 }
 
-inline VkAccessFlagBits StateToAccessMask(EResourceState state)
+inline VkAccessFlags StateToAccessMask(EResourceState state)
 {
     switch (state)
     {
     case EResourceState::Undefined:
-    case EResourceState::Present:
-    case EResourceState::Common:
     case EResourceState::PreInitialized:
-        return VkAccessFlagBits(0);
+        return 0;
+    case EResourceState::General:
+        return 0; // TODO
+    case EResourceState::IndirectArg:
+        return VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+    case EResourceState::IndexBuffer:
+        return VK_ACCESS_INDEX_READ_BIT;
     case EResourceState::VertexBuffer:
         return VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
     case EResourceState::ConstantBuffer:
         return VK_ACCESS_UNIFORM_READ_BIT;
-    case EResourceState::IndexBuffer:
-        return VK_ACCESS_INDEX_READ_BIT;
     case EResourceState::RenderTarget:
-        return VkAccessFlagBits(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-                                | VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
+        return VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     case EResourceState::UnorderedAccess:
-        return VK_ACCESS_SHADER_WRITE_BIT;
-    case EResourceState::DepthStencil:
-        return VkAccessFlagBits(VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
-                                | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
+        return VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    case EResourceState::DepthRead:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+    case EResourceState::DepthWrite:
+        return VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+            | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
     case EResourceState::ShaderResource:
-        return VK_ACCESS_INPUT_ATTACHMENT_READ_BIT;
-    case EResourceState::IndirectArg:
-        return VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-    case EResourceState::ResolveDest:
+    case EResourceState::PixelShaderResource:
+        return VK_ACCESS_SHADER_READ_BIT;
     case EResourceState::CopyDest:
         return VK_ACCESS_TRANSFER_WRITE_BIT;
-    case EResourceState::ResolveSource:
     case EResourceState::CopySource:
         return VK_ACCESS_TRANSFER_READ_BIT;
+    case EResourceState::Present:
+        return 0; // TODO: verify this
     default:
         throw std::runtime_error("Vulkan RHI resource state invalid");
     }
@@ -464,31 +451,33 @@ inline VkPipelineStageFlags StateToShaderStageMask(EResourceState state, bool sr
     {
     case EResourceState::Undefined:
     case EResourceState::PreInitialized:
-        assert(src);
-    case EResourceState::Common:
-        return src ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT : VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
-    case EResourceState::VertexBuffer:
-    case EResourceState::IndexBuffer:
-        return VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
-    case EResourceState::UnorderedAccess:
-    case EResourceState::ConstantBuffer:
-    case EResourceState::ShaderResource:
-        return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
-            | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT; // TODO: Assume the worst
-    case EResourceState::RenderTarget:
-        return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    case EResourceState::DepthStencil:
-        return src ? VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT
-                   : VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+        assert(src); // Transition to those states makes no sense
+        return VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    case EResourceState::General:
+        return VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
     case EResourceState::IndirectArg:
         return VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT;
+    case EResourceState::IndexBuffer:
+    case EResourceState::VertexBuffer:
+        return VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+    case EResourceState::ConstantBuffer:
+    case EResourceState::UnorderedAccess:
+    case EResourceState::ShaderResource:
+        return VK_PIPELINE_STAGE_VERTEX_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT
+            | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    case EResourceState::PixelShaderResource:
+        return VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    case EResourceState::RenderTarget:
+        return VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    case EResourceState::DepthRead:
+    case EResourceState::DepthWrite:
+        return VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT
+            | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
     case EResourceState::CopyDest:
     case EResourceState::CopySource:
-    case EResourceState::ResolveDest:
-    case EResourceState::ResolveSource:
         return VK_PIPELINE_STAGE_TRANSFER_BIT;
     case EResourceState::Present:
-        return src ? VK_PIPELINE_STAGE_ALL_COMMANDS_BIT : VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        return src ? VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT : VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     default:
         throw std::runtime_error("Vulkan RHI resource state invalid");
     }

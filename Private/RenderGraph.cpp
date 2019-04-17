@@ -26,7 +26,7 @@ void CGraphRenderPass::AddDepthStencilAttachment(const std::string& resource, bo
     usage->Type = EResourceUsageType::DepthStencilAttachment;
     usage->bRead = read;
     usage->bWrite = write;
-    usage->RequiredState = EResourceState::DepthStencil;
+    usage->RequiredState = EResourceState::DepthWrite;
 }
 
 void CGraphRenderPass::AddShaderResource(const std::string& resource)
