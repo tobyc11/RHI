@@ -73,19 +73,19 @@ public:
 
     virtual ~ICopyContext() = default;
 
-    virtual void CopyBuffer(CBuffer* src, CBuffer* dst,
+    virtual void CopyBuffer(CBuffer& src, CBuffer& dst,
                             const std::vector<CBufferCopy>& regions) = 0;
-    virtual void CopyImage(CImage* src, CImage* dst, const std::vector<CImageCopy>& regions) = 0;
-    virtual void CopyBufferToImage(CBuffer* src, CImage* dst,
+    virtual void CopyImage(CImage& src, CImage& dst, const std::vector<CImageCopy>& regions) = 0;
+    virtual void CopyBufferToImage(CBuffer& src, CImage& dst,
                                    const std::vector<CBufferImageCopy>& regions) = 0;
-    virtual void CopyImageToBuffer(CImage* src, CBuffer* dst,
+    virtual void CopyImageToBuffer(CImage& src, CBuffer& dst,
                                    const std::vector<CBufferImageCopy>& regions) = 0;
-    virtual void BlitImage(CImage* src, CImage* dst, const std::vector<CImageBlit>& regions,
+    virtual void BlitImage(CImage& src, CImage& dst, const std::vector<CImageBlit>& regions,
                            EFilter filter) = 0;
-    virtual void ResolveImage(CImage* src, CImage* dst,
+    virtual void ResolveImage(CImage& src, CImage& dst,
                               const std::vector<CImageResolve>& regions) = 0;
 
-    virtual void ExecuteCommandList(CCommandList* commandList) = 0;
+    virtual void ExecuteCommandList(CCommandList& commandList) = 0;
     virtual CCommandList::Ref FinishCommandList() = 0;
     virtual void Flush(bool wait = false) = 0;
 };

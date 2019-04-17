@@ -38,7 +38,7 @@ source_group(Public FILES ${RHI_PUBLIC_SOURCES})
 add_library(${MODULE_NAME} ${RHI_PRIVATE_SOURCES} ${RHI_PRIVATE_DIRECT3D11_SOURCES} ${RHI_PRIVATE_VULKAN_SOURCES} ${RHI_PUBLIC_SOURCES})
 add_library(tc::${MODULE_NAME} ALIAS ${MODULE_NAME})
 target_link_libraries(${MODULE_NAME} PUBLIC Backend)
-target_link_libraries(${MODULE_NAME} PUBLIC BackendPriv)
+target_link_libraries(${MODULE_NAME} PRIVATE BackendPriv)
 
 target_include_directories(${MODULE_NAME} PRIVATE Private)
 target_include_directories(${MODULE_NAME} PUBLIC Public)

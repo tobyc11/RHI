@@ -137,34 +137,33 @@ void CCommandContextVk::EndBuffer()
     CurrBindings.Reset();
 }
 
-void CCommandContextVk::TransitionImage(CImage* image, EResourceState newState)
+void CCommandContextVk::TransitionImage(CImage& image, EResourceState newState)
 {
-    auto* imageImpl = static_cast<CImageVk*>(image);
-    VkImageLayout srcLayout = StateToImageLayout(imageImpl->GetGlobalState());
+    auto& imageImpl = static_cast<CImageVk&>(image);
+    VkImageLayout srcLayout = StateToImageLayout(imageImpl.GetGlobalState());
     VkImageLayout dstLayout = StateToImageLayout(newState);
 
     if (srcLayout != dstLayout)
     {
         VkImageMemoryBarrier barrier = {};
         barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.srcAccessMask = StateToAccessMask(imageImpl->GetGlobalState());
+        barrier.srcAccessMask = StateToAccessMask(imageImpl.GetGlobalState());
         barrier.dstAccessMask = StateToAccessMask(newState);
         barrier.oldLayout = srcLayout;
         barrier.newLayout = dstLayout;
         barrier.srcQueueFamilyIndex = 0;
         barrier.dstQueueFamilyIndex = 0;
-        if (imageImpl->IsConcurrentAccess())
+        if (imageImpl.IsConcurrentAccess())
             barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = imageImpl->GetVkImage();
-        barrier.subresourceRange.aspectMask =
-            GetImageAspectFlags(imageImpl->GetCreateInfo().format);
+        barrier.image = imageImpl.GetVkImage();
+        barrier.subresourceRange.aspectMask = GetImageAspectFlags(imageImpl.GetCreateInfo().format);
         barrier.subresourceRange.baseArrayLayer = 0;
         barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.layerCount = imageImpl->GetCreateInfo().arrayLayers;
-        barrier.subresourceRange.levelCount = imageImpl->GetCreateInfo().mipLevels;
+        barrier.subresourceRange.layerCount = imageImpl.GetCreateInfo().arrayLayers;
+        barrier.subresourceRange.levelCount = imageImpl.GetCreateInfo().mipLevels;
 
         VkPipelineStageFlags srcStageMask =
-            StateToShaderStageMask(imageImpl->GetGlobalState(), true);
+            StateToShaderStageMask(imageImpl.GetGlobalState(), true);
         VkPipelineStageFlags dstStageMask = StateToShaderStageMask(newState, false);
         if (QueueType == TransferQueue)
         {
@@ -174,21 +173,21 @@ void CCommandContextVk::TransitionImage(CImage* image, EResourceState newState)
         vkCmdPipelineBarrier(CmdBuffer, srcStageMask, dstStageMask, 0, 0, nullptr, 0, nullptr, 1,
                              &barrier);
 
-        imageImpl->SetGlobalState(newState);
+        imageImpl.SetGlobalState(newState);
     }
 }
 
-void CCommandContextVk::CopyBuffer(CBuffer* src, CBuffer* dst,
+void CCommandContextVk::CopyBuffer(CBuffer& src, CBuffer& dst,
                                    const std::vector<CBufferCopy>& regions)
 {
     static_assert(sizeof(CBufferCopy) == sizeof(VkBufferCopy), "struct size mismatch");
     const VkBufferCopy* r = reinterpret_cast<const VkBufferCopy*>(regions.data());
 
-    vkCmdCopyBuffer(CmdBuffer, static_cast<CBufferVk*>(src)->Buffer,
-                    static_cast<CBufferVk*>(dst)->Buffer, static_cast<uint32_t>(regions.size()), r);
+    vkCmdCopyBuffer(CmdBuffer, static_cast<CBufferVk&>(src).Buffer,
+                    static_cast<CBufferVk&>(dst).Buffer, static_cast<uint32_t>(regions.size()), r);
 }
 
-void CCommandContextVk::CopyImage(CImage* src, CImage* dst, const std::vector<CImageCopy>& regions)
+void CCommandContextVk::CopyImage(CImage& src, CImage& dst, const std::vector<CImageCopy>& regions)
 {
     std::vector<VkImageCopy> r;
     for (const auto& rs : regions)
@@ -199,14 +198,14 @@ void CCommandContextVk::CopyImage(CImage* src, CImage* dst, const std::vector<CI
     }
     TransitionImage(src, EResourceState::CopySource);
     TransitionImage(dst, EResourceState::CopyDest);
-    auto* srcImpl = static_cast<CImageVk*>(src);
-    auto* dstImpl = static_cast<CImageVk*>(dst);
-    vkCmdCopyImage(CmdBuffer, srcImpl->GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   dstImpl->GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    auto& srcImpl = static_cast<CImageVk&>(src);
+    auto& dstImpl = static_cast<CImageVk&>(dst);
+    vkCmdCopyImage(CmdBuffer, srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                    static_cast<uint32_t>(r.size()), r.data());
 }
 
-void CCommandContextVk::CopyBufferToImage(CBuffer* src, CImage* dst,
+void CCommandContextVk::CopyBufferToImage(CBuffer& src, CImage& dst,
                                           const std::vector<CBufferImageCopy>& regions)
 {
     std::vector<VkBufferImageCopy> vkregions;
@@ -217,13 +216,13 @@ void CCommandContextVk::CopyBufferToImage(CBuffer* src, CImage* dst,
         vkregions.push_back(next);
     }
     TransitionImage(dst, EResourceState::CopyDest);
-    auto* dstImpl = static_cast<CImageVk*>(dst);
-    vkCmdCopyBufferToImage(CmdBuffer, static_cast<CBufferVk*>(src)->Buffer, dstImpl->GetVkImage(),
+    auto& dstImpl = static_cast<CImageVk&>(dst);
+    vkCmdCopyBufferToImage(CmdBuffer, static_cast<CBufferVk&>(src).Buffer, dstImpl.GetVkImage(),
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                            static_cast<uint32_t>(vkregions.size()), vkregions.data());
 }
 
-void CCommandContextVk::CopyImageToBuffer(CImage* src, CBuffer* dst,
+void CCommandContextVk::CopyImageToBuffer(CImage& src, CBuffer& dst,
                                           const std::vector<CBufferImageCopy>& regions)
 {
     std::vector<VkBufferImageCopy> vkregions;
@@ -234,13 +233,13 @@ void CCommandContextVk::CopyImageToBuffer(CImage* src, CBuffer* dst,
         vkregions.push_back(next);
     }
     TransitionImage(src, EResourceState::CopySource);
-    auto* srcImpl = static_cast<CImageVk*>(src);
-    vkCmdCopyImageToBuffer(CmdBuffer, srcImpl->GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                           static_cast<CBufferVk*>(dst)->Buffer,
+    auto& srcImpl = static_cast<CImageVk&>(src);
+    vkCmdCopyImageToBuffer(CmdBuffer, srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                           static_cast<CBufferVk&>(dst).Buffer,
                            static_cast<uint32_t>(vkregions.size()), vkregions.data());
 }
 
-void CCommandContextVk::BlitImage(CImage* src, CImage* dst, const std::vector<CImageBlit>& regions,
+void CCommandContextVk::BlitImage(CImage& src, CImage& dst, const std::vector<CImageBlit>& regions,
                                   EFilter filter)
 {
     std::vector<VkImageBlit> r;
@@ -252,14 +251,14 @@ void CCommandContextVk::BlitImage(CImage* src, CImage* dst, const std::vector<CI
     }
     TransitionImage(src, EResourceState::CopySource);
     TransitionImage(dst, EResourceState::CopyDest);
-    auto* srcImpl = static_cast<CImageVk*>(src);
-    auto* dstImpl = static_cast<CImageVk*>(dst);
-    vkCmdBlitImage(CmdBuffer, srcImpl->GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   dstImpl->GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    auto& srcImpl = static_cast<CImageVk&>(src);
+    auto& dstImpl = static_cast<CImageVk&>(dst);
+    vkCmdBlitImage(CmdBuffer, srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                    static_cast<uint32_t>(r.size()), r.data(), VkCast(filter));
 }
 
-void CCommandContextVk::ResolveImage(CImage* src, CImage* dst,
+void CCommandContextVk::ResolveImage(CImage& src, CImage& dst,
                                      const std::vector<CImageResolve>& regions)
 {
     std::vector<VkImageResolve> r;
@@ -271,26 +270,26 @@ void CCommandContextVk::ResolveImage(CImage* src, CImage* dst,
     }
     TransitionImage(src, EResourceState::CopySource);
     TransitionImage(dst, EResourceState::CopyDest);
-    auto* srcImpl = static_cast<CImageVk*>(src);
-    auto* dstImpl = static_cast<CImageVk*>(dst);
-    vkCmdResolveImage(CmdBuffer, srcImpl->GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                      dstImpl->GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    auto& srcImpl = static_cast<CImageVk&>(src);
+    auto& dstImpl = static_cast<CImageVk&>(dst);
+    vkCmdResolveImage(CmdBuffer, srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                      dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                       static_cast<uint32_t>(r.size()), r.data());
 }
 
-void CCommandContextVk::ExecuteCommandList(CCommandList* commandList)
+void CCommandContextVk::ExecuteCommandList(CCommandList& commandList)
 {
-    auto* cmdListImpl = static_cast<CCommandListVk*>(commandList);
-    if (cmdListImpl->bIsSecondary)
+    auto cmdListImpl = static_cast<CCommandListVk&>(commandList);
+    if (cmdListImpl.bIsSecondary)
     {
-        vkCmdExecuteCommands(CmdBuffer, 1, &cmdListImpl->CmdBuffer);
+        vkCmdExecuteCommands(CmdBuffer, 1, &cmdListImpl.CmdBuffer);
     }
     else
     {
         Flush();
         CGPUJobInfo job;
         job.QueueType = static_cast<EQueueType>(QueueType);
-        job.AddCommandBuffer(cmdListImpl->CmdBuffer, cmdListImpl->Parent);
+        job.AddCommandBuffer(cmdListImpl.CmdBuffer, cmdListImpl.Parent);
         Parent.SubmitJob(std::move(job));
     }
 }
@@ -354,28 +353,28 @@ void CCommandContextVk::Flush(bool wait, bool isPresent)
     BeginBuffer();
 }
 
-void CCommandContextVk::BeginRenderPass(CRenderPass::Ref renderPass,
+void CCommandContextVk::BeginRenderPass(CRenderPass& renderPass,
                                         const std::vector<CClearValue>& clearValues)
 {
-    auto rpImpl = std::static_pointer_cast<CRenderPassVk>(renderPass);
-    auto framebufferInfo = rpImpl->GetNextFramebuffer();
+    auto& rpImpl = static_cast<CRenderPassVk&>(renderPass);
+    auto framebufferInfo = rpImpl.GetNextFramebuffer();
     VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    beginInfo.renderPass = rpImpl->RenderPass;
+    beginInfo.renderPass = rpImpl.RenderPass;
     beginInfo.framebuffer = framebufferInfo.first;
     if (framebufferInfo.second != VK_NULL_HANDLE)
     {
-        WaitSemaphores.emplace_back(rpImpl->GetNextFramebuffer().second);
+        WaitSemaphores.emplace_back(rpImpl.GetNextFramebuffer().second);
         WaitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     }
     std::vector<VkClearValue> clear;
     size_t i = 0;
     for (const auto& c : clearValues)
     {
-        if (i >= rpImpl->GetAttachmentDesc().size())
+        if (i >= rpImpl.GetAttachmentDesc().size())
             break;
 
         VkClearValue vkClear;
-        auto aspect = GetImageAspectFlags(rpImpl->GetAttachmentDesc()[i].format);
+        auto aspect = GetImageAspectFlags(rpImpl.GetAttachmentDesc()[i].format);
         if (aspect & VK_IMAGE_ASPECT_COLOR_BIT)
             memcpy(vkClear.color.int32, c.ColorInt32, sizeof(vkClear.color));
         else
@@ -388,7 +387,7 @@ void CCommandContextVk::BeginRenderPass(CRenderPass::Ref renderPass,
     }
     beginInfo.clearValueCount = static_cast<uint32_t>(clear.size());
     beginInfo.pClearValues = clear.data();
-    RenderArea = beginInfo.renderArea = rpImpl->GetArea();
+    RenderArea = beginInfo.renderArea = rpImpl.GetArea();
     bIsInRenderPass = true;
 
     vkCmdBeginRenderPass(CmdBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
@@ -402,9 +401,9 @@ void CCommandContextVk::EndRenderPass()
     vkCmdEndRenderPass(CmdBuffer);
 }
 
-void CCommandContextVk::BindPipeline(CPipeline::Ref pipeline)
+void CCommandContextVk::BindPipeline(CPipeline& pipeline)
 {
-    CurrPipeline = static_cast<CPipelineVk*>(pipeline.get());
+    CurrPipeline = static_cast<CPipelineVk*>(&pipeline);
     vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CurrPipeline->GetHandle());
 
     // Bind the default viewport and scissors
@@ -422,14 +421,14 @@ void CCommandContextVk::BindPipeline(CPipeline::Ref pipeline)
     vkCmdSetStencilReference(CmdBuffer, VK_STENCIL_FRONT_AND_BACK, 0);
 }
 
-void CCommandContextVk::BindBuffer(CBuffer::Ref buffer, size_t offset, size_t range, uint32_t set,
+void CCommandContextVk::BindBuffer(CBuffer& buffer, size_t offset, size_t range, uint32_t set,
                                    uint32_t binding, uint32_t index)
 {
-    auto bufferImpl = std::static_pointer_cast<CBufferVk>(buffer);
-    CurrBindings.BindBuffer(bufferImpl->Buffer, offset, range, set, binding, index);
+    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
+    CurrBindings.BindBuffer(bufferImpl.Buffer, offset, range, set, binding, index);
 }
 
-void CCommandContextVk::BindBufferView(CBufferView::Ref bufferView, uint32_t set, uint32_t binding,
+void CCommandContextVk::BindBufferView(CBufferView& bufferView, uint32_t set, uint32_t binding,
                                        uint32_t index)
 {
     throw "unimplemented";
@@ -446,33 +445,33 @@ void CCommandContextVk::BindConstants(const void* pData, size_t size, uint32_t s
     CurrBindings.BindBuffer(bufferImpl->GetHandle(), offset, size, set, binding, index);
 }
 
-void CCommandContextVk::BindImageView(CImageView::Ref imageView, uint32_t set, uint32_t binding,
+void CCommandContextVk::BindImageView(CImageView& imageView, uint32_t set, uint32_t binding,
                                       uint32_t index)
 {
-    auto impl = std::static_pointer_cast<CImageViewVk>(imageView);
-    assert(impl->GetImage()->GetGlobalState() == EResourceState::ShaderResource);
-    CurrBindings.BindImageView(impl, VK_NULL_HANDLE, set, binding, index);
+    auto& impl = static_cast<CImageViewVk&>(imageView);
+    assert(impl.GetImage()->GetGlobalState() == EResourceState::ShaderResource);
+    CurrBindings.BindImageView(&impl, VK_NULL_HANDLE, set, binding, index);
 }
 
-void CCommandContextVk::BindSampler(CSampler::Ref sampler, uint32_t set, uint32_t binding,
+void CCommandContextVk::BindSampler(CSampler& sampler, uint32_t set, uint32_t binding,
                                     uint32_t index)
 {
-    CurrBindings.BindSampler(static_cast<CSamplerVk*>(sampler.get())->Sampler, set, binding, index);
+    CurrBindings.BindSampler(static_cast<CSamplerVk&>(sampler).Sampler, set, binding, index);
 }
 
-void CCommandContextVk::BindIndexBuffer(CBuffer::Ref buffer, size_t offset, EFormat format)
+void CCommandContextVk::BindIndexBuffer(CBuffer& buffer, size_t offset, EFormat format)
 {
-    auto bufferImpl = std::static_pointer_cast<CBufferVk>(buffer);
-    vkCmdBindIndexBuffer(CmdBuffer, bufferImpl->Buffer, offset,
+    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
+    vkCmdBindIndexBuffer(CmdBuffer, bufferImpl.Buffer, offset,
                          format == EFormat::R16_UINT ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32);
 }
 
-void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer::Ref buffer, size_t offset)
+void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer& buffer, size_t offset)
 {
-    auto bufferImpl = std::static_pointer_cast<CBufferVk>(buffer);
+    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
     // On macOS, size_t is 32 bit and VkDeviceSize is 64
     VkDeviceSize offsetDevice = offset;
-    vkCmdBindVertexBuffers(CmdBuffer, binding, 1, &bufferImpl->Buffer, &offsetDevice);
+    vkCmdBindVertexBuffers(CmdBuffer, binding, 1, &bufferImpl.Buffer, &offsetDevice);
 }
 
 void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,

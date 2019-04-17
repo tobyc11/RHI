@@ -18,7 +18,7 @@ void ResourceBindings::BindBuffer(VkBuffer buffer, VkDeviceSize offset, VkDevice
          BindingInfo { offset, range, buffer, VK_NULL_HANDLE, VK_NULL_HANDLE });
 }
 
-void ResourceBindings::BindImageView(CImageViewVk::Ref pImageView, VkSampler sampler, uint32_t set,
+void ResourceBindings::BindImageView(CImageViewVk* pImageView, VkSampler sampler, uint32_t set,
                                      uint32_t binding, uint32_t arrayElement)
 {
     Bind(set, binding, arrayElement, BindingInfo { 0, 0, VK_NULL_HANDLE, pImageView, sampler });

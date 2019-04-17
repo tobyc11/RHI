@@ -1,6 +1,7 @@
 #pragma once
 #include "PipelineStateDesc.h"
 #include <Hash.h>
+#include <LangUtils.h>
 #include <cfloat>
 #include <memory>
 
@@ -77,7 +78,7 @@ struct CSamplerDesc
     }
 };
 
-class CSampler
+class CSampler : public tc::FNonCopyable
 {
 public:
     typedef std::shared_ptr<CSampler> Ref;

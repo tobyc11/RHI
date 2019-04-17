@@ -27,7 +27,7 @@ private:
 class CPersistentMappedRingBuffer
 {
 public:
-    CPersistentMappedRingBuffer(CDeviceVk& p, size_t size);
+    CPersistentMappedRingBuffer(CDeviceVk& p, size_t size, VkBufferUsageFlags usage);
     ~CPersistentMappedRingBuffer();
     CPersistentMappedRingBuffer(const CPersistentMappedRingBuffer&) = delete;
     CPersistentMappedRingBuffer(CPersistentMappedRingBuffer&&) = delete;

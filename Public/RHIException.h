@@ -1,16 +1,17 @@
 #pragma once
+#include "RHIModuleAPI.h"
 #include <stdexcept>
 
 namespace RHI
 {
 
-class CRHIException : public std::runtime_error
+class RHI_API CRHIException : public std::runtime_error
 {
 public:
     using runtime_error::runtime_error;
 };
 
-class CRHIRuntimeError : public CRHIException
+class RHI_API CRHIRuntimeError : public CRHIException
 {
 public:
     CRHIRuntimeError(const char* msg)

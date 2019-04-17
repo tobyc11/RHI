@@ -112,7 +112,7 @@ enum class EShaderFormat
     DXBC
 };
 
-class CShaderModule
+class RHI_API CShaderModule : public tc::FNonCopyable
 {
 public:
     typedef std::shared_ptr<CShaderModule> Ref;

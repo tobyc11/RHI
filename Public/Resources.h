@@ -2,6 +2,7 @@
 #include "Format.h"
 #include "RHIChooseImpl.h"
 #include <EnumClass.h>
+#include <LangUtils.h>
 #include <cstdint>
 #include <memory>
 
@@ -21,7 +22,8 @@ enum class EBufferUsageFlags
 DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EBufferUsageFlags)
 
 template <typename TDerived>
-class CBufferBase : public std::enable_shared_from_this<CBufferBase<TDerived>>
+class RHI_API CBufferBase : public std::enable_shared_from_this<CBufferBase<TDerived>>,
+                            public tc::FNonCopyable
 {
 protected:
     CBufferBase(size_t size, EBufferUsageFlags usage);
@@ -39,7 +41,7 @@ protected:
     EBufferUsageFlags Usage;
 };
 
-class CBufferView
+class CBufferView : public tc::FNonCopyable
 {
 public:
     typedef std::shared_ptr<CBufferView> Ref;
@@ -69,7 +71,7 @@ enum class EImageUsageFlags
 
 DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EImageUsageFlags);
 
-class CImage : public std::enable_shared_from_this<CImage>
+class CImage : public std::enable_shared_from_this<CImage>, public tc::FNonCopyable
 {
 public:
     typedef std::shared_ptr<CImage> Ref;
@@ -117,6 +119,33 @@ struct CImageSubresourceRange
         BaseArrayLayer = layer;
         LayerCount = layerCount;
     }
+
+    bool operator<(const CImageSubresourceRange& rhs) const
+    {
+        if (BaseMipLevel < rhs.BaseMipLevel)
+            return true;
+        if (BaseMipLevel > rhs.BaseMipLevel)
+            return false;
+        if (LevelCount < rhs.LevelCount)
+            return true;
+        if (LevelCount > rhs.LevelCount)
+            return false;
+        if (BaseArrayLayer < rhs.BaseArrayLayer)
+            return true;
+        if (BaseArrayLayer > rhs.BaseArrayLayer)
+            return false;
+        if (LayerCount < rhs.LayerCount)
+            return true;
+        if (LayerCount > rhs.LayerCount)
+            return false;
+        return false;
+    }
+
+    bool operator==(const CImageSubresourceRange& rhs) const
+    {
+        return BaseMipLevel == rhs.BaseMipLevel && LevelCount == rhs.LevelCount
+            && BaseArrayLayer == rhs.BaseArrayLayer && LayerCount == rhs.LayerCount;
+    }
 };
 
 struct CImageViewDesc
@@ -126,7 +155,7 @@ struct CImageViewDesc
     CImageSubresourceRange Range;
 };
 
-class CImageView
+class CImageView : public std::enable_shared_from_this<CImageView>, public tc::FNonCopyable
 {
 public:
     typedef std::shared_ptr<CImageView> Ref;

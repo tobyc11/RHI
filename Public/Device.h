@@ -7,6 +7,7 @@
 #include "Sampler.h"
 #include "ShaderModule.h"
 #include "SwapChain.h"
+#include <LangUtils.h>
 
 namespace RHI
 {
@@ -20,7 +21,7 @@ enum class EDeviceCreateHints
     Discrete,
 };
 
-template <typename TDerived> class CDeviceBase
+template <typename TDerived> class RHI_API CDeviceBase : public tc::FNonCopyable
 {
 public:
     typedef std::shared_ptr<CDeviceBase> Ref;

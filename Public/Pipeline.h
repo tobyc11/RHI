@@ -2,6 +2,7 @@
 #include "PipelineStateDesc.h"
 #include "RenderPass.h"
 #include "ShaderModule.h"
+#include <LangUtils.h>
 
 namespace RHI
 {
@@ -26,7 +27,7 @@ struct CPipelineDesc
     CRenderPass::Ref RenderPass;
 };
 
-class CPipeline
+class CPipeline : public tc::FNonCopyable
 {
 public:
     typedef std::shared_ptr<CPipeline> Ref;

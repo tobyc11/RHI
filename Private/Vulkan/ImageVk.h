@@ -18,7 +18,7 @@ public:
     CImageVk(CDeviceVk& p, CSwapChain::WeakRef swapChain);
     ~CImageVk();
 
-	VkImage GetVkImage() const;
+    VkImage GetVkImage() const;
     bool IsConcurrentAccess() const;
 
     void CopyFrom(const void* mem);

@@ -5,13 +5,19 @@ namespace RHI
 
 #define ATCH_COLOR_BIT 1
 #define ATCH_DEPTH_BIT 2
+#define ATCH_SKIP_CLEAR 4
 
 RHI::CRenderPassD3D11::CRenderPassD3D11(CDeviceD3D11& p, const CRenderPassDesc& desc)
     : Parent(p)
 {
-    for (const auto& a : desc.Attachments)
+    AttachmentInfo.resize(desc.Attachments.size());
+    for (size_t i = 0; i < desc.Attachments.size(); i++)
+    {
+        const auto& a = desc.Attachments[i];
         Attachments.push_back(std::static_pointer_cast<CImageViewD3D11>(a.ImageView));
-    AttachmentInfo.resize(Attachments.size());
+        if (a.LoadOp == EAttachmentLoadOp::Load || a.LoadOp == EAttachmentLoadOp::DontCare)
+            AttachmentInfo[i] |= ATCH_SKIP_CLEAR;
+    }
 
     for (const auto& sp : desc.Subpasses)
     {
@@ -50,6 +56,8 @@ void RHI::CRenderPassD3D11::Bind(ID3D11DeviceContext* ctx, size_t subpass,
         // Clear attachments if beginning a render pass
         for (size_t i = 0; i < clearValues.size(); i++)
         {
+            if (AttachmentInfo[i] & ATCH_SKIP_CLEAR)
+                continue;
             if (AttachmentInfo[i] & ATCH_COLOR_BIT)
                 ctx->ClearRenderTargetView(Attachments[i]->GetRenderTargetView().Get(),
                                            clearValues[i].ColorFloat32);

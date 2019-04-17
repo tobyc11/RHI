@@ -274,7 +274,8 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     ImmediateGraphicsCtx = std::make_shared<CCommandContextVk>(*this, GraphicsQueue, false);
 
     DescriptorSetLayoutCache = std::make_unique<CDescriptorSetLayoutCacheVk>(*this);
-    HugeConstantBuffer = std::make_unique<CPersistentMappedRingBuffer>(*this, 33554432); // 32M
+    HugeConstantBuffer = std::make_unique<CPersistentMappedRingBuffer>(
+        *this, 33554432, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT); // 32M
 }
 
 CDeviceVk::~CDeviceVk()
@@ -361,7 +362,7 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     auto cmdBuffer = ctx->GetBuffer();
     if (initialData)
     {
-        ctx->TransitionImage(image.get(), EResourceState::CopyDest);
+        ctx->TransitionImage(*image, EResourceState::CopyDest);
 
         // Prepare a staging buffer
         VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
@@ -400,7 +401,7 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
 
         PendingDeletionBuffers.emplace_back(stagingBuffer, stagingAlloc);
     }
-    ctx->TransitionImage(image.get(), defaultState);
+    ctx->TransitionImage(*image, defaultState);
     ctx->Flush(true);
     PutImmediateTransferCtx(ctx);
     return std::move(image);
@@ -528,7 +529,12 @@ void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
         FinishOneJob(true);
 
     while (jobInfo.bIsFrame && FrameJobCount >= MaxFramesInFlight)
+    {
+        // If we don't allow more than one frame in flight, might as well wait for everything
+        if (MaxFramesInFlight == 1)
+            vkDeviceWaitIdle(Device);
         FinishOneJob(true);
+    }
 
     while (!JobQueue.empty() && vkGetFenceStatus(Device, JobQueue.front().Fence) == VK_SUCCESS)
         FinishOneJob();

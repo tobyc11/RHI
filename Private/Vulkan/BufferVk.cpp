@@ -86,7 +86,8 @@ void* CBufferVk::Map(size_t offset, size_t size)
 
 void CBufferVk::Unmap() { vmaUnmapMemory(Parent.GetAllocator(), Allocation); }
 
-CPersistentMappedRingBuffer::CPersistentMappedRingBuffer(CDeviceVk& p, size_t size)
+CPersistentMappedRingBuffer::CPersistentMappedRingBuffer(CDeviceVk& p, size_t size,
+                                                         VkBufferUsageFlags usage)
     : Parent(p)
     , TotalSize(size)
 {
@@ -94,7 +95,7 @@ CPersistentMappedRingBuffer::CPersistentMappedRingBuffer(CDeviceVk& p, size_t si
 
     VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     bufferInfo.size = TotalSize;
-    bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT; // Add more usage flags?
+    bufferInfo.usage = usage;
 
     VmaAllocationCreateInfo allocInfo = {};
     allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
