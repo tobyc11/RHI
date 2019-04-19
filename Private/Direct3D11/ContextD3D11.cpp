@@ -8,10 +8,10 @@
 namespace RHI
 {
 
-void CContextD3D11::CopyBuffer(CBuffer* src, CBuffer* dst, const std::vector<CBufferCopy>& regions)
+void CContextD3D11::CopyBuffer(CBuffer& src, CBuffer& dst, const std::vector<CBufferCopy>& regions)
 {
-    auto srcImpl = std::static_pointer_cast<CBufferD3D11>(src->shared_from_this());
-    auto dstImpl = std::static_pointer_cast<CBufferD3D11>(dst->shared_from_this());
+    auto& srcImpl = static_cast<CBufferD3D11&>(src);
+    auto& dstImpl = static_cast<CBufferD3D11&>(dst);
     for (const auto& region : regions)
     {
         D3D11_BOX srcBox;
@@ -21,42 +21,42 @@ void CContextD3D11::CopyBuffer(CBuffer* src, CBuffer* dst, const std::vector<CBu
         srcBox.bottom = 1;
         srcBox.front = 0;
         srcBox.back = 1;
-        Imm()->CopySubresourceRegion(dstImpl->GetD3D11Buffer(), 0,
+        Imm()->CopySubresourceRegion(dstImpl.GetD3D11Buffer(), 0,
                                      static_cast<UINT>(region.DstOffset), 0, 0,
-                                     srcImpl->GetD3D11Buffer(), 0, &srcBox);
+                                     srcImpl.GetD3D11Buffer(), 0, &srcBox);
     }
 }
 
-void CContextD3D11::CopyImage(CImage* src, CImage* dst, const std::vector<CImageCopy>& regions)
+void CContextD3D11::CopyImage(CImage& src, CImage& dst, const std::vector<CImageCopy>& regions)
 {
     throw "unimplemented";
 }
 
-void CContextD3D11::CopyBufferToImage(CBuffer* src, CImage* dst,
+void CContextD3D11::CopyBufferToImage(CBuffer& src, CImage& dst,
                                       const std::vector<CBufferImageCopy>& regions)
 {
     throw "unimplemented";
 }
 
-void CContextD3D11::CopyImageToBuffer(CImage* src, CBuffer* dst,
+void CContextD3D11::CopyImageToBuffer(CImage& src, CBuffer& dst,
                                       const std::vector<CBufferImageCopy>& regions)
 {
     throw "unimplemented";
 }
 
-void CContextD3D11::BlitImage(CImage* src, CImage* dst, const std::vector<CImageBlit>& regions,
+void CContextD3D11::BlitImage(CImage& src, CImage& dst, const std::vector<CImageBlit>& regions,
                               EFilter filter)
 {
     throw "unimplemented";
 }
 
-void CContextD3D11::ResolveImage(CImage* src, CImage* dst,
+void CContextD3D11::ResolveImage(CImage& src, CImage& dst,
                                  const std::vector<CImageResolve>& regions)
 {
     throw "unimplemented";
 }
 
-void CContextD3D11::ExecuteCommandList(CCommandList* commandList) { throw "unimplemented"; }
+void CContextD3D11::ExecuteCommandList(CCommandList& commandList) { throw "unimplemented"; }
 
 CCommandList::Ref CContextD3D11::FinishCommandList() { throw "unimplemented"; }
 
@@ -66,20 +66,20 @@ void CContextD3D11::Flush(bool wait)
         Imm()->Flush();
 }
 
-void CContextD3D11::BeginRenderPass(CRenderPass::Ref renderPass,
+void CContextD3D11::BeginRenderPass(CRenderPass& renderPass,
                                     const std::vector<CClearValue>& clearValues)
 {
-    CurrPass = renderPass;
+    CurrPass = &renderPass;
     CurrSubpass = 0;
-    std::static_pointer_cast<CRenderPassD3D11>(renderPass)->Bind(Imm(), CurrSubpass++, clearValues);
+    static_cast<CRenderPassD3D11*>(CurrPass)->Bind(Imm(), CurrSubpass++, clearValues);
 }
 
 void CContextD3D11::NextSubpass()
 {
-    std::static_pointer_cast<CRenderPassD3D11>(CurrPass)->Bind(Imm(), CurrSubpass++, {});
+    static_cast<CRenderPassD3D11*>(CurrPass)->Bind(Imm(), CurrSubpass++, {});
     // clear states to match vulkan behavior
     Imm()->ClearState();
-    CurrPipeline.reset();
+    CurrPipeline = nullptr;
     VSBoundLayouts.clear();
     PSBoundLayouts.clear();
     BoundResources.clear();
@@ -88,16 +88,16 @@ void CContextD3D11::NextSubpass()
 void CContextD3D11::EndRenderPass()
 {
     Imm()->ClearState();
-    CurrPass.reset();
-    CurrPipeline.reset();
+    CurrPass = nullptr;
+    CurrPipeline = nullptr;
     VSBoundLayouts.clear();
     PSBoundLayouts.clear();
     BoundResources.clear();
 }
 
-void CContextD3D11::BindPipeline(CPipeline::Ref pipeline)
+void CContextD3D11::BindPipeline(CPipeline& pipeline)
 {
-    CurrPipeline = std::static_pointer_cast<CPipelineD3D11>(pipeline);
+    CurrPipeline = static_cast<CPipelineD3D11*>(&pipeline);
     Imm()->IASetInputLayout(CurrPipeline->InputLayout.Get());
     Imm()->IASetPrimitiveTopology(Convert(CurrPipeline->PrimitiveTopology));
     Imm()->RSSetState(CurrPipeline->RasterizerState.Get());
@@ -107,7 +107,7 @@ void CContextD3D11::BindPipeline(CPipeline::Ref pipeline)
     Imm()->PSSetShader(CurrPipeline->PS.Get(), nullptr, 0);
 }
 
-void CContextD3D11::BindBuffer(CBuffer::Ref buffer, size_t offset, size_t range, uint32_t set,
+void CContextD3D11::BindBuffer(CBuffer& buffer, size_t offset, size_t range, uint32_t set,
                                uint32_t binding, uint32_t index)
 {
     auto location = MakeTriple(set, binding, index);
@@ -115,20 +115,19 @@ void CContextD3D11::BindBuffer(CBuffer::Ref buffer, size_t offset, size_t range,
     if (iter == BoundResources.end())
     {
         CBoundResource bound {};
-        bound.Buffer = std::static_pointer_cast<CBufferD3D11>(buffer)->GetD3D11Buffer();
+        bound.Buffer = static_cast<CBufferD3D11&>(buffer).GetD3D11Buffer();
         bound.Offset = offset;
         bound.Range = range;
         BoundResources[MakeTriple(set, binding, index)] = bound;
     }
     else
     {
-        iter->second.SetBuffer(std::static_pointer_cast<CBufferD3D11>(buffer)->GetD3D11Buffer(),
-                               offset, range);
+        iter->second.SetBuffer(static_cast<CBufferD3D11&>(buffer).GetD3D11Buffer(), offset, range);
     }
     assert(offset == 0); // D3D11.0 does not support offset in cbuffer binding
 }
 
-void CContextD3D11::BindBufferView(CBufferView::Ref bufferView, uint32_t set, uint32_t binding,
+void CContextD3D11::BindBufferView(CBufferView& bufferView, uint32_t set, uint32_t binding,
                                    uint32_t index)
 {
     throw "unimplemented";
@@ -182,7 +181,7 @@ void RHI::CContextD3D11::BindConstants(const void* pData, size_t size, uint32_t 
     }
 }
 
-void CContextD3D11::BindImageView(CImageView::Ref imageView, uint32_t set, uint32_t binding,
+void CContextD3D11::BindImageView(CImageView& imageView, uint32_t set, uint32_t binding,
                                   uint32_t index)
 {
     auto location = MakeTriple(set, binding, index);
@@ -190,45 +189,42 @@ void CContextD3D11::BindImageView(CImageView::Ref imageView, uint32_t set, uint3
     if (iter == BoundResources.end())
     {
         CBoundResource bound {};
-        bound.ImageView =
-            std::static_pointer_cast<CImageViewD3D11>(imageView)->GetShaderResourceView().Get();
+        bound.ImageView = static_cast<CImageViewD3D11&>(imageView).GetShaderResourceView().Get();
         BoundResources[MakeTriple(set, binding, index)] = bound;
     }
     else
     {
         iter->second.SetImageView(
-            std::static_pointer_cast<CImageViewD3D11>(imageView)->GetShaderResourceView().Get());
+            static_cast<CImageViewD3D11&>(imageView).GetShaderResourceView().Get());
     }
 }
 
-void CContextD3D11::BindSampler(CSampler::Ref sampler, uint32_t set, uint32_t binding,
-                                uint32_t index)
+void CContextD3D11::BindSampler(CSampler& sampler, uint32_t set, uint32_t binding, uint32_t index)
 {
     auto location = MakeTriple(set, binding, index);
     auto iter = BoundResources.find(location);
     if (iter == BoundResources.end())
     {
         CBoundResource bound {};
-        bound.SetSampler(std::static_pointer_cast<CSamplerD3D11>(sampler)->GetSamplerState());
+        bound.SetSampler(static_cast<CSamplerD3D11&>(sampler).GetSamplerState());
         BoundResources[MakeTriple(set, binding, index)] = bound;
     }
     else
     {
-        iter->second.SetSampler(
-            std::static_pointer_cast<CSamplerD3D11>(sampler)->GetSamplerState());
+        iter->second.SetSampler(static_cast<CSamplerD3D11&>(sampler).GetSamplerState());
     }
 }
 
-void CContextD3D11::BindIndexBuffer(CBuffer::Ref buffer, size_t offset, EFormat format)
+void CContextD3D11::BindIndexBuffer(CBuffer& buffer, size_t offset, EFormat format)
 {
-    auto impl = std::static_pointer_cast<CBufferD3D11>(buffer);
-    Imm()->IASetIndexBuffer(impl->GetD3D11Buffer(), Convert(format), static_cast<UINT>(offset));
+    auto& impl = static_cast<CBufferD3D11&>(buffer);
+    Imm()->IASetIndexBuffer(impl.GetD3D11Buffer(), Convert(format), static_cast<UINT>(offset));
 }
 
-void CContextD3D11::BindVertexBuffer(uint32_t binding, CBuffer::Ref buffer, size_t offset)
+void CContextD3D11::BindVertexBuffer(uint32_t binding, CBuffer& buffer, size_t offset)
 {
-    auto impl = std::static_pointer_cast<CBufferD3D11>(buffer);
-    ID3D11Buffer* buf = impl->GetD3D11Buffer();
+    auto& impl = static_cast<CBufferD3D11&>(buffer);
+    ID3D11Buffer* buf = impl.GetD3D11Buffer();
     uint32_t stride = CurrPipeline->BindingToStride[binding];
     UINT off = static_cast<UINT>(offset);
     Imm()->IASetVertexBuffers(binding, 1, &buf, &stride, &off);
