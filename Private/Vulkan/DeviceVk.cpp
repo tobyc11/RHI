@@ -171,6 +171,7 @@ static VkPhysicalDevice selectPhysicalDevice(const std::vector<VkPhysicalDevice>
 
 CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     : QueueFamilies { (uint32_t)-1, (uint32_t)-1, (uint32_t)-1 }
+    , SubmissionTracker(*this)
 {
     uint32_t physDeviceCount;
     std::vector<VkPhysicalDevice> physDevice;
@@ -192,11 +193,11 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     {
         VkQueueFlags flags = queueFamilyProperites[i].queueFlags;
         if ((flags & VK_QUEUE_GRAPHICS_BIT) != 0)
-            QueueFamilies[GraphicsQueue] = i;
+            QueueFamilies[QT_GRAPHICS] = i;
         if ((flags & VK_QUEUE_COMPUTE_BIT) != 0)
-            QueueFamilies[ComputeQueue] = i;
+            QueueFamilies[QT_COMPUTE] = i;
         if ((flags & VK_QUEUE_TRANSFER_BIT) != 0)
-            QueueFamilies[TransferQueue] = i;
+            QueueFamilies[QT_TRANSFER] = i;
     }
 
     // Enable all features
@@ -209,32 +210,32 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 
     {
         VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[GraphicsQueue]).queueCount;
+        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[QT_GRAPHICS]).queueCount;
         info.queueCount = queueCount;
-        info.queueFamilyIndex = QueueFamilies[GraphicsQueue];
+        info.queueFamilyIndex = QueueFamilies[QT_GRAPHICS];
         for (uint32_t unused = 0; unused < queueCount; unused++)
             queuePriorities.push_back(1.0f);
         info.pQueuePriorities = &queuePriorities.back() - queueCount + 1;
         queueInfos.push_back(info);
     }
-    if (QueueFamilies[ComputeQueue] != QueueFamilies[GraphicsQueue])
+    if (QueueFamilies[QT_COMPUTE] != QueueFamilies[QT_GRAPHICS])
     {
         VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[ComputeQueue]).queueCount;
+        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[QT_COMPUTE]).queueCount;
         info.queueCount = queueCount;
-        info.queueFamilyIndex = QueueFamilies[ComputeQueue];
+        info.queueFamilyIndex = QueueFamilies[QT_COMPUTE];
         for (uint32_t unused = 0; unused < queueCount; unused++)
             queuePriorities.push_back(1.0f);
         info.pQueuePriorities = &queuePriorities.back() - queueCount + 1;
         queueInfos.push_back(info);
     }
-    if (QueueFamilies[TransferQueue] != QueueFamilies[ComputeQueue]
-        && QueueFamilies[TransferQueue] != QueueFamilies[GraphicsQueue])
+    if (QueueFamilies[QT_TRANSFER] != QueueFamilies[QT_COMPUTE]
+        && QueueFamilies[QT_TRANSFER] != QueueFamilies[QT_GRAPHICS])
     {
         VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[TransferQueue]).queueCount;
+        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[QT_TRANSFER]).queueCount;
         info.queueCount = queueCount;
-        info.queueFamilyIndex = QueueFamilies[TransferQueue];
+        info.queueFamilyIndex = QueueFamilies[QT_TRANSFER];
         for (uint32_t unused = 0; unused < queueCount; unused++)
             queuePriorities.push_back(1.0f);
         info.pQueuePriorities = &queuePriorities.back() - queueCount + 1;
@@ -254,7 +255,7 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 
     vkCreateDevice(PhysicalDevice, &deviceInfo, nullptr, &Device);
 
-    for (uint32_t type = 0; type < NumQueueType; type++)
+    for (uint32_t type = 0; type < NUM_QUEUE_TYPES; type++)
     {
         uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[type]).queueCount;
         Queues[type].resize(queueCount);
@@ -270,23 +271,21 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 
     vmaCreateAllocator(&allocatorInfo, &Allocator);
 
-    ImmediateTransferCtx = std::make_shared<CCommandContextVk>(*this, TransferQueue, false);
-    ImmediateGraphicsCtx = std::make_shared<CCommandContextVk>(*this, GraphicsQueue, false);
-
     DescriptorSetLayoutCache = std::make_unique<CDescriptorSetLayoutCacheVk>(*this);
     HugeConstantBuffer = std::make_unique<CPersistentMappedRingBuffer>(
         *this, 33554432, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT); // 32M
+
+    SubmissionTracker.Init();
+    ImmediateContext =
+        std::make_shared<CCommandContextVk>(*this, QT_GRAPHICS, ECommandContextKind::Immediate);
 }
 
 CDeviceVk::~CDeviceVk()
 {
-    while (!JobQueue.empty())
-        FinishOneJob(true);
-
+    ImmediateContext.reset();
+    SubmissionTracker.Shutdown();
     HugeConstantBuffer.reset();
     DescriptorSetLayoutCache.reset();
-    ImmediateTransferCtx.reset();
-    ImmediateGraphicsCtx.reset();
     vmaDestroyAllocator(Allocator);
     vkDestroyDevice(Device, nullptr);
 }
@@ -307,7 +306,7 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     imageInfo.samples = static_cast<VkSampleCountFlagBits>(sampleCount);
     imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL; // BELOW
     imageInfo.usage = 0; // BELOW
-    if (QueueFamilies[TransferQueue] != QueueFamilies[GraphicsQueue])
+    if (QueueFamilies[QT_TRANSFER] != QueueFamilies[QT_GRAPHICS])
     {
         imageInfo.sharingMode = VK_SHARING_MODE_CONCURRENT;
         imageInfo.queueFamilyIndexCount = 3;
@@ -356,9 +355,9 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
 
     // Create an Image class instance from handle.
     auto image =
-        std::make_shared<CImageVk>(*this, handle, allocation, imageInfo, usage, defaultState);
+        std::make_shared<CMemoryImageVk>(*this, handle, allocation, imageInfo, usage, defaultState);
 
-    auto ctx = GetImmediateTransferCtx();
+    auto ctx = MakeTransientContext(QT_TRANSFER);
     auto cmdBuffer = ctx->GetBuffer();
     if (initialData)
     {
@@ -403,7 +402,6 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     }
     ctx->TransitionImage(*image, defaultState);
     ctx->Flush(true);
-    PutImmediateTransferCtx(ctx);
     return std::move(image);
 }
 
@@ -462,12 +460,9 @@ CSampler::Ref CDeviceVk::CreateSampler(const CSamplerDesc& desc)
     return std::make_shared<CSamplerVk>(*this, desc);
 }
 
-IRenderContext::Ref CDeviceVk::GetImmediateContext() { return ImmediateGraphicsCtx; }
+IRenderContext::Ref CDeviceVk::GetImmediateContext() { return ImmediateContext; }
 
-IRenderContext::Ref CDeviceVk::CreateDeferredContext()
-{
-    return std::make_shared<CCommandContextVk>(*this, GraphicsQueue, true);
-}
+IRenderContext::Ref CDeviceVk::CreateDeferredContext() { throw "unimplemented"; }
 
 CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format)
 {
@@ -521,76 +516,11 @@ CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info,
 
 VkInstance CDeviceVk::GetVkInstance() const { return Instance; }
 
-void CDeviceVk::SubmitJob(CGPUJobInfo jobInfo)
+CCommandContextVk::Ref CDeviceVk::MakeTransientContext(EQueueType qt)
 {
-    std::unique_lock<std::mutex> lk(JobSubmitMutex);
-
-    while (JobQueue.size() >= MaxJobsInFlight)
-        FinishOneJob(true);
-
-    while (jobInfo.bIsFrame && FrameJobCount >= MaxFramesInFlight)
-    {
-        // If we don't allow more than one frame in flight, might as well wait for everything
-        if (MaxFramesInFlight == 1)
-            vkDeviceWaitIdle(Device);
-        FinishOneJob(true);
-    }
-
-    while (!JobQueue.empty() && vkGetFenceStatus(Device, JobQueue.front().Fence) == VK_SUCCESS)
-        FinishOneJob();
-
-    if (jobInfo.bIsFrame)
-    {
-        HugeConstantBuffer->MarkBlockEnd();
-        FrameJobCount++;
-    }
-
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = static_cast<uint32_t>(jobInfo.CmdBuffersInFlight.size());
-    submitInfo.pCommandBuffers = jobInfo.CmdBuffersInFlight.data();
-    submitInfo.waitSemaphoreCount = static_cast<uint32_t>(jobInfo.WaitSemaphores.size());
-    submitInfo.pWaitSemaphores = jobInfo.WaitSemaphores.data();
-    submitInfo.pWaitDstStageMask = jobInfo.WaitStages.data();
-    if (jobInfo.SignalSemaphore)
-    {
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &jobInfo.SignalSemaphore;
-    }
-
-    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-    vkCreateFence(Device, &fenceInfo, nullptr, &jobInfo.Fence);
-
-    VkQueue q = GetVkQueue(jobInfo.QueueType);
-    vkQueueSubmit(q, 1, &submitInfo, jobInfo.Fence);
-
-    // Queue up
-    std::swap(jobInfo.PendingDeletionBuffers, PendingDeletionBuffers);
-    std::swap(jobInfo.PendingDeletionImages, PendingDeletionImages);
-    JobQueue.push(std::move(jobInfo));
-}
-
-void CDeviceVk::FinishOneJob(bool wait)
-{
-    auto& waitJob = JobQueue.front();
-    if (wait)
-        vkWaitForFences(Device, 1, &waitJob.Fence, VK_TRUE, std::numeric_limits<uint64_t>::max());
-    if (waitJob.bIsFrame)
-    {
-        HugeConstantBuffer->FreeBlock();
-        FrameJobCount--;
-    }
-    vkDestroyFence(Device, waitJob.Fence, nullptr);
-    vkDestroySemaphore(Device, waitJob.SignalSemaphore, nullptr);
-    for (auto& fn : waitJob.DeferredDeleters)
-        fn();
-    for (auto& pair : waitJob.PendingDeletionBuffers)
-        vmaDestroyBuffer(Allocator, pair.first, pair.second);
-    for (auto& pair : waitJob.PendingDeletionImages)
-        vmaDestroyImage(Allocator, pair.first, pair.second);
-    for (size_t i = 0; i < waitJob.CmdBuffersInFlight.size(); i++)
-        waitJob.CmdContexts[i]->DoneWithCmdBuffer(waitJob.CmdBuffersInFlight[i]);
-    JobQueue.pop();
+    CCommandContextVk::Ref context =
+        std::make_shared<CCommandContextVk>(*this, qt, ECommandContextKind::Transient);
+    return context;
 }
 
 } /* namespace RHI */

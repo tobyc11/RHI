@@ -78,7 +78,6 @@ public:
 
     virtual ~CImage() = default;
 
-    virtual void CopyFrom(const void* mem) = 0;
     virtual EFormat GetFormat() const = 0;
     virtual EImageUsageFlags GetUsageFlags() const = 0;
     virtual uint32_t GetWidth() const = 0;
@@ -118,6 +117,17 @@ struct CImageSubresourceRange
         LevelCount = mipCount;
         BaseArrayLayer = layer;
         LayerCount = layerCount;
+    }
+
+    bool Overlaps(const CImageSubresourceRange& rhs) const
+    {
+        if (BaseMipLevel + LevelCount <= rhs.BaseMipLevel
+            || rhs.BaseMipLevel + rhs.LevelCount <= BaseMipLevel)
+            return false;
+        if (BaseArrayLayer + LayerCount <= rhs.BaseArrayLayer
+            || rhs.BaseArrayLayer + rhs.LayerCount <= BaseArrayLayer)
+            return false;
+        return true;
     }
 
     bool operator<(const CImageSubresourceRange& rhs) const

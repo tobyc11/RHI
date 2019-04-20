@@ -5,6 +5,7 @@
 #include "PipelineVk.h"
 #include "RenderContext.h"
 #include "ResourceBindingsVk.h"
+#include "SubmissionTracker.h"
 #include "VkCommon.h"
 #include <memory>
 #include <mutex>
@@ -28,7 +29,7 @@ class CCommandContextVk : public std::enable_shared_from_this<CCommandContextVk>
 public:
     typedef std::shared_ptr<CCommandContextVk> Ref;
 
-    CCommandContextVk(CDeviceVk& p, uint32_t qfi, bool deferredContext = false);
+    CCommandContextVk(CDeviceVk& p, EQueueType queueType, ECommandContextKind kind);
     virtual ~CCommandContextVk();
 
     void BeginBuffer();
@@ -88,15 +89,14 @@ private:
 
 private:
     CDeviceVk& Parent;
-    bool bIsDeferred;
-    uint32_t QueueType;
+    ECommandContextKind Kind;
+    EQueueType QueueType;
+    // Only valid for immediate and deferred contexts
     VkCommandPool CmdPool;
     VkCommandBuffer CmdBuffer = VK_NULL_HANDLE;
 
-    std::mutex GarbageMutex;
-    std::vector<VkCommandBuffer> GarbageBuffers;
-
     // Render states kept track of
+    CAccessTracker AccessTracker;
     bool bIsInRenderPass = false;
     VkRect2D RenderArea {};
 

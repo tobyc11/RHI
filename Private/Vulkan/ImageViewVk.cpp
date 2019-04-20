@@ -24,6 +24,28 @@ static VkImageViewType ImageToViewType(VkImageType type)
     }
 }
 
+static VkImageViewType Convert(EImageViewType type) {
+    switch (type)
+    {
+    case RHI::EImageViewType::View1D:
+        return VK_IMAGE_VIEW_TYPE_1D;
+    case RHI::EImageViewType::View2D:
+        return VK_IMAGE_VIEW_TYPE_2D;
+    case RHI::EImageViewType::View3D:
+        return VK_IMAGE_VIEW_TYPE_3D;
+    case RHI::EImageViewType::Cube:
+        return VK_IMAGE_VIEW_TYPE_CUBE;
+    case RHI::EImageViewType::View1DArray:
+        return VK_IMAGE_VIEW_TYPE_1D_ARRAY;
+    case RHI::EImageViewType::View2DArray:
+        return VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    case RHI::EImageViewType::CubeArray:
+        return VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+    default:
+        throw CRHIRuntimeError("Unable to create image view: image type corruption");
+    }
+}
+
 static void Convert(VkImageSubresourceRange& dst, const CImageSubresourceRange& src)
 {
     dst.baseArrayLayer = src.BaseArrayLayer;
@@ -40,17 +62,18 @@ CImageViewVk::CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImageVk::R
     , ImageView(VK_NULL_HANDLE)
 {
     auto* imgVk = static_cast<CImageVk*>(image.get());
-    if (imgVk->bIsSwapChainProxy)
+    if (imgVk->IsSwapChainProxy())
     {
         // The image passed in is a proxy image
+        auto* swapImageVk = static_cast<CSwapChainImageVk*>(imgVk);
         bIsSwapChainProxy = true;
-        SwapChain = imgVk->SwapChain;
+        SwapChain = swapImageVk->GetSwapChain();
         return;
     }
 
     ViewCreateInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
     ViewCreateInfo.image = imgVk->GetVkImage();
-    ViewCreateInfo.viewType = ImageToViewType(imgVk->GetCreateInfo().imageType);
+    ViewCreateInfo.viewType = Convert(desc.Type);
     ViewCreateInfo.format = static_cast<VkFormat>(desc.Format);
     Convert(ViewCreateInfo.subresourceRange, desc.Range);
     ViewCreateInfo.subresourceRange.aspectMask = GetImageAspectFlags(ViewCreateInfo.format);
@@ -85,6 +108,16 @@ VkFormat CImageViewVk::GetFormat() const
     if (bIsSwapChainProxy)
         return std::static_pointer_cast<CSwapChainVk>(SwapChain.lock())->GetChosenFormat();
     return ViewCreateInfo.format;
+}
+
+CImageSubresourceRange CImageViewVk::GetResourceRange() const
+{
+    CImageSubresourceRange result;
+    result.BaseArrayLayer = ViewCreateInfo.subresourceRange.baseArrayLayer;
+    result.BaseMipLevel = ViewCreateInfo.subresourceRange.baseMipLevel;
+    result.LayerCount = ViewCreateInfo.subresourceRange.layerCount;
+    result.LevelCount = ViewCreateInfo.subresourceRange.levelCount;
+    return result;
 }
 
 }

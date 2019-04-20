@@ -59,8 +59,8 @@ void CRHIImGuiBackend::Init(CDevice::Ref device, CRenderPass::Ref renderPass)
     init_info.Instance = DeviceImpl->GetVkInstance();
     init_info.PhysicalDevice = DeviceImpl->GetVkPhysicalDevice();
     init_info.Device = DeviceImpl->GetVkDevice();
-    init_info.QueueFamily = DeviceImpl->GetQueueFamily(GraphicsQueue);
-    init_info.Queue = DeviceImpl->GetVkQueue(GraphicsQueue);
+    init_info.QueueFamily = DeviceImpl->GetQueueFamily(QT_GRAPHICS);
+    init_info.Queue = DeviceImpl->GetVkQueue(QT_GRAPHICS);
     init_info.PipelineCache = PipelineCache;
     init_info.DescriptorPool = DescriptorPool;
     init_info.Allocator = nullptr;
@@ -81,14 +81,12 @@ void CRHIImGuiBackend::NewFrame()
 {
     if (!bFontsUploaded)
     {
-        auto ctx = DeviceImpl->GetImmediateTransferCtx();
+        auto ctx = DeviceImpl->MakeTransientContext(QT_GRAPHICS);
 
         ImGui_ImplVulkan_CreateFontsTexture(ctx->GetBuffer());
 
         ctx->Flush(true); // TODO: might cause hitching
         ImGui_ImplVulkan_InvalidateFontUploadObjects();
-
-        DeviceImpl->PutImmediateTransferCtx(ctx);
 
 		bFontsUploaded = true;
     }

@@ -45,6 +45,8 @@ target_include_directories(${MODULE_NAME} PUBLIC Public)
 if(DEFAULT_COMPILE_OPTIONS)
     target_compile_options(${MODULE_NAME} ${DEFAULT_COMPILE_OPTIONS})
 endif()
+#Address a MSVC alignment regression
+target_compile_definitions(${MODULE_NAME} PUBLIC _ENABLE_EXTENDED_ALIGNED_STORAGE)
 
 #Generate dll linkage header
 include(GenerateExportHeader)

@@ -439,7 +439,7 @@ inline VkAccessFlags StateToAccessMask(EResourceState state)
     case EResourceState::CopySource:
         return VK_ACCESS_TRANSFER_READ_BIT;
     case EResourceState::Present:
-        return 0; // TODO: verify this
+        return 0;
     default:
         throw std::runtime_error("Vulkan RHI resource state invalid");
     }

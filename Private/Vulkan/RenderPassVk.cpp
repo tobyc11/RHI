@@ -42,12 +42,17 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
         r.storeOp = static_cast<VkAttachmentStoreOp>(attachment.StoreOp);
         r.stencilLoadOp = static_cast<VkAttachmentLoadOp>(attachment.StencilLoadOp);
         r.stencilStoreOp = static_cast<VkAttachmentStoreOp>(attachment.StencilStoreOp);
-        r.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        r.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // TODO: Layout undefined destroys content
         r.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        if (GetImageAspectFlags(r.format) & VK_IMAGE_ASPECT_DEPTH_BIT)
-            r.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
         if (viewImpl->bIsSwapChainProxy)
             r.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+        else
+        {
+            if (Any(viewImpl->GetImage()->GetUsageFlags(), EImageUsageFlags::Sampled))
+                r.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            if (GetImageAspectFlags(r.format) & VK_IMAGE_ASPECT_DEPTH_BIT)
+                r.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        }
     }
 
     std::vector<VkSubpassDescription> subpassDescriptions;
@@ -92,24 +97,14 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
     ColorAttachmentCount = subpassDescriptions[0].colorAttachmentCount;
 
     // Let's only handle the situation where there is only one subpass
-    std::vector<VkSubpassDependency> dependency(2);
+    std::vector<VkSubpassDependency> dependency(1);
     dependency[0].dependencyFlags = 0;
     dependency[0].srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency[0].dstSubpass = 0;
-    dependency[0].srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    dependency[0].srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency[0].dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency[0].srcAccessMask = 0;
-    dependency[0].dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-    dependency[0].dstAccessMask = 0;
-    dependency[1].dependencyFlags = 0;
-    dependency[1].srcSubpass = 0;
-    dependency[1].dstSubpass = VK_SUBPASS_EXTERNAL;
-    dependency[1].srcStageMask = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
-    dependency[1].srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
-        | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT | VK_ACCESS_SHADER_WRITE_BIT;
-    dependency[1].dstStageMask =
-        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT;
-    dependency[1].dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_TRANSFER_READ_BIT;
-    // TODO: barrier too aggresive?
+    dependency[0].dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
     passInfo.attachmentCount = static_cast<uint32_t>(AttachmentsVk.size());
     passInfo.pAttachments = AttachmentsVk.data();
@@ -120,6 +115,8 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
 
     vkCreateRenderPass(Parent.GetVkDevice(), &passInfo, nullptr, &RenderPass);
 
+    // Create the framebuffer, if not swapchain, just one is fine. Otherwise create as many as there
+    // are swapchain images
     if (swapChainViews.empty())
     {
         // Not linking to a swap chain

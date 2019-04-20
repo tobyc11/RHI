@@ -23,6 +23,9 @@ struct CPhysicalDeviceSwapChainCaps
 class CSwapChainVk : public CSwapChain
 {
 public:
+    typedef std::shared_ptr<CSwapChainVk> Ref;
+    typedef std::weak_ptr<CSwapChainVk> WeakRef;
+
     static CPhysicalDeviceSwapChainCaps GetDeviceSwapChainCaps(VkSurfaceKHR surface,
                                                                VkPhysicalDevice device);
     static VkSurfaceFormatKHR SelectImageFormat(const CPhysicalDeviceSwapChainCaps& caps);

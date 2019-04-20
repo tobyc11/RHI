@@ -14,6 +14,7 @@ public:
     ~CRenderPassVk() override;
 
     const std::vector<VkAttachmentDescription>& GetAttachmentDesc() const { return AttachmentsVk; }
+    const std::vector<CImageView::Ref>& GetAttachmentViews() const { return AttachmentViews; }
 
     // TODO: support multiple subpasses
     uint32_t SubpassColorAttachmentCount(uint32_t subpass) { return ColorAttachmentCount; }

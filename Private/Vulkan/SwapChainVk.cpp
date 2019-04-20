@@ -201,7 +201,7 @@ void CSwapChainVk::GetSize(uint32_t& width, uint32_t& height) const
 CImage::Ref CSwapChainVk::GetImage()
 {
     if (!ProxyImage)
-        ProxyImage = std::make_shared<CImageVk>(Parent, this->weak_from_this());
+        ProxyImage = std::make_shared<CSwapChainImageVk>(Parent, this->weak_from_this());
     return ProxyImage;
 }
 
@@ -226,6 +226,8 @@ bool CSwapChainVk::AcquireNextImage()
     }
 
     AcquiredImages.push(std::make_pair(imageIndex, imageAvailableSemaphore));
+    std::static_pointer_cast<CSwapChainImageVk>(ProxyImage)
+        ->InitializeAccess(0, 0, VK_IMAGE_LAYOUT_UNDEFINED);
     return true;
 }
 
@@ -242,7 +244,7 @@ void CSwapChainVk::Present(const CSwapChainPresentInfo& info)
     presentInfo.pSwapchains = &SwapChainHandle;
     presentInfo.pImageIndices = &AcquiredImages.front().first;
     presentInfo.pResults = nullptr;
-    vkQueuePresentKHR(Parent.GetVkQueue(GraphicsQueue), &presentInfo);
+    vkQueuePresentKHR(Parent.GetVkQueue(QT_GRAPHICS), &presentInfo);
 
     vkDestroySemaphore(Parent.GetVkDevice(), AcquiredImages.front().second, nullptr);
     AcquiredImages.pop();

@@ -1,6 +1,7 @@
 #pragma once
 #include "Device.h"
 
+#include "BufferVk.h"
 #include "CommandContextVk.h"
 #include "DescriptorSetLayoutCacheVk.h"
 #include "VkCommon.h"
@@ -10,44 +11,6 @@
 
 namespace RHI
 {
-
-enum EQueueType
-{
-    TransferQueue,
-    ComputeQueue,
-    GraphicsQueue,
-    NumQueueType
-};
-
-struct CGPUJobInfo
-{
-    // Fill out these
-    bool bIsFrame = false; // Whether this job is for a present
-    std::vector<VkCommandBuffer> CmdBuffersInFlight;
-    std::vector<CCommandContextVk::Ref> CmdContexts;
-    std::vector<VkSemaphore> WaitSemaphores;
-    std::vector<VkPipelineStageFlags> WaitStages;
-    VkSemaphore SignalSemaphore;
-    EQueueType QueueType;
-    std::vector<std::function<void()>> DeferredDeleters;
-
-    // Don't worry about this
-    VkFence Fence;
-    std::vector<std::pair<VkBuffer, VmaAllocation>> PendingDeletionBuffers;
-    std::vector<std::pair<VkImage, VmaAllocation>> PendingDeletionImages;
-
-    void AddCommandBuffer(VkCommandBuffer b, CCommandContextVk::Ref ctx)
-    {
-        CmdBuffersInFlight.push_back(b);
-        CmdContexts.push_back(ctx);
-    }
-
-    void Reset()
-    {
-        CmdBuffersInFlight.clear();
-        CmdContexts.clear();
-    }
-};
 
 class CDeviceVk : public CDevice
 {
@@ -101,22 +64,29 @@ public:
     VkDevice GetVkDevice() const { return Device; }
     VkPhysicalDevice GetVkPhysicalDevice() const { return PhysicalDevice; }
     const VkPhysicalDeviceLimits& GetVkLimits() const { return Properties.limits; }
-    VmaAllocator GetAllocator() const { return Allocator; }
-    VkQueue GetVkQueue(uint32_t type) const { return Queues[type][0]; }
-    uint32_t GetQueueFamily(uint32_t type) const { return QueueFamilies[type]; }
-    void SubmitJob(CGPUJobInfo jobInfo);
-    void FinishOneJob(bool wait = false);
-    CCommandContextVk::Ref GetImmediateTransferCtx()
+
+    // Otherwise transfer and graphics are the same queue
+    bool IsTransferQueueSeparate() const
     {
-        ImmediateTransferMutex.lock();
-        return ImmediateTransferCtx;
+        return QueueFamilies[QT_TRANSFER] != QueueFamilies[QT_GRAPHICS];
     }
-    void PutImmediateTransferCtx(CCommandContextVk::Ref ref) { ImmediateTransferMutex.unlock(); }
+    bool IsComputeQueueSeparate() const
+    {
+        return QueueFamilies[QT_COMPUTE] != QueueFamilies[QT_GRAPHICS];
+    }
+
+    // Getters for global objects
+    uint32_t GetQueueFamily(uint32_t type) const { return QueueFamilies[type]; }
+    VkQueue GetVkQueue(uint32_t type) const { return Queues[type][0]; }
+    VmaAllocator GetAllocator() const { return Allocator; }
+
     CDescriptorSetLayoutCacheVk* GetDescriptorSetLayoutCache() const
     {
         return DescriptorSetLayoutCache.get();
     }
     CPersistentMappedRingBuffer* GetHugeConstantBuffer() const { return HugeConstantBuffer.get(); }
+    CSubmissionTracker& GetSubmissionTracker() { return SubmissionTracker; }
+    CCommandContextVk::Ref MakeTransientContext(EQueueType qt);
 
 private:
     VkDevice Device;
@@ -125,25 +95,18 @@ private:
     //   it's best to stick to one queue per family for current GPUs
     VkPhysicalDevice PhysicalDevice;
     VkPhysicalDeviceProperties Properties;
-    uint32_t QueueFamilies[NumQueueType];
-    std::vector<VkQueue> Queues[NumQueueType];
 
-    std::mutex ImmediateTransferMutex;
-    CCommandContextVk::Ref ImmediateTransferCtx; // Per thread??
-    CCommandContextVk::Ref ImmediateGraphicsCtx;
-
+    // Global objects
+    uint32_t QueueFamilies[NUM_QUEUE_TYPES];
+    std::vector<VkQueue> Queues[NUM_QUEUE_TYPES];
     VmaAllocator Allocator;
     std::unique_ptr<CDescriptorSetLayoutCacheVk> DescriptorSetLayoutCache;
     std::unique_ptr<CPersistentMappedRingBuffer> HugeConstantBuffer;
-
-    // A ring buffer contains the jobs currently in flight
-    std::mutex JobSubmitMutex;
-    std::queue<CGPUJobInfo> JobQueue;
-    uint32_t FrameJobCount = 0;
-    static const uint32_t MaxJobsInFlight = 8;
-    static const uint32_t MaxFramesInFlight = 2;
+    CSubmissionTracker SubmissionTracker;
+    CCommandContextVk::Ref ImmediateContext;
 
     // Every job submission collects those, and deletes them when job is finished
+    friend class CSubmissionTracker;
     std::vector<std::pair<VkBuffer, VmaAllocation>> PendingDeletionBuffers;
     std::vector<std::pair<VkImage, VmaAllocation>> PendingDeletionImages;
 };

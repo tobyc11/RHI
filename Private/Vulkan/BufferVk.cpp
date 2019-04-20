@@ -61,7 +61,7 @@ CBufferVk::CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const v
         vmaUnmapMemory(Parent.GetAllocator(), stagingAlloc);
 
         // Synchronously copy the content
-        auto ctx = Parent.GetImmediateTransferCtx();
+        auto ctx = Parent.MakeTransientContext(QT_TRANSFER);
         auto cmdBuffer = ctx->GetBuffer();
         VkBufferCopy copy;
         copy.srcOffset = 0;
@@ -69,7 +69,6 @@ CBufferVk::CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const v
         copy.size = size;
         vkCmdCopyBuffer(cmdBuffer, stagingBuffer, Buffer, 1, &copy);
         ctx->Flush(true);
-        Parent.PutImmediateTransferCtx(ctx);
 
         vmaDestroyBuffer(Parent.GetAllocator(), stagingBuffer, stagingAlloc);
     }

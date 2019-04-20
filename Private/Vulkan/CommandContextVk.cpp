@@ -75,18 +75,31 @@ void CCommandContextVk::Convert(VkImageBlit& dst, const CImageBlit& src)
     Convert(dst.dstOffsets[1], src.DstOffsets[1]);
 }
 
-CCommandContextVk::CCommandContextVk(CDeviceVk& p, uint32_t qfi, bool deferredContext)
+CCommandContextVk::CCommandContextVk(CDeviceVk& p, EQueueType queueType, ECommandContextKind kind)
     : Parent(p)
-    , QueueType(qfi)
-    , bIsDeferred(deferredContext)
+    , QueueType(queueType)
+    , Kind(kind)
 {
-    VkCommandPoolCreateInfo poolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-    if (bIsDeferred)
+    if (Kind == ECommandContextKind::Deferred)
+    {
+        VkCommandPoolCreateInfo poolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
         poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        poolInfo.queueFamilyIndex = Parent.GetQueueFamily(QueueType);
+        vkCreateCommandPool(Parent.GetVkDevice(), &poolInfo, nullptr, &CmdPool);
+    }
+    else if (Kind == ECommandContextKind::Immediate)
+    {
+        // All allocation should be done through CFrameResources
+        CmdPool = VK_NULL_HANDLE;
+    }
+    else if (Kind == ECommandContextKind::Transient)
+    {
+        CmdPool = Parent.GetSubmissionTracker().GetTransientPool(queueType);
+    }
     else
-        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
-    poolInfo.queueFamilyIndex = Parent.GetQueueFamily(QueueType);
-    vkCreateCommandPool(Parent.GetVkDevice(), &poolInfo, nullptr, &CmdPool);
+    {
+        assert(false);
+    }
 
     BeginBuffer();
 }
@@ -95,34 +108,35 @@ CCommandContextVk::~CCommandContextVk()
 {
     EndBuffer();
     vkDestroySemaphore(Parent.GetVkDevice(), SignalSemaphore, nullptr);
-    vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool, 1, &CmdBuffer);
-    std::unique_lock<std::mutex> lk(GarbageMutex);
-    vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool,
-                         static_cast<uint32_t>(GarbageBuffers.size()), GarbageBuffers.data());
-    GarbageBuffers.clear();
-    vkDestroyCommandPool(Parent.GetVkDevice(), CmdPool, nullptr);
+    if (Kind != ECommandContextKind::Immediate)
+        vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool, 1, &CmdBuffer);
+
+    if (Kind == ECommandContextKind::Deferred)
+        vkDestroyCommandPool(Parent.GetVkDevice(), CmdPool, nullptr);
 }
 
 void CCommandContextVk::BeginBuffer()
 {
-    // Clear garbage
-    std::unique_lock<std::mutex> lk(GarbageMutex);
-    vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool,
-                         static_cast<uint32_t>(GarbageBuffers.size()), GarbageBuffers.data());
-    GarbageBuffers.clear();
-
-    // Create a new command buffer
-    VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-    cmdInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmdInfo.commandPool = CmdPool;
-    cmdInfo.commandBufferCount = 1;
-    vkAllocateCommandBuffers(Parent.GetVkDevice(), &cmdInfo, &CmdBuffer);
+    if (Kind != ECommandContextKind::Immediate)
+    {
+        // Create a new command buffer
+        VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        cmdInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        cmdInfo.commandPool = CmdPool;
+        cmdInfo.commandBufferCount = 1;
+        vkAllocateCommandBuffers(Parent.GetVkDevice(), &cmdInfo, &CmdBuffer);
+    }
+    else
+    {
+        CmdBuffer = Parent.GetSubmissionTracker().GetCurrentFrameResources().AllocateCmdBuffer();
+    }
 
     VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    if (!bIsDeferred)
+    if (Kind != ECommandContextKind::Deferred)
         beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     vkBeginCommandBuffer(CmdBuffer, &beginInfo);
 
+    AccessTracker.Clear();
     WaitSemaphores.clear();
     WaitStages.clear();
     VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
@@ -140,41 +154,13 @@ void CCommandContextVk::EndBuffer()
 void CCommandContextVk::TransitionImage(CImage& image, EResourceState newState)
 {
     auto& imageImpl = static_cast<CImageVk&>(image);
-    VkImageLayout srcLayout = StateToImageLayout(imageImpl.GetGlobalState());
-    VkImageLayout dstLayout = StateToImageLayout(newState);
-
-    if (srcLayout != dstLayout)
-    {
-        VkImageMemoryBarrier barrier = {};
-        barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-        barrier.srcAccessMask = StateToAccessMask(imageImpl.GetGlobalState());
-        barrier.dstAccessMask = StateToAccessMask(newState);
-        barrier.oldLayout = srcLayout;
-        barrier.newLayout = dstLayout;
-        barrier.srcQueueFamilyIndex = 0;
-        barrier.dstQueueFamilyIndex = 0;
-        if (imageImpl.IsConcurrentAccess())
-            barrier.srcQueueFamilyIndex = barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = imageImpl.GetVkImage();
-        barrier.subresourceRange.aspectMask = GetImageAspectFlags(imageImpl.GetCreateInfo().format);
-        barrier.subresourceRange.baseArrayLayer = 0;
-        barrier.subresourceRange.baseMipLevel = 0;
-        barrier.subresourceRange.layerCount = imageImpl.GetCreateInfo().arrayLayers;
-        barrier.subresourceRange.levelCount = imageImpl.GetCreateInfo().mipLevels;
-
-        VkPipelineStageFlags srcStageMask =
-            StateToShaderStageMask(imageImpl.GetGlobalState(), true);
-        VkPipelineStageFlags dstStageMask = StateToShaderStageMask(newState, false);
-        if (QueueType == TransferQueue)
-        {
-            dstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
-            barrier.dstAccessMask = 0;
-        }
-        vkCmdPipelineBarrier(CmdBuffer, srcStageMask, dstStageMask, 0, 0, nullptr, 0, nullptr, 1,
-                             &barrier);
-
-        imageImpl.SetGlobalState(newState);
-    }
+    CImageSubresourceRange range;
+    range.BaseArrayLayer = 0;
+    range.BaseMipLevel = 0;
+    range.LayerCount = imageImpl.GetArrayLayers();
+    range.LevelCount = imageImpl.GetMipLevels();
+    AccessTracker.TransitionImageState(CmdBuffer, &imageImpl, range, newState,
+                                       QueueType == QT_TRANSFER);
 }
 
 void CCommandContextVk::CopyBuffer(CBuffer& src, CBuffer& dst,
@@ -287,10 +273,8 @@ void CCommandContextVk::ExecuteCommandList(CCommandList& commandList)
     else
     {
         Flush();
-        CGPUJobInfo job;
-        job.QueueType = static_cast<EQueueType>(QueueType);
-        job.AddCommandBuffer(cmdListImpl.CmdBuffer, cmdListImpl.Parent);
-        Parent.SubmitJob(std::move(job));
+        CGPUJobInfo job({ cmdListImpl.CmdBuffer }, {}, {}, {}, QueueType, {});
+        Parent.GetSubmissionTracker().SubmitJob(std::move(job));
     }
 }
 
@@ -309,46 +293,44 @@ void CCommandContextVk::Flush(bool wait, bool isPresent)
 {
     EndBuffer();
 
-    if (wait)
+    auto pool = CmdPool;
+    if (!pool)
+        pool = Parent.GetSubmissionTracker().GetCurrentFrameResources().CommandPool;
+    printf("Flush(%d) %p %p\n", isPresent, pool, CmdBuffer);
+
+    // Can't flush a deferred context
+    assert(Kind == ECommandContextKind::Immediate || Kind == ECommandContextKind::Transient);
+
+    // Create a new command buffer for all the resource transitions
+    VkCommandBuffer preCmdBuffer;
+    if (Kind == ECommandContextKind::Immediate)
     {
-        VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-        submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &CmdBuffer;
-        submitInfo.waitSemaphoreCount = static_cast<uint32_t>(WaitSemaphores.size());
-        submitInfo.pWaitSemaphores = WaitSemaphores.data();
-        submitInfo.pWaitDstStageMask = WaitStages.data();
-        submitInfo.signalSemaphoreCount = 1;
-        submitInfo.pSignalSemaphores = &SignalSemaphore;
-
-        VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-        VkFence fence;
-        vkCreateFence(Parent.GetVkDevice(), &fenceInfo, nullptr, &fence);
-
-        VkQueue q = Parent.GetVkQueue(QueueType);
-        vkQueueSubmit(q, 1, &submitInfo, fence);
-        vkWaitForFences(Parent.GetVkDevice(), 1, &fence, VK_TRUE,
-                        std::numeric_limits<uint64_t>::max());
-        vkDestroyFence(Parent.GetVkDevice(), fence, nullptr);
-        vkDestroySemaphore(Parent.GetVkDevice(), SignalSemaphore, nullptr);
-        for (auto& fn : DeferredDeleters)
-            fn();
-        DeferredDeleters.clear();
-
-        DoneWithCmdBuffer(CmdBuffer);
+        preCmdBuffer = Parent.GetSubmissionTracker().GetCurrentFrameResources().AllocateCmdBuffer();
     }
     else
     {
-        // Bye bye command buffer, I hope you all well on the GPU side
-        CGPUJobInfo job;
-        job.QueueType = static_cast<EQueueType>(QueueType);
-        job.AddCommandBuffer(CmdBuffer, this->shared_from_this());
-        job.WaitSemaphores = WaitSemaphores;
-        job.WaitStages = WaitStages;
-        job.SignalSemaphore = SignalSemaphore;
-        job.DeferredDeleters = std::move(DeferredDeleters);
-        job.bIsFrame = isPresent;
-        Parent.SubmitJob(std::move(job));
+        VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+        cmdInfo.commandPool = CmdPool;
+        cmdInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        cmdInfo.commandBufferCount = 1;
+        vkAllocateCommandBuffers(Parent.GetVkDevice(), &cmdInfo, &preCmdBuffer);
     }
+    VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(preCmdBuffer, &beginInfo);
+    AccessTracker.DeployAllBarriers(preCmdBuffer);
+    vkEndCommandBuffer(preCmdBuffer);
+    AccessTracker.Clear();
+
+    auto& tracker = Parent.GetSubmissionTracker();
+    // Bye bye command buffer, I hope you all well on the GPU side
+    CGPUJobInfo job({ preCmdBuffer, CmdBuffer }, std::move(WaitSemaphores), std::move(WaitStages),
+                    { SignalSemaphore }, QueueType, std::move(DeferredDeleters));
+    if (Kind == ECommandContextKind::Immediate)
+    {
+        job.SetImmediateJob(isPresent);
+    }
+    tracker.SubmitJob(std::move(job), wait);
 
     BeginBuffer();
 }
@@ -361,9 +343,10 @@ void CCommandContextVk::BeginRenderPass(CRenderPass& renderPass,
     VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
     beginInfo.renderPass = rpImpl.RenderPass;
     beginInfo.framebuffer = framebufferInfo.first;
+    // If the framebuffer comes with a semaphore, put it into the wait list
     if (framebufferInfo.second != VK_NULL_HANDLE)
     {
-        WaitSemaphores.emplace_back(rpImpl.GetNextFramebuffer().second);
+        WaitSemaphores.emplace_back(framebufferInfo.second);
         WaitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     }
     std::vector<VkClearValue> clear;
@@ -449,7 +432,9 @@ void CCommandContextVk::BindImageView(CImageView& imageView, uint32_t set, uint3
                                       uint32_t index)
 {
     auto& impl = static_cast<CImageViewVk&>(imageView);
-    assert(impl.GetImage()->GetGlobalState() == EResourceState::ShaderResource);
+    /*auto image = impl.GetImage();
+    AccessTracker.TransitionImageState(CmdBuffer, image.get(), impl.GetResourceRange(),
+                                       EResourceState::ShaderResource);*/
     CurrBindings.BindImageView(&impl, VK_NULL_HANDLE, set, binding, index);
 }
 
@@ -491,9 +476,8 @@ void CCommandContextVk::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
 
 void CCommandContextVk::DoneWithCmdBuffer(VkCommandBuffer b)
 {
-    std::unique_lock<std::mutex> lk(GarbageMutex);
-
-    GarbageBuffers.push_back(b);
+    assert(Kind == ECommandContextKind::Deferred);
+    vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool, 1, &b);
 }
 
 void CCommandContextVk::ResolveBindings()

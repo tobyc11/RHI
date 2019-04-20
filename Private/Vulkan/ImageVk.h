@@ -1,4 +1,5 @@
 #pragma once
+#include "AccessTracker.h"
 #include "RHICommon.h"
 #include "Resources.h"
 #include "SwapChain.h"
@@ -13,15 +14,62 @@ class CImageVk : public CImage
 public:
     typedef std::shared_ptr<CImageVk> Ref;
 
-    CImageVk(CDeviceVk& p, VkImage image, VmaAllocation alloc, const VkImageCreateInfo& createInfo,
-             EImageUsageFlags usage, EResourceState defaultState);
-    CImageVk(CDeviceVk& p, CSwapChain::WeakRef swapChain);
-    ~CImageVk();
+    virtual VkImage GetVkImage() const = 0;
+    virtual VkFormat GetVkFormat() const = 0; // As opposed to RHI EFormat
+    virtual bool IsConcurrentAccess() const = 0;
+    virtual bool IsSwapChainProxy() const = 0;
 
+    // Access tracking for barrier deduction
+    void InitializeAccess(VkAccessFlags access, VkPipelineStageFlags stages, VkImageLayout layout);
+    /// Transitoin a subset of this image to new access record. Inserts the barriers into cmdBuffer
+    void TransitionAccess(VkCommandBuffer cmdBuffer, const CImageSubresourceRange& range,
+                          const CAccessRecord& accessRecord);
+    /// Doesn't do any transition, but updates the LastAccess map
+    void UpdateAccess(const CImageSubresourceRange& range, const CAccessRecord& accessRecord);
+
+protected:
+    CImageVk() = default;
+
+private:
+    std::map<CImageSubresourceRange, CAccessRecord> LastAccess;
+};
+
+class CSwapChainImageVk : public CImageVk
+{
+public:
+    CSwapChainImageVk(CDeviceVk& p, CSwapChain::WeakRef swapChain);
+
+    // CImage interface
+    EFormat GetFormat() const;
+    EImageUsageFlags GetUsageFlags() const;
+    uint32_t GetWidth() const;
+    uint32_t GetHeight() const;
+    uint32_t GetDepth() const { return 1; }
+    uint32_t GetMipLevels() const { return 1; }
+    uint32_t GetArrayLayers() const { return 1; }
+    uint32_t GetSampleCount() const { return 1; }
+
+    // CImageVk interface
     VkImage GetVkImage() const;
-    bool IsConcurrentAccess() const;
+    VkFormat GetVkFormat() const;
+    bool IsConcurrentAccess() const { return false; }
+    bool IsSwapChainProxy() const { return true; }
 
-    void CopyFrom(const void* mem);
+    CSwapChain::WeakRef GetSwapChain() const { return SwapChain; }
+
+private:
+    CSwapChain::WeakRef SwapChain;
+};
+
+class CMemoryImageVk : public CImageVk
+{
+public:
+    CMemoryImageVk(CDeviceVk& p, VkImage image, VmaAllocation alloc,
+                   const VkImageCreateInfo& createInfo, EImageUsageFlags usage,
+                   EResourceState defaultState);
+    ~CMemoryImageVk();
+
+    // CImage interface
     EFormat GetFormat() const { return static_cast<EFormat>(GetCreateInfo().format); }
     EImageUsageFlags GetUsageFlags() const;
     uint32_t GetWidth() const { return GetCreateInfo().extent.width; }
@@ -31,15 +79,14 @@ public:
     uint32_t GetArrayLayers() const { return GetCreateInfo().arrayLayers; }
     uint32_t GetSampleCount() const { return GetCreateInfo().samples; }
 
+    // CImageVk interface
+    VkImage GetVkImage() const;
+    VkFormat GetVkFormat() const { return GetCreateInfo().format; }
+    bool IsConcurrentAccess() const;
+    bool IsSwapChainProxy() const { return false; }
+
     VkImageCreateInfo GetCreateInfo() const;
     EResourceState GetDefaultState() const;
-
-    EResourceState GetGlobalState() const;
-    void SetGlobalState(EResourceState state);
-
-    // The image object could be a mere proxy for a swapchain, and does not hold any real image
-    bool bIsSwapChainProxy = false;
-    CSwapChain::WeakRef SwapChain;
 
 private:
     CDeviceVk& Parent;
@@ -50,7 +97,6 @@ private:
     VkImageCreateInfo CreateInfo;
     EImageUsageFlags UsageFlags {};
     EResourceState DefaultState;
-    EResourceState GlobalState;
 };
 
 } /* namespace RHI */
