@@ -49,8 +49,8 @@ CBufferVk::CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const v
         VmaAllocationCreateInfo stgallocInfo = {};
         stgallocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
-        VkBuffer stagingBuffer;
-        VmaAllocation stagingAlloc;
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VmaAllocation stagingAlloc = VK_NULL_HANDLE;
 
         vmaCreateBuffer(Parent.GetAllocator(), &stgbufferInfo, &stgallocInfo, &stagingBuffer,
                         &stagingAlloc, nullptr);

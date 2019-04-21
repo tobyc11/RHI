@@ -27,10 +27,9 @@ void CSubmissionTracker::Init()
         allocInfo.pNext = nullptr;
         allocInfo.commandPool = r.CommandPool;
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 1;
+        allocInfo.commandBufferCount = 4;
 
         r.CommandBuffers.resize(4);
-        allocInfo.commandBufferCount = 4;
         vkAllocateCommandBuffers(Parent.GetVkDevice(), &allocInfo, r.CommandBuffers.data());
 
         r.NextFreeCommandBuffer = 0;
@@ -119,8 +118,15 @@ void CSubmissionTracker::SubmitJob(CGPUJobInfo jobInfo, bool wait)
 void CSubmissionTracker::PopFrontJob(bool wait)
 {
     auto& waitJob = JobQueue.front();
+
+    VkResult result;
     if (wait)
-        vkWaitForFences(Parent.GetVkDevice(), 1, &waitJob.Fence, VK_TRUE, UINT64_MAX);
+    {
+        result = vkWaitForFences(Parent.GetVkDevice(), 1, &waitJob.Fence, VK_TRUE, 1000000000);
+        if (result != VK_SUCCESS)
+            throw CRHIRuntimeError("vkWaitForFences timedout or errored: "
+                                   + std::to_string(result));
+    }
 
     if (waitJob.bIsFrameJob)
     {

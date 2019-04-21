@@ -87,6 +87,7 @@ public:
     CPersistentMappedRingBuffer* GetHugeConstantBuffer() const { return HugeConstantBuffer.get(); }
     CSubmissionTracker& GetSubmissionTracker() { return SubmissionTracker; }
     CCommandContextVk::Ref MakeTransientContext(EQueueType qt);
+    VkPipelineCache GetPipelineCache() const { return PipelineCache; }
 
 private:
     VkDevice Device;
@@ -104,6 +105,7 @@ private:
     std::unique_ptr<CPersistentMappedRingBuffer> HugeConstantBuffer;
     CSubmissionTracker SubmissionTracker;
     CCommandContextVk::Ref ImmediateContext;
+    VkPipelineCache PipelineCache;
 
     // Every job submission collects those, and deletes them when job is finished
     friend class CSubmissionTracker;

@@ -1,6 +1,7 @@
 #pragma once
 #include "RHIModuleAPI.h"
 #include <stdexcept>
+#include <string>
 
 namespace RHI
 {
@@ -16,6 +17,11 @@ class RHI_API CRHIRuntimeError : public CRHIException
 public:
     CRHIRuntimeError(const char* msg)
         : CRHIException(msg)
+    {
+    }
+
+    CRHIRuntimeError(const std::string& msg)
+        : CRHIException(msg.c_str())
     {
     }
 };

@@ -62,11 +62,11 @@ public:
             ComPtr<ID3D11DepthStencilState> stateBlock;
             // Translate RHI state block to D3D
             D3D11_DEPTH_STENCIL_DESC desc;
-            desc.DepthEnable = inDesc.DepthTestEnable;
+            desc.DepthEnable = inDesc.DepthEnable;
             desc.DepthWriteMask =
                 inDesc.DepthWriteEnable ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
             desc.DepthFunc = Convert(inDesc.DepthCompareOp);
-            desc.StencilEnable = inDesc.StencilTestEnable;
+            desc.StencilEnable = inDesc.StencilEnable;
             desc.StencilReadMask = static_cast<UINT8>(inDesc.Front.CompareMask);
             desc.StencilWriteMask = static_cast<UINT8>(inDesc.Front.WriteMask);
             desc.FrontFace.StencilFailOp = Convert(inDesc.Front.FailOp);

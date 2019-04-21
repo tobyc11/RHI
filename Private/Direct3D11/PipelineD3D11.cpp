@@ -61,9 +61,9 @@ CPipelineD3D11::CPipelineD3D11(CDeviceD3D11& p, const CPipelineDesc& desc)
     }
 
     PrimitiveTopology = desc.PrimitiveTopology;
-    RasterizerState = Parent.StateCache->FindOrCreate(*desc.RasterizerState);
-    DepthStencilState = Parent.StateCache->FindOrCreate(*desc.DepthStencilState);
-    BlendState = Parent.StateCache->FindOrCreate(*desc.BlendState);
+    RasterizerState = Parent.StateCache->FindOrCreate(desc.RasterizerState);
+    DepthStencilState = Parent.StateCache->FindOrCreate(desc.DepthStencilState);
+    BlendState = Parent.StateCache->FindOrCreate(desc.BlendState);
 }
 
 CPipelineD3D11::~CPipelineD3D11()

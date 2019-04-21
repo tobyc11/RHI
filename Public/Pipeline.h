@@ -19,12 +19,24 @@ struct CPipelineDesc
     std::vector<CVertexInputAttributeDesc> VertexAttributes;
     std::vector<CVertexInputBindingDesc> VertexBindings;
     EPrimitiveTopology PrimitiveTopology = EPrimitiveTopology::TriangleList;
-    uint32_t PatchControlPoints;
-    const CRasterizerDesc* RasterizerState;
-    const CMultisampleStateDesc* MultisampleState;
-    const CDepthStencilDesc* DepthStencilState;
-    const CBlendDesc* BlendState;
-    CRenderPass::Ref RenderPass;
+    uint32_t PatchControlPoints = 0;
+    CRasterizerDesc RasterizerState;
+    CMultisampleStateDesc MultisampleState;
+    CDepthStencilDesc DepthStencilState;
+    CBlendDesc BlendState;
+    CRenderPass::WeakRef RenderPass;
+
+    void VertexAttribFormat(uint32_t location, EFormat format, uint32_t offset, uint32_t binding)
+    {
+        CVertexInputAttributeDesc desc { location, format, offset, binding };
+        VertexAttributes.push_back(desc);
+    }
+
+    void VertexBinding(uint32_t binding, bool bIsPerInstance = false)
+    {
+        CVertexInputBindingDesc desc { binding, bIsPerInstance };
+        VertexBindings.push_back(desc);
+    }
 };
 
 class CPipeline : public tc::FNonCopyable

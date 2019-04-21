@@ -185,7 +185,7 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
         throw CRHIRuntimeError("Vulkan pipeline layout create failed");
 
     // Create a pipeline create info and fill in handles
-    auto renderpass = std::static_pointer_cast<CRenderPassVk>(desc.RenderPass);
+    auto renderpass = std::static_pointer_cast<CRenderPassVk>(desc.RenderPass.lock());
     VkGraphicsPipelineCreateInfo pipelineInfo = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
     pipelineInfo.stageCount = static_cast<uint32_t>(StageInfos.size());
     pipelineInfo.pStages = StageInfos.data();
@@ -248,58 +248,52 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     pipelineInfo.pViewportState = &viewportInfo;
 
     // Rasterization state
+    bool disableRast = !desc.PS && !desc.DepthStencilState.DepthEnable
+        && !desc.DepthStencilState.StencilEnable;
+
     VkPipelineRasterizationStateCreateInfo rastInfo {
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO
     };
-    if (desc.RasterizerState)
-    {
-        rastInfo.depthClampEnable = desc.RasterizerState->DepthClampEnable;
-        rastInfo.rasterizerDiscardEnable = VK_FALSE;
-        rastInfo.polygonMode = VkCast(desc.RasterizerState->PolygonMode);
-        rastInfo.cullMode = VkCast(desc.RasterizerState->CullMode);
-        rastInfo.frontFace = desc.RasterizerState->FrontFaceCCW ? VK_FRONT_FACE_COUNTER_CLOCKWISE
-                                                                : VK_FRONT_FACE_CLOCKWISE;
-        rastInfo.depthBiasEnable = desc.RasterizerState->DepthBiasEnable;
-        rastInfo.depthBiasConstantFactor = desc.RasterizerState->DepthBiasConstantFactor;
-        rastInfo.depthBiasClamp = desc.RasterizerState->DepthBiasClamp;
-        rastInfo.depthBiasSlopeFactor = desc.RasterizerState->DepthBiasSlopeFactor;
-        rastInfo.lineWidth = 1.0f;
-        pipelineInfo.pRasterizationState = &rastInfo;
-    }
+    rastInfo.depthClampEnable = desc.RasterizerState.DepthClampEnable;
+    rastInfo.rasterizerDiscardEnable = disableRast;
+    rastInfo.polygonMode = VkCast(desc.RasterizerState.PolygonMode);
+    rastInfo.cullMode = VkCast(desc.RasterizerState.CullMode);
+    rastInfo.frontFace = desc.RasterizerState.FrontFaceCCW ? VK_FRONT_FACE_COUNTER_CLOCKWISE
+                                                           : VK_FRONT_FACE_CLOCKWISE;
+    rastInfo.depthBiasEnable = desc.RasterizerState.DepthBiasEnable;
+    rastInfo.depthBiasConstantFactor = desc.RasterizerState.DepthBiasConstantFactor;
+    rastInfo.depthBiasClamp = desc.RasterizerState.DepthBiasClamp;
+    rastInfo.depthBiasSlopeFactor = desc.RasterizerState.DepthBiasSlopeFactor;
+    rastInfo.lineWidth = 1.0f;
+    pipelineInfo.pRasterizationState = &rastInfo;
 
     // Multisample state
     VkPipelineMultisampleStateCreateInfo msInfo {
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO
     };
-    if (desc.MultisampleState)
-    {
-        msInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-        msInfo.sampleShadingEnable = VK_FALSE;
-        msInfo.minSampleShading = 1.0f;
-        msInfo.pSampleMask = nullptr;
-        msInfo.alphaToCoverageEnable = VK_FALSE;
-        msInfo.alphaToOneEnable = VK_FALSE;
-        pipelineInfo.pMultisampleState = &msInfo;
-        // TODO: implement multisampling
-    }
+    msInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    msInfo.sampleShadingEnable = VK_FALSE;
+    msInfo.minSampleShading = 0.0f;
+    msInfo.pSampleMask = nullptr;
+    msInfo.alphaToCoverageEnable = VK_FALSE;
+    msInfo.alphaToOneEnable = VK_FALSE;
+    pipelineInfo.pMultisampleState = &msInfo;
+    // TODO: implement multisampling
 
     // Depth stencil state
     VkPipelineDepthStencilStateCreateInfo dsInfo {
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO
     };
-    if (desc.DepthStencilState)
-    {
-        dsInfo.depthTestEnable = desc.DepthStencilState->DepthTestEnable;
-        dsInfo.depthWriteEnable = desc.DepthStencilState->DepthWriteEnable;
-        dsInfo.depthCompareOp = VkCast(desc.DepthStencilState->DepthCompareOp);
-        dsInfo.depthBoundsTestEnable = VK_FALSE;
-        dsInfo.stencilTestEnable = desc.DepthStencilState->StencilTestEnable;
-        Convert(dsInfo.front, desc.DepthStencilState->Front);
-        Convert(dsInfo.back, desc.DepthStencilState->Back);
-        dsInfo.minDepthBounds = 0.0f;
-        dsInfo.maxDepthBounds = 1.0f;
-        pipelineInfo.pDepthStencilState = &dsInfo;
-    }
+    dsInfo.depthTestEnable = desc.DepthStencilState.DepthEnable;
+    dsInfo.depthWriteEnable = desc.DepthStencilState.DepthWriteEnable;
+    dsInfo.depthCompareOp = VkCast(desc.DepthStencilState.DepthCompareOp);
+    dsInfo.depthBoundsTestEnable = VK_FALSE;
+    dsInfo.stencilTestEnable = desc.DepthStencilState.StencilEnable;
+    Convert(dsInfo.front, desc.DepthStencilState.Front);
+    Convert(dsInfo.back, desc.DepthStencilState.Back);
+    dsInfo.minDepthBounds = 0.0f;
+    dsInfo.maxDepthBounds = 1.0f;
+    pipelineInfo.pDepthStencilState = &dsInfo;
 
     // Blend state
     VkPipelineColorBlendStateCreateInfo blendInfo {
@@ -309,15 +303,15 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     blendInfo.logicOp = VK_LOGIC_OP_CLEAR;
     blendInfo.attachmentCount = renderpass->SubpassColorAttachmentCount(pipelineInfo.subpass);
     std::vector<VkPipelineColorBlendAttachmentState> attachmentBlend;
-    if (desc.BlendState && blendInfo.attachmentCount)
+    if (blendInfo.attachmentCount)
     {
         attachmentBlend.resize(blendInfo.attachmentCount);
-        Convert(attachmentBlend[0], desc.BlendState->RenderTargets[0]);
+        Convert(attachmentBlend[0], desc.BlendState.RenderTargets[0]);
         for (size_t i = 1; i < attachmentBlend.size(); i++)
-            if (!desc.BlendState->IndependentBlendEnable)
+            if (!desc.BlendState.IndependentBlendEnable)
                 attachmentBlend[i] = attachmentBlend[0];
             else
-                Convert(attachmentBlend[i], desc.BlendState->RenderTargets[i]);
+                Convert(attachmentBlend[i], desc.BlendState.RenderTargets[i]);
         blendInfo.pAttachments = attachmentBlend.data();
         pipelineInfo.pColorBlendState = &blendInfo;
 
@@ -337,8 +331,8 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     dynamicStateInfo.pDynamicStates = dynamicStates.data();
     pipelineInfo.pDynamicState = &dynamicStateInfo;
 
-    result = vkCreateGraphicsPipelines(Parent.GetVkDevice(), VK_NULL_HANDLE, 1, &pipelineInfo,
-                                       nullptr, &PipelineHandle);
+    result = vkCreateGraphicsPipelines(Parent.GetVkDevice(), Parent.GetPipelineCache(), 1,
+                                       &pipelineInfo, nullptr, &PipelineHandle);
     if (result != VK_SUCCESS)
         throw CRHIRuntimeError("Failed to create vulkan pipeline");
 }

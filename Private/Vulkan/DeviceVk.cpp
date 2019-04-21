@@ -271,6 +271,9 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 
     vmaCreateAllocator(&allocatorInfo, &Allocator);
 
+    VkPipelineCacheCreateInfo pipelineCacheInfo = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO };
+    vkCreatePipelineCache(Device, &pipelineCacheInfo, nullptr, &PipelineCache);
+
     DescriptorSetLayoutCache = std::make_unique<CDescriptorSetLayoutCacheVk>(*this);
     HugeConstantBuffer = std::make_unique<CPersistentMappedRingBuffer>(
         *this, 33554432, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT); // 32M
@@ -286,6 +289,7 @@ CDeviceVk::~CDeviceVk()
     SubmissionTracker.Shutdown();
     HugeConstantBuffer.reset();
     DescriptorSetLayoutCache.reset();
+    vkDestroyPipelineCache(Device, PipelineCache, nullptr);
     vmaDestroyAllocator(Allocator);
     vkDestroyDevice(Device, nullptr);
 }
@@ -372,8 +376,8 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
         VmaAllocationCreateInfo allocInfo = {};
         allocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
 
-        VkBuffer stagingBuffer;
-        VmaAllocation stagingAlloc;
+        VkBuffer stagingBuffer = VK_NULL_HANDLE;
+        VmaAllocation stagingAlloc = VK_NULL_HANDLE;
 
         vmaCreateBuffer(Allocator, &bufferInfo, &allocInfo, &stagingBuffer, &stagingAlloc, nullptr);
 

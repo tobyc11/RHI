@@ -146,9 +146,9 @@ struct CRasterizerDesc
 
 struct CMultisampleStateDesc
 {
-    bool MultisampleEnable; // Replace with sample count?
-    uint64_t SampleMask;
-    bool AlphaToCoverageEnable;
+    bool MultisampleEnable = false; // Replace with sample count?
+    uint64_t SampleMask = ~0U;
+    bool AlphaToCoverageEnable = false;
 
     CMultisampleStateDesc& SetMultisampleEnable(bool value)
     {
@@ -272,16 +272,16 @@ struct CStencilOpState
 
 struct CDepthStencilDesc
 {
-    bool DepthTestEnable = true;
+    bool DepthEnable = true;
     bool DepthWriteEnable = true;
     ECompareOp DepthCompareOp = ECompareOp::Less;
-    bool StencilTestEnable = false;
+    bool StencilEnable = false;
     CStencilOpState Front;
     CStencilOpState Back;
 
-    CDepthStencilDesc& SetDepthTestEnable(bool value)
+    CDepthStencilDesc& SetDepthEnable(bool value)
     {
-        DepthTestEnable = value;
+        DepthEnable = value;
         return *this;
     }
     CDepthStencilDesc& SetDepthWriteEnable(bool value)
@@ -294,9 +294,9 @@ struct CDepthStencilDesc
         DepthCompareOp = value;
         return *this;
     }
-    CDepthStencilDesc& SetStencilTestEnable(bool value)
+    CDepthStencilDesc& SetStencilEnable(bool value)
     {
-        StencilTestEnable = value;
+        StencilEnable = value;
         return *this;
     }
     CDepthStencilDesc& SetFront(CStencilOpState value)
@@ -312,19 +312,19 @@ struct CDepthStencilDesc
 
     bool operator==(const CDepthStencilDesc& rhs) const
     {
-        return DepthTestEnable == rhs.DepthTestEnable && DepthWriteEnable == rhs.DepthWriteEnable
-            && DepthCompareOp == rhs.DepthCompareOp && StencilTestEnable == rhs.StencilTestEnable
+        return DepthEnable == rhs.DepthEnable && DepthWriteEnable == rhs.DepthWriteEnable
+            && DepthCompareOp == rhs.DepthCompareOp && StencilEnable == rhs.StencilEnable
             && Front == rhs.Front && Back == rhs.Back;
     }
 
     friend std::size_t hash_value(const CDepthStencilDesc& r)
     {
         std::size_t result = 0;
-        tc::hash_combine(result, r.DepthTestEnable);
+        tc::hash_combine(result, r.DepthEnable);
         tc::hash_combine(result, r.DepthWriteEnable);
         result |= static_cast<std::size_t>(r.DepthCompareOp);
         result <<= 1;
-        tc::hash_combine(result, r.StencilTestEnable);
+        tc::hash_combine(result, r.StencilEnable);
         tc::hash_combine(result, r.Front);
         tc::hash_combine(result, r.Back);
         return result;
@@ -424,10 +424,10 @@ struct CRenderTargetBlendDesc
     {
         return (BlendEnable == false && rhs.BlendEnable == false)
             || (BlendEnable == rhs.BlendEnable && SrcBlend == rhs.SrcBlend
-            && DestBlend == rhs.DestBlend && BlendOp == rhs.BlendOp
-            && SrcBlendAlpha == rhs.SrcBlendAlpha && DestBlendAlpha == rhs.DestBlendAlpha
-            && BlendOpAlpha == rhs.BlendOpAlpha
-            && RenderTargetWriteMask == rhs.RenderTargetWriteMask);
+                && DestBlend == rhs.DestBlend && BlendOp == rhs.BlendOp
+                && SrcBlendAlpha == rhs.SrcBlendAlpha && DestBlendAlpha == rhs.DestBlendAlpha
+                && BlendOpAlpha == rhs.BlendOpAlpha
+                && RenderTargetWriteMask == rhs.RenderTargetWriteMask);
     }
 
     friend std::size_t hash_value(const CRenderTargetBlendDesc& r)
