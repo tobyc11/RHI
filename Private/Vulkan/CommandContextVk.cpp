@@ -613,6 +613,11 @@ void CCommandContextVk::ResolveBindings()
                                 imageInfo.imageView = bindingInfo.pImageView->GetVkImageView();
                                 imageInfo.imageLayout =
                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: fixme
+                                auto aspect =
+                                    GetImageAspectFlags(bindingInfo.pImageView->GetFormat());
+                                if (aspect != VK_IMAGE_ASPECT_COLOR_BIT)
+                                    imageInfo.imageLayout =
+                                        VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
                             }
 
                             imageInfos.push_back(imageInfo);

@@ -158,10 +158,18 @@ struct CImageSubresourceRange
     }
 };
 
+enum class EDepthStencilAspectFlags : uint32_t
+{
+    Depth = 1,
+    Stencil = 2,
+    Both = 3,
+};
+
 struct CImageViewDesc
 {
     EImageViewType Type;
     EFormat Format;
+    EDepthStencilAspectFlags DepthStencilAspect = EDepthStencilAspectFlags::Both;
     CImageSubresourceRange Range;
 };
 

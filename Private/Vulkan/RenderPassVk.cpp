@@ -48,10 +48,14 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
             r.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         else
         {
-            if (Any(viewImpl->GetImage()->GetUsageFlags(), EImageUsageFlags::Sampled))
-                r.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             if (GetImageAspectFlags(r.format) & VK_IMAGE_ASPECT_DEPTH_BIT)
+            {
                 r.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                if (Any(viewImpl->GetImage()->GetUsageFlags(), EImageUsageFlags::Sampled))
+                    r.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+            }
+            else if (Any(viewImpl->GetImage()->GetUsageFlags(), EImageUsageFlags::Sampled))
+                r.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         }
     }
 

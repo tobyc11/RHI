@@ -24,7 +24,8 @@ static VkImageViewType ImageToViewType(VkImageType type)
     }
 }
 
-static VkImageViewType Convert(EImageViewType type) {
+static VkImageViewType Convert(EImageViewType type)
+{
     switch (type)
     {
     case RHI::EImageViewType::View1D:
@@ -77,6 +78,16 @@ CImageViewVk::CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImageVk::R
     ViewCreateInfo.format = static_cast<VkFormat>(desc.Format);
     Convert(ViewCreateInfo.subresourceRange, desc.Range);
     ViewCreateInfo.subresourceRange.aspectMask = GetImageAspectFlags(ViewCreateInfo.format);
+    // Only if aspect flags are set and we are dealing with a DepthStencil format
+    if (ViewCreateInfo.subresourceRange.aspectMask != VK_IMAGE_ASPECT_COLOR_BIT)
+    {
+        // We are handling a depth stencil texture
+        ViewCreateInfo.subresourceRange.aspectMask = 0;
+        if (Any(desc.DepthStencilAspect, EDepthStencilAspectFlags::Depth))
+            ViewCreateInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_DEPTH_BIT;
+        if (Any(desc.DepthStencilAspect, EDepthStencilAspectFlags::Stencil))
+            ViewCreateInfo.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+    }
 
     if (vkCreateImageView(Parent.GetVkDevice(), &ViewCreateInfo, nullptr, &ImageView) != VK_SUCCESS)
         throw CRHIRuntimeError("Unable to create image view");
