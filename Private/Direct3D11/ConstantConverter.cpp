@@ -194,8 +194,9 @@ static DXGI_FORMAT FormatMappingTable[] = {
 
 DXGI_FORMAT Convert(EFormat format)
 {
-    // TODO: potentiall warn if return UNKNOWN?
-    return FormatMappingTable[static_cast<size_t>(format)];
+    DXGI_FORMAT result = FormatMappingTable[static_cast<size_t>(format)];
+    if (result == DXGI_FORMAT_UNKNOWN && format != EFormat::UNDEFINED)
+        throw CRHIException("You are using a format unsupported by the D3D11 backend");
 }
 
 D3D11_TEXTURE_ADDRESS_MODE Convert(ESamplerAddressMode mode)
@@ -354,6 +355,13 @@ D3D11_SHADER_RESOURCE_VIEW_DESC ConvertDescToSRV(const CImageViewDesc& desc)
 {
     D3D11_SHADER_RESOURCE_VIEW_DESC d;
     d.Format = Convert(desc.Format);
+    if (IsDepthStencilFormat(desc.Format))
+    {
+        if (Any(desc.DepthStencilAspect, EDepthStencilAspectFlags::Depth))
+            d.Format = DepthStencilFormatToDepth(desc.Format);
+        else
+            d.Format = DepthStencilFormatToStencil(desc.Format);
+    }
     switch (desc.Type)
     {
     case EImageViewType::View1D:

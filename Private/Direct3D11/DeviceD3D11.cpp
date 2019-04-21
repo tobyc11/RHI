@@ -162,6 +162,9 @@ CImage::Ref CDeviceD3D11::CreateImage2D(EFormat format, EImageUsageFlags usage, 
     desc.CPUAccessFlags = 0;
     desc.MiscFlags = miscFlags;
 
+    if (IsDepthStencilFormat(format))
+        desc.Format = DepthStencilFormatToTypeless(format);
+
     auto image = std::make_shared<CImageD3D11>(*this, desc);
     if (bCreateImmediately)
         image->CreateFromMem(initialData);

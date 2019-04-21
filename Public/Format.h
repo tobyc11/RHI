@@ -131,13 +131,16 @@ enum class EFormat
     R64G64B64A64_SFLOAT = 121,
     B10G11R11_UFLOAT_PACK32 = 122,
     E5B9G9R9_UFLOAT_PACK32 = 123,
+    // Depth only formats and stencil only formats:
     D16_UNORM = 124,
     X8_D24_UNORM_PACK32 = 125,
     D32_SFLOAT = 126,
     S8_UINT = 127,
-    D16_UNORM_S8_UINT = 128,
+    // Depth stencil formats:
+    D16_UNORM_S8_UINT = 128, // This format is rarely supported, don't use
     D24_UNORM_S8_UINT = 129,
     D32_SFLOAT_S8_UINT = 130,
+    // Compressed formats:
     BC1_RGB_UNORM_BLOCK = 131,
     BC1_RGB_SRGB_BLOCK = 132,
     BC1_RGBA_UNORM_BLOCK = 133,
