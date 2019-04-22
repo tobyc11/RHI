@@ -23,6 +23,7 @@
 #include "VkCommon.h"
 #include <SpinLock.h>
 #include <map>
+#include <queue>
 #include <unordered_map>
 #include <vector>
 
@@ -51,6 +52,7 @@ private:
     uint32_t MaxSetsPerPool = 50;
 
     std::unordered_map<VkDescriptorSet, uint32_t> AllocatedDescriptorSets;
+    std::queue<VkDescriptorSet> RecycledDescriptorSets;
     tc::FSpinLock SpinLock;
 };
 

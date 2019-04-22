@@ -197,6 +197,7 @@ DXGI_FORMAT Convert(EFormat format)
     DXGI_FORMAT result = FormatMappingTable[static_cast<size_t>(format)];
     if (result == DXGI_FORMAT_UNKNOWN && format != EFormat::UNDEFINED)
         throw CRHIException("You are using a format unsupported by the D3D11 backend");
+    return result;
 }
 
 D3D11_TEXTURE_ADDRESS_MODE Convert(ESamplerAddressMode mode)

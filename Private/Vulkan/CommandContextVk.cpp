@@ -293,11 +293,6 @@ void CCommandContextVk::Flush(bool wait, bool isPresent)
 {
     EndBuffer();
 
-    auto pool = CmdPool;
-    if (!pool)
-        pool = Parent.GetSubmissionTracker().GetCurrentFrameResources().CommandPool;
-    printf("Flush(%d) %p %p\n", isPresent, pool, CmdBuffer);
-
     // Can't flush a deferred context
     assert(Kind == ECommandContextKind::Immediate || Kind == ECommandContextKind::Transient);
 
@@ -332,6 +327,8 @@ void CCommandContextVk::Flush(bool wait, bool isPresent)
     }
     tracker.SubmitJob(std::move(job), wait);
 
+    // Small regression: the signal semaphore might get destroyed before vkQueueSubmit if max frames
+    // in flight == 1
     BeginBuffer();
 }
 
@@ -484,13 +481,12 @@ void CCommandContextVk::ResolveBindings()
 {
     if (CurrPipeline)
     {
-        std::unordered_set<uint32_t> setConflicts;
-        const auto& pipelineBindings = CurrPipeline->GetSetBindings();
-        for (const auto& it : pipelineBindings)
+        std::set<uint32_t> setConflicts;
+        const auto& pipelineSets = CurrPipeline->GetBoundSets();
+        for (const auto& set : pipelineSets)
         {
             // For given set index, if descriptor set layouts differ, store set index in conflicts
             // map.
-            auto set = it.first;
             if (BoundDescriptorSetLayouts.find(set) != BoundDescriptorSetLayouts.end())
             {
                 if (BoundDescriptorSetLayouts.at(set) != CurrPipeline->GetSetLayout(set))

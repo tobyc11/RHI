@@ -102,7 +102,7 @@ private:
 
     CPipelineVk* CurrPipeline = nullptr;
     ResourceBindings CurrBindings;
-    std::unordered_map<uint32_t, CDescriptorSetLayoutVk*> BoundDescriptorSetLayouts;
+    std::map<uint32_t, CDescriptorSetLayoutVk*> BoundDescriptorSetLayouts;
     std::vector<std::function<void()>> DeferredDeleters;
     std::vector<VkSemaphore> WaitSemaphores;
     std::vector<VkPipelineStageFlags> WaitStages;

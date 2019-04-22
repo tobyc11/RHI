@@ -3,9 +3,12 @@
 #include "Pipeline.h"
 #include "ShaderModuleVk.h"
 #include "VkCommon.h"
+#include <set>
 
 namespace RHI
 {
+
+const size_t kMaxBoundDescriptorSets = 32;
 
 class CPipelineVk : public CPipeline
 {
@@ -15,8 +18,8 @@ public:
 
     VkPipeline GetHandle() const { return PipelineHandle; }
 
-	VkPipelineLayout GetPipelineLayout() const { return PipelineLayout; }
-    const std::unordered_map<uint32_t, std::vector<CPipelineResource>>& GetSetBindings() const;
+    VkPipelineLayout GetPipelineLayout() const { return PipelineLayout; }
+    const std::set<uint32_t>& GetBoundSets() const;
     CDescriptorSetLayoutVk* GetSetLayout(uint32_t set) const;
 
 private:
@@ -28,8 +31,8 @@ private:
     std::vector<std::string> EntryPoints;
 
     std::map<std::string, CPipelineResource> ResourceByName;
-    std::unordered_map<uint32_t, std::vector<CPipelineResource>> SetBindings;
-    std::unordered_map<uint32_t, CDescriptorSetLayoutVk*> SetLayouts;
+    std::set<uint32_t> BoundSets;
+    std::array<CDescriptorSetLayoutVk*, kMaxBoundDescriptorSets> SetLayouts;
 
     VkPipelineLayout PipelineLayout = VK_NULL_HANDLE;
     VkPipeline PipelineHandle = VK_NULL_HANDLE;

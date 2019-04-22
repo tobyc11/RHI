@@ -68,7 +68,14 @@ CDescriptorPoolVk::~CDescriptorPoolVk()
 VkDescriptorSet CDescriptorPoolVk::AllocateDescriptorSet()
 {
     // Safe guard access to internal resources across threads.
-    SpinLock.Lock();
+    std::unique_lock<tc::FSpinLock> lk(SpinLock);
+
+    if (!RecycledDescriptorSets.empty())
+    {
+        auto result = RecycledDescriptorSets.front();
+        RecycledDescriptorSets.pop();
+        return result;
+    }
 
     // Find the next pool to allocate from.
     while (true)
@@ -121,7 +128,6 @@ VkDescriptorSet CDescriptorPoolVk::AllocateDescriptorSet()
     // This is used when FreeDescriptorSet is called downstream.
     AllocatedDescriptorSets.emplace(handle, CurrentAllocationPoolIndex);
 
-    SpinLock.Unlock();
     // Return descriptor set handle.
     return handle;
 }
@@ -129,28 +135,9 @@ VkDescriptorSet CDescriptorPoolVk::AllocateDescriptorSet()
 VkResult CDescriptorPoolVk::FreeDescriptorSet(VkDescriptorSet descriptorSet)
 {
     // Safe guard access to internal resources across threads.
-    SpinLock.Lock();
+    std::unique_lock<tc::FSpinLock> lk(SpinLock);
 
-    // Get the index of the descriptor pool the descriptor set was allocated from.
-    auto it = AllocatedDescriptorSets.find(descriptorSet);
-    if (it == AllocatedDescriptorSets.end())
-        return VK_INCOMPLETE;
-
-    // Return the descriptor set to the original pool.
-    auto poolIndex = it->second;
-    vkFreeDescriptorSets(Layout->GetDevice().GetVkDevice(), Pools[poolIndex], 1, &descriptorSet);
-
-    // Remove descriptor set from allocatedDescriptorSets map.
-    AllocatedDescriptorSets.erase(descriptorSet);
-
-    // Decrement the number of allocated descriptor sets for the pool.
-    --AllocatedSets[poolIndex];
-
-    // Set the next allocation to use this pool index.
-    CurrentAllocationPoolIndex = std::min(CurrentAllocationPoolIndex, poolIndex);
-
-    SpinLock.Unlock();
-    // Return success.
+    RecycledDescriptorSets.push(descriptorSet);
     return VK_SUCCESS;
 }
 

@@ -129,35 +129,33 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     AddShaderModule(desc.DS, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
     AddShaderModule(desc.HS, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 
+    std::array<std::vector<CPipelineResource>, kMaxBoundDescriptorSets> setBindings;
+
     // Catagorize each binding by set id
     for (const auto& pair : ResourceByName)
     {
         const auto& resource = pair.second;
-
-        auto set = SetBindings.find(resource.Set);
-        if (set != SetBindings.end())
-        {
-            set->second.push_back(resource);
-        }
-        else
-        {
-            SetBindings.emplace(resource.Set, std::vector<CPipelineResource> { resource });
-        }
+        auto& set = setBindings[resource.Set];
+        set.push_back(resource);
+        BoundSets.insert(resource.Set);
     }
 
     // Create descriptor set layout
-    for (const auto& pair : SetBindings)
+    SetLayouts.fill(nullptr);
+    for (uint32_t set = 0; set < kMaxBoundDescriptorSets; set++)
     {
-        auto set = pair.first;
+        if (BoundSets.find(set) == BoundSets.end())
+            continue;
         CDescriptorSetLayoutVk* layout = nullptr;
-        Parent.GetDescriptorSetLayoutCache()->CreateLayout(set, pair.second, &layout);
-        SetLayouts.emplace(set, layout);
+        Parent.GetDescriptorSetLayoutCache()->CreateLayout(set, setBindings[set], &layout);
+        SetLayouts[set] = layout;
     }
 
     // Create pipeline layout
     std::vector<VkDescriptorSetLayout> setLayouts;
     for (auto it : SetLayouts)
-        setLayouts.push_back(it.second->GetHandle());
+        if (it)
+            setLayouts.push_back(it->GetHandle());
 
     std::vector<VkPushConstantRange> pushConstantRanges;
     for (auto it : ResourceByName)
@@ -248,8 +246,8 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     pipelineInfo.pViewportState = &viewportInfo;
 
     // Rasterization state
-    bool disableRast = !desc.PS && !desc.DepthStencilState.DepthEnable
-        && !desc.DepthStencilState.StencilEnable;
+    bool disableRast =
+        !desc.PS && !desc.DepthStencilState.DepthEnable && !desc.DepthStencilState.StencilEnable;
 
     VkPipelineRasterizationStateCreateInfo rastInfo {
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO
@@ -346,22 +344,12 @@ CPipelineVk::~CPipelineVk()
         vkDestroyPipelineLayout(Parent.GetVkDevice(), PipelineLayout, nullptr);
 
     for (auto it : SetLayouts)
-        Parent.GetDescriptorSetLayoutCache()->DestroyLayout(it.second);
+        Parent.GetDescriptorSetLayoutCache()->DestroyLayout(it);
 }
 
-const std::unordered_map<uint32_t, std::vector<CPipelineResource>>&
-CPipelineVk::GetSetBindings() const
-{
-    return SetBindings;
-}
+const std::set<uint32_t>& CPipelineVk::GetBoundSets() const { return BoundSets; }
 
-CDescriptorSetLayoutVk* CPipelineVk::GetSetLayout(uint32_t set) const
-{
-    auto iter = SetLayouts.find(set);
-    if (iter == SetLayouts.end())
-        return nullptr;
-    return iter->second;
-}
+CDescriptorSetLayoutVk* CPipelineVk::GetSetLayout(uint32_t set) const { return SetLayouts[set]; }
 
 void CPipelineVk::AddShaderModule(CShaderModule::Ref shaderModule, VkShaderStageFlagBits stage)
 {
