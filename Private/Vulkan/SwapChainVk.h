@@ -47,9 +47,6 @@ public:
     const std::vector<VkImage>& GetVkImages() const { return Images; }
     const std::vector<VkImageView>& GetVkImageViews() const { return ImageViews; }
     std::queue<std::pair<uint32_t, VkSemaphore>> AcquiredImages;
-#ifdef _DEBUG
-    uint32_t Version = 0;
-#endif
 
 private:
     void ReleaseSwapChainAndImages(bool dontDeleteSwapchain = false);

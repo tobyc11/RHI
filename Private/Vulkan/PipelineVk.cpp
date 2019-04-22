@@ -188,7 +188,7 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     pipelineInfo.stageCount = static_cast<uint32_t>(StageInfos.size());
     pipelineInfo.pStages = StageInfos.data();
     pipelineInfo.layout = PipelineLayout;
-    pipelineInfo.renderPass = renderpass->RenderPass;
+    pipelineInfo.renderPass = renderpass->GetHandle();
     pipelineInfo.subpass = 0; // TODO
 
     // Translate vertex input states

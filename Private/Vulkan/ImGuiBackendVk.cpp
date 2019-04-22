@@ -67,7 +67,7 @@ void CRHIImGuiBackend::Init(CDevice::Ref device, CRenderPass::Ref renderPass)
     init_info.CheckVkResultFn = check_vk_result;
 
     ImGui_ImplVulkan_Init(&init_info,
-                          std::static_pointer_cast<CRenderPassVk>(renderPass)->RenderPass);
+                          std::static_pointer_cast<CRenderPassVk>(renderPass)->GetHandle());
 }
 
 void CRHIImGuiBackend::Shutdown()
@@ -88,7 +88,7 @@ void CRHIImGuiBackend::NewFrame()
         ctx->Flush(true); // TODO: might cause hitching
         ImGui_ImplVulkan_InvalidateFontUploadObjects();
 
-		bFontsUploaded = true;
+        bFontsUploaded = true;
     }
 
     ImGui_ImplVulkan_NewFrame();

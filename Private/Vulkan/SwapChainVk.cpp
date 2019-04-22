@@ -186,10 +186,6 @@ void CSwapChainVk::Resize(uint32_t width, uint32_t height)
     CreateSwapChainAndImages();
     vkDestroySwapchainKHR(Parent.GetVkDevice(), CreateInfo.oldSwapchain, nullptr);
     CreateInfo.oldSwapchain = VK_NULL_HANDLE;
-
-#ifdef _DEBUG
-    Version++;
-#endif
 }
 
 void CSwapChainVk::GetSize(uint32_t& width, uint32_t& height) const

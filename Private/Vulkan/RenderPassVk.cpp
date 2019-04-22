@@ -12,26 +12,9 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
 {
     VkRenderPassCreateInfo passInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO };
 
-    std::vector<VkImageView> swapChainViews;
-
     for (const auto& attachment : desc.Attachments)
     {
         auto viewImpl = std::static_pointer_cast<CImageViewVk>(attachment.ImageView);
-        if (viewImpl->bIsSwapChainProxy)
-        {
-            auto swapChainImpl = std::static_pointer_cast<CSwapChainVk>(viewImpl->SwapChain.lock());
-            swapChainViews = swapChainImpl->GetVkImageViews();
-#ifdef _DEBUG
-            SwapChainVersion = swapChainImpl->Version;
-#endif
-
-            bIsSwapChainProxy = true;
-            SwapChain = viewImpl->SwapChain;
-        }
-        else
-        {
-            AttachmentViews.push_back(attachment.ImageView);
-        }
 
         AttachmentsVk.push_back(VkAttachmentDescription());
         VkAttachmentDescription& r = AttachmentsVk.back();
@@ -57,6 +40,8 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
             else if (Any(viewImpl->GetImage()->GetUsageFlags(), EImageUsageFlags::Sampled))
                 r.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         }
+
+        AttachmentViews.push_back(attachment.ImageView);
     }
 
     std::vector<VkSubpassDescription> subpassDescriptions;
@@ -119,81 +104,49 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
 
     vkCreateRenderPass(Parent.GetVkDevice(), &passInfo, nullptr, &RenderPass);
 
-    // Create the framebuffer, if not swapchain, just one is fine. Otherwise create as many as there
-    // are swapchain images
-    if (swapChainViews.empty())
-    {
-        // Not linking to a swap chain
-        VkFramebufferCreateInfo fbInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-        fbInfo.renderPass = RenderPass;
-        std::vector<VkImageView> attachments;
-        for (auto attachment : desc.Attachments)
-        {
-            auto viewImpl = std::static_pointer_cast<CImageViewVk>(attachment.ImageView);
-            attachments.push_back(viewImpl->GetVkImageView());
-        }
-        fbInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        fbInfo.pAttachments = attachments.data();
-        fbInfo.width = desc.Width;
-        fbInfo.height = desc.Height;
-        fbInfo.layers = desc.Layers;
-        VkFramebuffer fb;
-        vkCreateFramebuffer(Parent.GetVkDevice(), &fbInfo, nullptr, &fb);
-        Framebuffer.push_back(fb);
-    }
-    for (VkImageView swapChainView : swapChainViews)
-    {
-        // Links to a swap chain, thus create multiple framebuffers
-        VkFramebufferCreateInfo fbInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-        fbInfo.renderPass = RenderPass;
-        std::vector<VkImageView> attachments;
-        for (auto attachment : desc.Attachments)
-        {
-            auto viewImpl = std::static_pointer_cast<CImageViewVk>(attachment.ImageView);
-            if (viewImpl->bIsSwapChainProxy)
-                attachments.push_back(swapChainView);
-            else
-                attachments.push_back(viewImpl->GetVkImageView());
-        }
-        fbInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-        fbInfo.pAttachments = attachments.data();
-        fbInfo.width = desc.Width;
-        fbInfo.height = desc.Height;
-        fbInfo.layers = desc.Layers;
-        VkFramebuffer fb;
-        vkCreateFramebuffer(Parent.GetVkDevice(), &fbInfo, nullptr, &fb);
-        Framebuffer.push_back(fb);
-    }
-
     Area.offset.x = Area.offset.y = 0;
     Area.extent.width = desc.Width;
     Area.extent.height = desc.Height;
+    Layers = desc.Layers;
 }
 
 CRenderPassVk::~CRenderPassVk()
 {
-    for (auto fb : Framebuffer)
-    {
-        vkDestroyFramebuffer(Parent.GetVkDevice(), fb, nullptr);
-    }
     vkDestroyRenderPass(Parent.GetVkDevice(), RenderPass, nullptr);
     AttachmentViews.clear();
 }
 
-std::pair<VkFramebuffer, VkSemaphore> CRenderPassVk::GetNextFramebuffer()
+std::pair<VkFramebuffer, VkSemaphore> CRenderPassVk::MakeFramebuffer()
 {
-    if (Framebuffer.size() == 1)
-        return std::pair<VkFramebuffer, VkSemaphore>(Framebuffer[0], VK_NULL_HANDLE);
+    VkSemaphore waitSemaphore = VK_NULL_HANDLE;
 
-    auto swapChainImpl = std::static_pointer_cast<CSwapChainVk>(SwapChain.lock());
-    if (swapChainImpl->AcquiredImages.empty())
-        throw CRHIException("Did not acquire any image from the swap chain");
-#ifdef _DEBUG
-    if (SwapChainVersion != swapChainImpl->Version)
-        throw CRHIException("Framebuffer (renderpass) outdated with respect to swap chain");
-#endif
-    return std::make_pair(Framebuffer[swapChainImpl->AcquiredImages.front().first],
-                          swapChainImpl->AcquiredImages.front().second);
+    VkFramebufferCreateInfo fbInfo = { VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+    fbInfo.renderPass = RenderPass;
+    std::vector<VkImageView> attachments;
+    for (auto view : AttachmentViews)
+    {
+        auto viewImpl = std::static_pointer_cast<CImageViewVk>(view);
+        if (viewImpl->bIsSwapChainProxy)
+        {
+            assert(!waitSemaphore);
+            auto swapChainImpl = std::static_pointer_cast<CSwapChainVk>(viewImpl->SwapChain.lock());
+            if (swapChainImpl->AcquiredImages.empty())
+                throw CRHIException("Did not acquire any image from the swap chain");
+            attachments.push_back(
+                swapChainImpl->GetVkImageViews()[swapChainImpl->AcquiredImages.front().first]);
+            waitSemaphore = swapChainImpl->AcquiredImages.front().second;
+        }
+        else
+            attachments.push_back(viewImpl->GetVkImageView());
+    }
+    fbInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
+    fbInfo.pAttachments = attachments.data();
+    fbInfo.width = Area.extent.width;
+    fbInfo.height = Area.extent.height;
+    fbInfo.layers = Layers;
+    VkFramebuffer fb;
+    vkCreateFramebuffer(Parent.GetVkDevice(), &fbInfo, nullptr, &fb);
+    return std::make_pair(fb, waitSemaphore);
 }
 
 }

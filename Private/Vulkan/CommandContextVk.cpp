@@ -336,9 +336,9 @@ void CCommandContextVk::BeginRenderPass(CRenderPass& renderPass,
                                         const std::vector<CClearValue>& clearValues)
 {
     auto& rpImpl = static_cast<CRenderPassVk&>(renderPass);
-    auto framebufferInfo = rpImpl.GetNextFramebuffer();
+    auto framebufferInfo = rpImpl.MakeFramebuffer();
     VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    beginInfo.renderPass = rpImpl.RenderPass;
+    beginInfo.renderPass = rpImpl.GetHandle();
     beginInfo.framebuffer = framebufferInfo.first;
     // If the framebuffer comes with a semaphore, put it into the wait list
     if (framebufferInfo.second != VK_NULL_HANDLE)
@@ -371,6 +371,10 @@ void CCommandContextVk::BeginRenderPass(CRenderPass& renderPass,
     bIsInRenderPass = true;
 
     vkCmdBeginRenderPass(CmdBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+
+    VkDevice device = Parent.GetVkDevice();
+    VkFramebuffer fb = framebufferInfo.first;
+    DeferredDeleters.emplace_back([device, fb]() { vkDestroyFramebuffer(device, fb, nullptr); });
 }
 
 void CCommandContextVk::NextSubpass() { throw "unimplemented"; }
