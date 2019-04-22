@@ -49,11 +49,11 @@ struct CGPUJobInfo
                 std::vector<VkSemaphore> signalSemaphores, EQueueType queueType,
                 std::vector<std::function<void()>> deferredDeleters)
         : CmdBuffers(cmdBuffers)
-        , WaitSemaphores(waitSemaphores)
-        , WaitStages(waitStages)
-        , SignalSemaphores(signalSemaphores)
+        , WaitSemaphores(std::move(waitSemaphores))
+        , WaitStages(std::move(waitStages))
+        , SignalSemaphores(std::move(signalSemaphores))
         , QueueType(queueType)
-        , DeferredDeleters(deferredDeleters)
+        , DeferredDeleters(std::move(deferredDeleters))
     {
     }
 
