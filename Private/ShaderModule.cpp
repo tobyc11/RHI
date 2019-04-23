@@ -1,6 +1,8 @@
 #include "ShaderModule.h"
 #include <picosha2.h>
 
+#include <cstring>
+
 namespace RHI
 {
 

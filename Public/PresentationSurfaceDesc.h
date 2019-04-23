@@ -4,13 +4,18 @@
 #include <Windows.h>
 #endif
 
+#if TC_OS == TC_OS_LINUX
+#include <xcb/xcb.h>
+#endif
+
 namespace RHI
 {
 
 enum class EPresentationSurfaceDescType
 {
     Win32,
-    MacOS
+    MacOS,
+    Linux
 };
 
 struct CPresentationSurfaceDescWin32
@@ -31,12 +36,21 @@ struct CPresentationSurfaceDescMacOS
 #endif
 };
 
+struct CPresentationSurfaceDescLinux
+{
+#if TC_OS == TC_OS_LINUX
+xcb_window_t window;
+xcb_connection_t *xconn;
+#endif
+};
+
 struct CPresentationSurfaceDesc
 {
     EPresentationSurfaceDescType Type;
     union {
         CPresentationSurfaceDescWin32 Win32;
         CPresentationSurfaceDescMacOS MacOS;
+        CPresentationSurfaceDescLinux Linux;
     };
 };
 

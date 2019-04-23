@@ -10,6 +10,10 @@
 #define VK_USE_PLATFORM_MACOS_MVK
 #endif
 
+#if TC_OS == TC_OS_LINUX
+#define VK_USE_PLATFORM_LINUX_KHR
+#endif
+
 #include "vk_mem_alloc.h"
 
 namespace RHI

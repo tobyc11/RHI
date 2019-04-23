@@ -10,6 +10,11 @@
 #include "VkHelpers.h"
 
 #include <vector>
+#include <cstring>
+
+#if TC_OS == TC_OS_LINUX
+#include <vulkan/vulkan_xcb.h>
+#endif
 
 namespace RHI
 {
@@ -77,7 +82,7 @@ void InitRHIInstance()
 #ifdef _WIN32
                                                     "VK_KHR_win32_surface"
 #elif TC_OS == TC_OS_LINUX
-                                                    "VK_KHR_xlib_surface"
+                                                    "VK_KHR_xcb_surface"
 #elif TC_OS == TC_OS_MAC_OS_X
                                                     "VK_MVK_macos_surface"
 #endif
@@ -507,6 +512,19 @@ CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info,
         result = vkCreateMacOSSurfaceMVK(Instance, &createInfo, nullptr, &surface);
         if (result != VK_SUCCESS)
             throw CRHIRuntimeError("vkCreateMacOSSurfaceMVK failed");
+    }
+#endif
+#ifdef VK_USE_PLATFORM_LINUX_KHR
+    if (info.Type == EPresentationSurfaceDescType::Linux)
+    {
+        VkXcbSurfaceCreateInfoKHR surfaceInfo = {};
+        surfaceInfo.sType = VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR;
+        surfaceInfo.connection = info.Linux.xconn;
+        surfaceInfo.window = info.Linux.window;
+
+        VkResult res = vkCreateXcbSurfaceKHR(Instance, &surfaceInfo, nullptr, &surface);
+        if (res != VK_SUCCESS)
+            throw CRHIRuntimeError("vkCreateXcbSurfaceKHR failed");
     }
 #endif
     else { throw CRHIException("CreateSwapChain received invalid presentation surface desc"); }
