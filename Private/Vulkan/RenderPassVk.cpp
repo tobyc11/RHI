@@ -149,4 +149,53 @@ std::pair<VkFramebuffer, VkSemaphore> CRenderPassVk::MakeFramebuffer()
     return std::make_pair(fb, waitSemaphore);
 }
 
+void CRenderPassVk::UpdateImageInitialAccess(CAccessTracker& tracker)
+{
+    for (size_t i = 0; i < AttachmentsVk.size(); i++)
+    {
+        auto viewImpl = std::static_pointer_cast<CImageViewVk>(AttachmentViews[i]);
+        CImageVk* image = viewImpl->GetImage().get();
+        CImageSubresourceRange imageRange = viewImpl->GetResourceRange();
+        VkImageLayout layout = AttachmentsVk[i].initialLayout;
+        CAccessRecord record {};
+        if (layout == VK_IMAGE_LAYOUT_UNDEFINED)
+        {
+            tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange, 0,
+                                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, layout);
+        }
+        else if (layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+        {
+            tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange, 0,
+                                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, layout);
+        }
+        else if (layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        {
+            tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange, 0,
+                                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, layout);
+        }
+        else if (layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL)
+        {
+            tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange, 0,
+                                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, layout);
+        }
+        else
+        {
+            throw CRHIException("Expecting the wrong image layout");
+        }
+    }
+}
+
+void CRenderPassVk::UpdateImageFinalAccess(CAccessTracker& tracker)
+{
+    for (size_t i = 0; i < AttachmentsVk.size(); i++)
+    {
+        auto viewImpl = std::static_pointer_cast<CImageViewVk>(AttachmentViews[i]);
+        CImageVk* image = viewImpl->GetImage().get();
+        CImageSubresourceRange imageRange = viewImpl->GetResourceRange();
+        VkImageLayout layout = AttachmentsVk[i].finalLayout;
+        tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange, 0,
+                                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, layout);
+    }
+}
+
 }

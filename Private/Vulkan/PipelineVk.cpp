@@ -189,7 +189,7 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     pipelineInfo.pStages = StageInfos.data();
     pipelineInfo.layout = PipelineLayout;
     pipelineInfo.renderPass = renderpass->GetHandle();
-    pipelineInfo.subpass = 0; // TODO
+    pipelineInfo.subpass = desc.Subpass;
 
     // Translate vertex input states
     std::vector<VkVertexInputBindingDescription> bindingDesc;

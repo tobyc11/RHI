@@ -115,6 +115,9 @@ void CAccessTracker::DeployAllBarriers(VkCommandBuffer cmdBuffer)
     // Transition all relevant images to the needed state
     for (const auto& iter : ImageFirstAccess)
     {
+        if (iter.second.ImageLayout == VK_IMAGE_LAYOUT_UNDEFINED
+            || iter.second.ImageLayout == VK_IMAGE_LAYOUT_PREINITIALIZED)
+            continue;
         iter.first.Image->TransitionAccess(cmdBuffer, iter.first.Range, iter.second);
     }
     for (const auto& iter : ImageLastAccess)
@@ -267,12 +270,15 @@ void CAccessTracker::HandleImageLastAccess(VkCommandBuffer cmdBuffer, CImageVk* 
         CalcOverlap(range, iter->first.Range, top, bottom, left, right);
 
         // Go ahead and transition the overlapping region
-        CImageSubresourceRange overlapRange;
-        overlapRange.BaseMipLevel = top;
-        overlapRange.LevelCount = bottom - top + 1;
-        overlapRange.BaseArrayLayer = left;
-        overlapRange.LayerCount = right - left + 1;
-        InsertImageBarrier(cmdBuffer, image, overlapRange, iter->second, record);
+        if (cmdBuffer)
+        {
+            CImageSubresourceRange overlapRange;
+            overlapRange.BaseMipLevel = top;
+            overlapRange.LevelCount = bottom - top + 1;
+            overlapRange.BaseArrayLayer = left;
+            overlapRange.LayerCount = right - left + 1;
+            InsertImageBarrier(cmdBuffer, image, overlapRange, iter->second, record);
+        }
 
         // Split the old region into 4 and remove the overlapping one from the store
         // NOTE: my* is actually iter

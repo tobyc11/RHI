@@ -85,9 +85,7 @@ public:
     virtual void ResolveImage(CImage& src, CImage& dst,
                               const std::vector<CImageResolve>& regions) = 0;
 
-    virtual void ExecuteCommandList(CCommandList& commandList) = 0;
-    virtual CCommandList::Ref FinishCommandList() = 0;
-    virtual void Flush(bool wait = false) = 0;
+    virtual void FinishRecording() = 0;
 };
 
 } /* namespace RHI */

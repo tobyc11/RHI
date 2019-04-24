@@ -8,22 +8,22 @@ namespace RHI
 
 CImageD3D11::CImageD3D11(CDeviceD3D11& parent, ComPtr<ID3D11Texture1D> p)
     : Parent(parent)
-    , TexturePtr(p)
     , Dimensions(1)
+    , TexturePtr(p)
 {
 }
 
 CImageD3D11::CImageD3D11(CDeviceD3D11& parent, ComPtr<ID3D11Texture2D> p)
     : Parent(parent)
-    , TexturePtr(p)
     , Dimensions(2)
+    , TexturePtr(p)
 {
 }
 
 CImageD3D11::CImageD3D11(CDeviceD3D11& parent, ComPtr<ID3D11Texture3D> p)
     : Parent(parent)
-    , TexturePtr(p)
     , Dimensions(3)
+    , TexturePtr(p)
 {
 }
 

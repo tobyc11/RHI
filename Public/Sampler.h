@@ -56,23 +56,23 @@ struct CSamplerDesc
             && MaxLod == r.MaxLod && BorderColor == r.BorderColor;
     }
 
-    std::size_t hash(const CSamplerDesc& r)
+    friend std::size_t hash_value(const CSamplerDesc& r)
     {
         std::size_t h = 0;
-        tc::hash_combine(h, (std::underlying_type_t<EFilter>)(MagFilter));
-        tc::hash_combine(h, (std::underlying_type_t<EFilter>)(MinFilter));
-        tc::hash_combine(h, (std::underlying_type_t<ESamplerMipmapMode>)(MipmapMode));
-        tc::hash_combine(h, (std::underlying_type_t<ESamplerAddressMode>)(AddressModeU));
-        tc::hash_combine(h, (std::underlying_type_t<ESamplerAddressMode>)(AddressModeV));
-        tc::hash_combine(h, (std::underlying_type_t<ESamplerAddressMode>)(AddressModeW));
-        tc::hash_combine(h, MipLodBias);
-        tc::hash_combine(h, AnisotropyEnable);
-        tc::hash_combine(h, MaxAnisotropy);
-        tc::hash_combine(h, CompareEnable);
-        tc::hash_combine(h, (std::underlying_type_t<ECompareOp>)(CompareOp));
-        tc::hash_combine(h, MinLod);
-        tc::hash_combine(h, MaxLod);
-        for (float f : BorderColor)
+        tc::hash_combine(h, (std::underlying_type_t<EFilter>)(r.MagFilter));
+        tc::hash_combine(h, (std::underlying_type_t<EFilter>)(r.MinFilter));
+        tc::hash_combine(h, (std::underlying_type_t<ESamplerMipmapMode>)(r.MipmapMode));
+        tc::hash_combine(h, (std::underlying_type_t<ESamplerAddressMode>)(r.AddressModeU));
+        tc::hash_combine(h, (std::underlying_type_t<ESamplerAddressMode>)(r.AddressModeV));
+        tc::hash_combine(h, (std::underlying_type_t<ESamplerAddressMode>)(r.AddressModeW));
+        tc::hash_combine(h, r.MipLodBias);
+        tc::hash_combine(h, r.AnisotropyEnable);
+        tc::hash_combine(h, r.MaxAnisotropy);
+        tc::hash_combine(h, r.CompareEnable);
+        tc::hash_combine(h, (std::underlying_type_t<ECompareOp>)(r.CompareOp));
+        tc::hash_combine(h, r.MinLod);
+        tc::hash_combine(h, r.MaxLod);
+        for (float f : r.BorderColor)
             tc::hash_combine(h, f);
         return h;
     }

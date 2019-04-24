@@ -52,8 +52,12 @@ public:
     CSampler::Ref CreateSampler(const CSamplerDesc& desc);
 
     // Command submission
-    IRenderContext::Ref GetImmediateContext();
-    IRenderContext::Ref CreateDeferredContext();
+    IImmediateContext::Ref GetImmediateContext();
+    CCommandList::Ref CreateCommandList();
+    ICopyContext::Ref CreateCopyContext(CCommandList& cmdList);
+    IComputeContext::Ref CreateComputeContext(CCommandList& cmdList);
+    IRenderPassContext::Ref CreateRenderPassContext(CCommandList& cmdList, CRenderPass& renderPass,
+                                                    const std::vector<CClearValue>& clearValues);
 
     // Windowing system interface
     CSwapChain::Ref CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format);

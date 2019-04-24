@@ -25,6 +25,7 @@ struct CPipelineDesc
     CDepthStencilDesc DepthStencilState;
     CBlendDesc BlendState;
     CRenderPass::WeakRef RenderPass;
+    uint32_t Subpass = 0;
 
     void VertexAttribFormat(uint32_t location, EFormat format, uint32_t offset, uint32_t binding)
     {

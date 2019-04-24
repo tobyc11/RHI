@@ -13,26 +13,10 @@ CSubmissionTracker::CSubmissionTracker(CDeviceVk& p)
 
 void CSubmissionTracker::Init()
 {
-    VkCommandPoolCreateInfo poolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-    poolInfo.flags = 0; // VK_COMMAND_POOL_CREATE_TRANSIENT_BIT?
-    poolInfo.queueFamilyIndex = Parent.GetQueueFamily(QT_GRAPHICS);
-
     for (uint32_t i = 0; i < MaxFramesInFlight; i++)
     {
         CFrameResources& r = FrameResources[i];
-        vkCreateCommandPool(Parent.GetVkDevice(), &poolInfo, nullptr, &r.CommandPool);
-
-        VkCommandBufferAllocateInfo allocInfo;
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.pNext = nullptr;
-        allocInfo.commandPool = r.CommandPool;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        allocInfo.commandBufferCount = 4;
-
-        r.CommandBuffers.resize(4);
-        vkAllocateCommandBuffers(Parent.GetVkDevice(), &allocInfo, r.CommandBuffers.data());
-
-        r.NextFreeCommandBuffer = 0;
+        r.FrameCmdPool = std::make_shared<CCommandPoolVk>(Parent, QT_GRAPHICS, false);
     }
     CurrentFrameResourcesIndex = 0;
 }
@@ -44,20 +28,17 @@ void CSubmissionTracker::Shutdown()
     while (!JobQueue.empty())
         PopFrontJob(true);
 
-    for (const auto& pair : TransientPools)
-        for (const auto& pair2 : pair.second)
+    for (auto& pair : TransientPools)
+        for (auto& pair2 : pair.second)
         {
-            vkDestroyCommandPool(Parent.GetVkDevice(), pair2.second, nullptr);
+            pair2.second.reset();
         }
     TransientPools.clear();
 
     for (uint32_t i = 0; i < MaxFramesInFlight; i++)
     {
         CFrameResources& r = FrameResources[i];
-        vkFreeCommandBuffers(Parent.GetVkDevice(), r.CommandPool,
-                             static_cast<uint32_t>(r.CommandBuffers.size()),
-                             r.CommandBuffers.data());
-        vkDestroyCommandPool(Parent.GetVkDevice(), r.CommandPool, nullptr);
+        r.FrameCmdPool.reset();
     }
 }
 
@@ -85,9 +66,13 @@ void CSubmissionTracker::SubmitJob(CGPUJobInfo jobInfo, bool wait)
         CurrentFrameResourcesIndex %= MaxFramesInFlight;
     }
 
+    std::vector<VkCommandBuffer> cmdBufferHandles;
+    for (const auto& ptr : jobInfo.CmdBuffers)
+        cmdBufferHandles.push_back(ptr->GetHandle());
+
     VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    submitInfo.commandBufferCount = static_cast<uint32_t>(jobInfo.CmdBuffers.size());
-    submitInfo.pCommandBuffers = jobInfo.CmdBuffers.data();
+    submitInfo.commandBufferCount = static_cast<uint32_t>(cmdBufferHandles.size());
+    submitInfo.pCommandBuffers = cmdBufferHandles.data();
     submitInfo.waitSemaphoreCount = static_cast<uint32_t>(jobInfo.WaitSemaphores.size());
     submitInfo.pWaitSemaphores = jobInfo.WaitSemaphores.data();
     submitInfo.pWaitDstStageMask = jobInfo.WaitStages.data();
@@ -132,17 +117,9 @@ void CSubmissionTracker::PopFrontJob(bool wait)
     {
         Parent.GetHugeConstantBuffer()->FreeBlock();
         FrameResources[waitJob.FrameResourceIndex].InFlightLock.Unlock();
-        vkResetCommandPool(Parent.GetVkDevice(),
-                           FrameResources[waitJob.FrameResourceIndex].CommandPool, 0);
-        FrameResources[waitJob.FrameResourceIndex].NextFreeCommandBuffer = 0;
+        waitJob.CmdBuffers.clear();
+        FrameResources[waitJob.FrameResourceIndex].FrameCmdPool->ResetPool();
         FrameJobCount--;
-    }
-
-    if (waitJob.Kind == ECommandContextKind::Deferred)
-    {
-        // Need to reset the command buffers and return them to the context
-        for (VkCommandBuffer b : waitJob.CmdBuffers)
-            waitJob.DeferredContext->DoneWithCmdBuffer(b);
     }
 
     vkDestroyFence(Parent.GetVkDevice(), waitJob.Fence, nullptr);
@@ -159,31 +136,22 @@ void CSubmissionTracker::PopFrontJob(bool wait)
     JobQueue.pop_front();
 }
 
-VkCommandPool CSubmissionTracker::GetTransientPool(EQueueType queueType)
+CCommandPoolVk::Ref CSubmissionTracker::GetTransientPool(EQueueType queueType)
 {
-    VkCommandPoolCreateInfo poolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-    poolInfo.flags =
-        VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    poolInfo.queueFamilyIndex = Parent.GetQueueFamily(queueType);
-
     auto id = std::this_thread::get_id();
     auto iter = TransientPools.find(id);
     if (iter == TransientPools.end())
     {
         // Create a new pool
-        VkCommandPool cmdPool;
-        vkCreateCommandPool(Parent.GetVkDevice(), &poolInfo, nullptr, &cmdPool);
-        TransientPools[id][queueType] = cmdPool;
-        return cmdPool;
+        TransientPools[id][queueType] = std::make_shared<CCommandPoolVk>(Parent, queueType);
+        return TransientPools[id][queueType];
     }
 
     auto iter2 = iter->second.find(queueType);
     if (iter2 == iter->second.end())
     {
-        VkCommandPool cmdPool;
-        vkCreateCommandPool(Parent.GetVkDevice(), &poolInfo, nullptr, &cmdPool);
-        TransientPools[id][queueType] = cmdPool;
-        return cmdPool;
+        TransientPools[id][queueType] = std::make_shared<CCommandPoolVk>(Parent, queueType);
+        return TransientPools[id][queueType];
     }
 
     return iter2->second;

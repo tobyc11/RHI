@@ -76,14 +76,34 @@ CSampler::Ref CDeviceBase<TDerived>::CreateSampler(const CSamplerDesc& desc)
     return static_cast<TDerived*>(this)->CreateSampler(desc);
 }
 
-template <typename TDerived> IRenderContext::Ref CDeviceBase<TDerived>::GetImmediateContext()
+template <typename TDerived> IImmediateContext::Ref CDeviceBase<TDerived>::GetImmediateContext()
 {
     return static_cast<TDerived*>(this)->GetImmediateContext();
 }
 
-template <typename TDerived> IRenderContext::Ref CDeviceBase<TDerived>::CreateDeferredContext()
+template <typename TDerived> CCommandList::Ref CDeviceBase<TDerived>::CreateCommandList()
 {
-    return static_cast<TDerived*>(this)->CreateDeferredContext();
+    return static_cast<TDerived*>(this)->CreateCommandList();
+}
+
+template <typename TDerived>
+ICopyContext::Ref CDeviceBase<TDerived>::CreateCopyContext(CCommandList& cmdList)
+{
+    return static_cast<TDerived*>(this)->CreateCopyContext(cmdList);
+}
+
+template <typename TDerived>
+IComputeContext::Ref CDeviceBase<TDerived>::CreateComputeContext(CCommandList& cmdList)
+{
+    return static_cast<TDerived*>(this)->CreateComputeContext(cmdList);
+}
+
+template <typename TDerived>
+IRenderPassContext::Ref
+CDeviceBase<TDerived>::CreateRenderPassContext(CCommandList& cmdList, CRenderPass& renderPass,
+                                               const std::vector<CClearValue>& clearValues)
+{
+    return static_cast<TDerived*>(this)->CreateRenderPassContext(cmdList, renderPass, clearValues);
 }
 
 template <typename TDerived>

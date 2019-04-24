@@ -69,7 +69,7 @@ enum class EImageUsageFlags
     Staging = 1 << 5,
 };
 
-DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EImageUsageFlags);
+DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EImageUsageFlags)
 
 class CImage : public std::enable_shared_from_this<CImage>, public tc::FNonCopyable
 {

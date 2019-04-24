@@ -145,7 +145,6 @@ void CRenderGraph::ValidateDFSRenderPass(size_t nodeId) const
 
 void CRenderGraph::ValidateDFSResource(size_t nodeId) const
 {
-    assert(nodeId >= 0);
     assert(nodeId < Nodes.size());
     assert(Nodes[nodeId]);
     auto node = Nodes[nodeId];

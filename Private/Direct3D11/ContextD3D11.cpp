@@ -8,6 +8,15 @@
 namespace RHI
 {
 
+CContextD3D11::CContextD3D11(CDeviceD3D11& p, bool isDeferred)
+    : Parent(p)
+{
+    if (isDeferred)
+    {
+        Parent.D3dDevice->CreateDeferredContext(0, DeferredContext.GetAddressOf());
+    }
+}
+
 void CContextD3D11::CopyBuffer(CBuffer& src, CBuffer& dst, const std::vector<CBufferCopy>& regions)
 {
     auto& srcImpl = static_cast<CBufferD3D11&>(src);
@@ -56,9 +65,18 @@ void CContextD3D11::ResolveImage(CImage& src, CImage& dst,
     throw "unimplemented";
 }
 
-void CContextD3D11::ExecuteCommandList(CCommandList& commandList) { throw "unimplemented"; }
+void CContextD3D11::ExecuteCommandList(CCommandList& commandList)
+{
+    auto impl = static_cast<CCommandListD3D11&>(commandList);
+    Imm()->ExecuteCommandList(impl.CommandList.Get(), FALSE);
+}
 
-CCommandList::Ref CContextD3D11::FinishCommandList() { throw "unimplemented"; }
+CCommandList::Ref CContextD3D11::FinishCommandList()
+{
+    auto cmdList = std::make_shared<CCommandListD3D11>();
+    Imm()->FinishCommandList(FALSE, cmdList->CommandList.GetAddressOf());
+    return std::move(cmdList);
+}
 
 void CContextD3D11::Flush(bool wait)
 {
@@ -77,18 +95,12 @@ void CContextD3D11::BeginRenderPass(CRenderPass& renderPass,
 void CContextD3D11::NextSubpass()
 {
     static_cast<CRenderPassD3D11*>(CurrPass)->Bind(Imm(), CurrSubpass++, {});
-    // clear states to match vulkan behavior
-    Imm()->ClearState();
-    CurrPipeline = nullptr;
-    VSBoundLayouts.clear();
-    PSBoundLayouts.clear();
-    BoundResources.clear();
 }
 
 void CContextD3D11::EndRenderPass()
 {
-    Imm()->ClearState();
     CurrPass = nullptr;
+    // Clearing all bindings isn't exactly the expected behavior, but I don't know whereelse to put it
     CurrPipeline = nullptr;
     VSBoundLayouts.clear();
     PSBoundLayouts.clear();
@@ -251,7 +263,12 @@ void CContextD3D11::DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uin
         Imm()->DrawIndexed(indexCount, firstIndex, vertexOffset);
 }
 
-ID3D11DeviceContext* CContextD3D11::Imm() { return Parent.ImmediateContext.Get(); }
+ID3D11DeviceContext* CContextD3D11::Imm()
+{
+    if (DeferredContext)
+        return DeferredContext.Get();
+    return Parent.ImmediateContext.Get();
+}
 
 void RHI::CContextD3D11::ResolveResourceBindings()
 {

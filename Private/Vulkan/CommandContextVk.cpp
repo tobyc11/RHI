@@ -1,4 +1,5 @@
 #include "CommandContextVk.h"
+#include "DeferredContextVk.h"
 #include "DeviceVk.h"
 #include "PipelineVk.h"
 #include "RenderPassVk.h"
@@ -8,14 +9,6 @@
 
 namespace RHI
 {
-
-class CCommandListVk : public CCommandList
-{
-public:
-    bool bIsSecondary = false;
-    VkCommandBuffer CmdBuffer = VK_NULL_HANDLE;
-    CCommandContextVk::Ref Parent;
-};
 
 void CCommandContextVk::Convert(VkOffset3D& dst, const COffset3D& src)
 {
@@ -80,27 +73,6 @@ CCommandContextVk::CCommandContextVk(CDeviceVk& p, EQueueType queueType, EComman
     , QueueType(queueType)
     , Kind(kind)
 {
-    if (Kind == ECommandContextKind::Deferred)
-    {
-        VkCommandPoolCreateInfo poolInfo = { VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        poolInfo.queueFamilyIndex = Parent.GetQueueFamily(QueueType);
-        vkCreateCommandPool(Parent.GetVkDevice(), &poolInfo, nullptr, &CmdPool);
-    }
-    else if (Kind == ECommandContextKind::Immediate)
-    {
-        // All allocation should be done through CFrameResources
-        CmdPool = VK_NULL_HANDLE;
-    }
-    else if (Kind == ECommandContextKind::Transient)
-    {
-        CmdPool = Parent.GetSubmissionTracker().GetTransientPool(queueType);
-    }
-    else
-    {
-        assert(false);
-    }
-
     BeginBuffer();
 }
 
@@ -108,33 +80,23 @@ CCommandContextVk::~CCommandContextVk()
 {
     EndBuffer();
     vkDestroySemaphore(Parent.GetVkDevice(), SignalSemaphore, nullptr);
-    if (Kind != ECommandContextKind::Immediate)
-        vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool, 1, &CmdBuffer);
-
-    if (Kind == ECommandContextKind::Deferred)
-        vkDestroyCommandPool(Parent.GetVkDevice(), CmdPool, nullptr);
 }
 
 void CCommandContextVk::BeginBuffer()
 {
     if (Kind != ECommandContextKind::Immediate)
     {
-        // Create a new command buffer
-        VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-        cmdInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        cmdInfo.commandPool = CmdPool;
-        cmdInfo.commandBufferCount = 1;
-        vkAllocateCommandBuffers(Parent.GetVkDevice(), &cmdInfo, &CmdBuffer);
+        CmdBuffer =
+            Parent.GetSubmissionTracker().GetTransientPool(QueueType)->AllocateCommandBuffer();
     }
     else
     {
-        CmdBuffer = Parent.GetSubmissionTracker().GetCurrentFrameResources().AllocateCmdBuffer();
+        CmdBuffer = Parent.GetSubmissionTracker()
+                        .GetCurrentFrameResources()
+                        .FrameCmdPool->AllocateCommandBuffer();
     }
 
-    VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    if (Kind != ECommandContextKind::Deferred)
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(CmdBuffer, &beginInfo);
+    CmdBuffer->BeginRecording(nullptr, 0);
 
     AccessTracker.Clear();
     WaitSemaphores.clear();
@@ -147,7 +109,7 @@ void CCommandContextVk::BeginBuffer()
 
 void CCommandContextVk::EndBuffer()
 {
-    vkEndCommandBuffer(CmdBuffer);
+    CmdBuffer->EndRecording();
     CurrBindings.Reset();
 }
 
@@ -159,7 +121,7 @@ void CCommandContextVk::TransitionImage(CImage& image, EResourceState newState)
     range.BaseMipLevel = 0;
     range.LayerCount = imageImpl.GetArrayLayers();
     range.LevelCount = imageImpl.GetMipLevels();
-    AccessTracker.TransitionImageState(CmdBuffer, &imageImpl, range, newState,
+    AccessTracker.TransitionImageState(CmdBuffer->GetHandle(), &imageImpl, range, newState,
                                        QueueType == QT_TRANSFER);
 }
 
@@ -169,7 +131,7 @@ void CCommandContextVk::CopyBuffer(CBuffer& src, CBuffer& dst,
     static_assert(sizeof(CBufferCopy) == sizeof(VkBufferCopy), "struct size mismatch");
     const VkBufferCopy* r = reinterpret_cast<const VkBufferCopy*>(regions.data());
 
-    vkCmdCopyBuffer(CmdBuffer, static_cast<CBufferVk&>(src).Buffer,
+    vkCmdCopyBuffer(CmdBuffer->GetHandle(), static_cast<CBufferVk&>(src).Buffer,
                     static_cast<CBufferVk&>(dst).Buffer, static_cast<uint32_t>(regions.size()), r);
 }
 
@@ -186,9 +148,9 @@ void CCommandContextVk::CopyImage(CImage& src, CImage& dst, const std::vector<CI
     TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdCopyImage(CmdBuffer, srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                   static_cast<uint32_t>(r.size()), r.data());
+    vkCmdCopyImage(CmdBuffer->GetHandle(), srcImpl.GetVkImage(),
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImpl.GetVkImage(),
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(r.size()), r.data());
 }
 
 void CCommandContextVk::CopyBufferToImage(CBuffer& src, CImage& dst,
@@ -203,8 +165,8 @@ void CCommandContextVk::CopyBufferToImage(CBuffer& src, CImage& dst,
     }
     TransitionImage(dst, EResourceState::CopyDest);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdCopyBufferToImage(CmdBuffer, static_cast<CBufferVk&>(src).Buffer, dstImpl.GetVkImage(),
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    vkCmdCopyBufferToImage(CmdBuffer->GetHandle(), static_cast<CBufferVk&>(src).Buffer,
+                           dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                            static_cast<uint32_t>(vkregions.size()), vkregions.data());
 }
 
@@ -220,7 +182,8 @@ void CCommandContextVk::CopyImageToBuffer(CImage& src, CBuffer& dst,
     }
     TransitionImage(src, EResourceState::CopySource);
     auto& srcImpl = static_cast<CImageVk&>(src);
-    vkCmdCopyImageToBuffer(CmdBuffer, srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    vkCmdCopyImageToBuffer(CmdBuffer->GetHandle(), srcImpl.GetVkImage(),
+                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            static_cast<CBufferVk&>(dst).Buffer,
                            static_cast<uint32_t>(vkregions.size()), vkregions.data());
 }
@@ -239,9 +202,10 @@ void CCommandContextVk::BlitImage(CImage& src, CImage& dst, const std::vector<CI
     TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdBlitImage(CmdBuffer, srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                   static_cast<uint32_t>(r.size()), r.data(), VkCast(filter));
+    vkCmdBlitImage(CmdBuffer->GetHandle(), srcImpl.GetVkImage(),
+                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImpl.GetVkImage(),
+                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(r.size()), r.data(),
+                   VkCast(filter));
 }
 
 void CCommandContextVk::ResolveImage(CImage& src, CImage& dst,
@@ -258,35 +222,130 @@ void CCommandContextVk::ResolveImage(CImage& src, CImage& dst,
     TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdResolveImage(CmdBuffer, srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                      dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                      static_cast<uint32_t>(r.size()), r.data());
+    vkCmdResolveImage(CmdBuffer->GetHandle(), srcImpl.GetVkImage(),
+                      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImpl.GetVkImage(),
+                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(r.size()),
+                      r.data());
+}
+
+void CCommandContextVk::FinishRecording()
+{
+    throw CRHIException("Can't call this on an immediate context");
+}
+
+void CCommandContextVk::BindPipeline(CPipeline& pipeline)
+{
+    CurrPipeline = static_cast<CPipelineVk*>(&pipeline);
+    vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+                      CurrPipeline->GetHandle());
+
+    // Bind the default viewport and scissors
+    auto renderArea = CurrRenderPass->GetArea();
+    VkViewport vp;
+    vp.x = 0;
+    vp.y = 0;
+    vp.width = static_cast<float>(renderArea.extent.width);
+    vp.height = static_cast<float>(renderArea.extent.height);
+    vp.minDepth = 0.0f;
+    vp.maxDepth = 1.0f;
+    vkCmdSetViewport(CmdBuffer->GetHandle(), 0, 1, &vp);
+    vkCmdSetScissor(CmdBuffer->GetHandle(), 0, 1, &renderArea);
+    const float blendFactor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    vkCmdSetBlendConstants(CmdBuffer->GetHandle(), blendFactor);
+    vkCmdSetStencilReference(CmdBuffer->GetHandle(), VK_STENCIL_FRONT_AND_BACK, 0);
+}
+
+void CCommandContextVk::BindBuffer(CBuffer& buffer, size_t offset, size_t range, uint32_t set,
+                                   uint32_t binding, uint32_t index)
+{
+    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
+    CurrBindings.BindBuffer(bufferImpl.Buffer, offset, range, set, binding, index);
+}
+
+void CCommandContextVk::BindBufferView(CBufferView& bufferView, uint32_t set, uint32_t binding,
+                                       uint32_t index)
+{
+    throw "unimplemented";
+}
+
+void CCommandContextVk::BindConstants(const void* pData, size_t size, uint32_t set,
+                                      uint32_t binding, uint32_t index)
+{
+    auto* bufferImpl = Parent.GetHugeConstantBuffer();
+    size_t offset;
+    size_t minAlignment = Parent.GetVkLimits().minUniformBufferOffsetAlignment;
+    void* bufferData = bufferImpl->Allocate(size, minAlignment, offset);
+    memcpy(bufferData, pData, size);
+    CurrBindings.BindBuffer(bufferImpl->GetHandle(), offset, size, set, binding, index);
+}
+
+void CCommandContextVk::BindImageView(CImageView& imageView, uint32_t set, uint32_t binding,
+                                      uint32_t index)
+{
+    auto& impl = static_cast<CImageViewVk&>(imageView);
+    CurrBindings.BindImageView(&impl, VK_NULL_HANDLE, set, binding, index);
+}
+
+void CCommandContextVk::BindSampler(CSampler& sampler, uint32_t set, uint32_t binding,
+                                    uint32_t index)
+{
+    CurrBindings.BindSampler(static_cast<CSamplerVk&>(sampler).Sampler, set, binding, index);
+}
+
+void CCommandContextVk::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
+{
+    throw "unimplemented";
+}
+
+void CCommandContextVk::BindIndexBuffer(CBuffer& buffer, size_t offset, EFormat format)
+{
+    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
+    vkCmdBindIndexBuffer(CmdBuffer->GetHandle(), bufferImpl.Buffer, offset,
+                         format == EFormat::R16_UINT ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32);
+}
+
+void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer& buffer, size_t offset)
+{
+    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
+    // On macOS, size_t is 32 bit and VkDeviceSize is 64
+    VkDeviceSize offsetDevice = offset;
+    vkCmdBindVertexBuffers(CmdBuffer->GetHandle(), binding, 1, &bufferImpl.Buffer, &offsetDevice);
+}
+
+void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                             uint32_t firstInstance)
+{
+    ResolveBindings();
+    vkCmdDraw(CmdBuffer->GetHandle(), vertexCount, instanceCount, firstVertex, firstInstance);
+}
+
+void CCommandContextVk::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
+                                    uint32_t firstIndex, int32_t vertexOffset,
+                                    uint32_t firstInstance)
+{
+    ResolveBindings();
+    vkCmdDrawIndexed(CmdBuffer->GetHandle(), indexCount, instanceCount, firstIndex, vertexOffset,
+                     firstInstance);
 }
 
 void CCommandContextVk::ExecuteCommandList(CCommandList& commandList)
 {
-    auto cmdListImpl = static_cast<CCommandListVk&>(commandList);
-    if (cmdListImpl.bIsSecondary)
-    {
-        vkCmdExecuteCommands(CmdBuffer, 1, &cmdListImpl.CmdBuffer);
-    }
-    else
-    {
-        Flush();
-        CGPUJobInfo job({ cmdListImpl.CmdBuffer }, {}, {}, {}, QueueType, {});
-        Parent.GetSubmissionTracker().SubmitJob(std::move(job));
-    }
-}
+    if (IsInRenderPass())
+        throw CRHIRuntimeError(
+            "CCommandContextVk::ExecuteCommandList can only be called outside of a render pass");
 
-CCommandList::Ref CCommandContextVk::FinishCommandList()
-{
-    EndBuffer();
-    auto ptr = std::make_shared<CCommandListVk>();
-    ptr->CmdBuffer = CmdBuffer;
-    ptr->bIsSecondary = false;
-    ptr->Parent = this->shared_from_this();
-    BeginBuffer();
-    return ptr;
+    auto& impl = static_cast<CCommandListVk&>(commandList);
+    if (impl.IsRecording())
+        throw CRHIRuntimeError("Cannot execute a command list currently being recorded into");
+
+    Flush(false);
+
+    // Create a new command buffer for all the resource transitions
+    std::unique_ptr<CCommandBufferVk> preCmdBufferRef;
+    preCmdBufferRef = Parent.GetSubmissionTracker()
+                          .GetCurrentFrameResources()
+                          .FrameCmdPool->AllocateCommandBuffer();
+    impl.Submit(Parent.GetSubmissionTracker(), std::move(preCmdBufferRef));
 }
 
 void CCommandContextVk::Flush(bool wait, bool isPresent)
@@ -297,34 +356,31 @@ void CCommandContextVk::Flush(bool wait, bool isPresent)
     assert(Kind == ECommandContextKind::Immediate || Kind == ECommandContextKind::Transient);
 
     // Create a new command buffer for all the resource transitions
-    VkCommandBuffer preCmdBuffer;
+    std::unique_ptr<CCommandBufferVk> preCmdBufferRef;
     if (Kind == ECommandContextKind::Immediate)
     {
-        preCmdBuffer = Parent.GetSubmissionTracker().GetCurrentFrameResources().AllocateCmdBuffer();
+        preCmdBufferRef = Parent.GetSubmissionTracker()
+                              .GetCurrentFrameResources()
+                              .FrameCmdPool->AllocateCommandBuffer();
     }
     else
     {
-        VkCommandBufferAllocateInfo cmdInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
-        cmdInfo.commandPool = CmdPool;
-        cmdInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-        cmdInfo.commandBufferCount = 1;
-        vkAllocateCommandBuffers(Parent.GetVkDevice(), &cmdInfo, &preCmdBuffer);
+        preCmdBufferRef =
+            Parent.GetSubmissionTracker().GetTransientPool(QueueType)->AllocateCommandBuffer();
     }
-    VkCommandBufferBeginInfo beginInfo = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(preCmdBuffer, &beginInfo);
-    AccessTracker.DeployAllBarriers(preCmdBuffer);
-    vkEndCommandBuffer(preCmdBuffer);
+    preCmdBufferRef->BeginRecording(nullptr, 0);
+    AccessTracker.DeployAllBarriers(preCmdBufferRef->GetHandle());
+    preCmdBufferRef->EndRecording();
     AccessTracker.Clear();
 
     auto& tracker = Parent.GetSubmissionTracker();
     // Bye bye command buffer, I hope you all well on the GPU side
-    CGPUJobInfo job({ preCmdBuffer, CmdBuffer }, std::move(WaitSemaphores), std::move(WaitStages),
-                    { SignalSemaphore }, QueueType, std::move(DeferredDeleters));
-    if (Kind == ECommandContextKind::Immediate)
-    {
-        job.SetImmediateJob(isPresent);
-    }
+    std::vector<std::unique_ptr<CCommandBufferVk>> cmdBuffers;
+    cmdBuffers.emplace_back(std::move(preCmdBufferRef));
+    cmdBuffers.emplace_back(std::move(CmdBuffer));
+    CGPUJobInfo job(std::move(cmdBuffers), isPresent, std::move(WaitSemaphores),
+                    std::move(WaitStages), { SignalSemaphore }, QueueType,
+                    std::move(DeferredDeleters));
     tracker.SubmitJob(std::move(job), wait);
 
     // Small regression: the signal semaphore might get destroyed before vkQueueSubmit if max frames
@@ -335,6 +391,9 @@ void CCommandContextVk::Flush(bool wait, bool isPresent)
 void CCommandContextVk::BeginRenderPass(CRenderPass& renderPass,
                                         const std::vector<CClearValue>& clearValues)
 {
+    if (CurrRenderPass)
+        throw CRHIRuntimeError("A render pass is already bound to the context");
+
     auto& rpImpl = static_cast<CRenderPassVk&>(renderPass);
     auto framebufferInfo = rpImpl.MakeFramebuffer();
     VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
@@ -367,118 +426,25 @@ void CCommandContextVk::BeginRenderPass(CRenderPass& renderPass,
     }
     beginInfo.clearValueCount = static_cast<uint32_t>(clear.size());
     beginInfo.pClearValues = clear.data();
-    RenderArea = beginInfo.renderArea = rpImpl.GetArea();
-    bIsInRenderPass = true;
+    beginInfo.renderArea = rpImpl.GetArea();
 
-    vkCmdBeginRenderPass(CmdBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBeginRenderPass(CmdBuffer->GetHandle(), &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     VkDevice device = Parent.GetVkDevice();
     VkFramebuffer fb = framebufferInfo.first;
     DeferredDeleters.emplace_back([device, fb]() { vkDestroyFramebuffer(device, fb, nullptr); });
+
+    rpImpl.UpdateImageInitialAccess(AccessTracker);
+    CurrRenderPass = &rpImpl;
 }
 
 void CCommandContextVk::NextSubpass() { throw "unimplemented"; }
 
 void CCommandContextVk::EndRenderPass()
 {
-    bIsInRenderPass = false;
-    vkCmdEndRenderPass(CmdBuffer);
-}
-
-void CCommandContextVk::BindPipeline(CPipeline& pipeline)
-{
-    CurrPipeline = static_cast<CPipelineVk*>(&pipeline);
-    vkCmdBindPipeline(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, CurrPipeline->GetHandle());
-
-    // Bind the default viewport and scissors
-    VkViewport vp;
-    vp.x = 0;
-    vp.y = 0;
-    vp.width = static_cast<float>(RenderArea.extent.width);
-    vp.height = static_cast<float>(RenderArea.extent.height);
-    vp.minDepth = 0.0f;
-    vp.maxDepth = 1.0f;
-    vkCmdSetViewport(CmdBuffer, 0, 1, &vp);
-    vkCmdSetScissor(CmdBuffer, 0, 1, &RenderArea);
-    const float blendFactor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    vkCmdSetBlendConstants(CmdBuffer, blendFactor);
-    vkCmdSetStencilReference(CmdBuffer, VK_STENCIL_FRONT_AND_BACK, 0);
-}
-
-void CCommandContextVk::BindBuffer(CBuffer& buffer, size_t offset, size_t range, uint32_t set,
-                                   uint32_t binding, uint32_t index)
-{
-    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
-    CurrBindings.BindBuffer(bufferImpl.Buffer, offset, range, set, binding, index);
-}
-
-void CCommandContextVk::BindBufferView(CBufferView& bufferView, uint32_t set, uint32_t binding,
-                                       uint32_t index)
-{
-    throw "unimplemented";
-}
-
-void CCommandContextVk::BindConstants(const void* pData, size_t size, uint32_t set,
-                                      uint32_t binding, uint32_t index)
-{
-    auto* bufferImpl = Parent.GetHugeConstantBuffer();
-    size_t offset;
-    size_t minAlignment = Parent.GetVkLimits().minUniformBufferOffsetAlignment;
-    void* bufferData = bufferImpl->Allocate(size, minAlignment, offset);
-    memcpy(bufferData, pData, size);
-    CurrBindings.BindBuffer(bufferImpl->GetHandle(), offset, size, set, binding, index);
-}
-
-void CCommandContextVk::BindImageView(CImageView& imageView, uint32_t set, uint32_t binding,
-                                      uint32_t index)
-{
-    auto& impl = static_cast<CImageViewVk&>(imageView);
-    /*auto image = impl.GetImage();
-    AccessTracker.TransitionImageState(CmdBuffer, image.get(), impl.GetResourceRange(),
-                                       EResourceState::ShaderResource);*/
-    CurrBindings.BindImageView(&impl, VK_NULL_HANDLE, set, binding, index);
-}
-
-void CCommandContextVk::BindSampler(CSampler& sampler, uint32_t set, uint32_t binding,
-                                    uint32_t index)
-{
-    CurrBindings.BindSampler(static_cast<CSamplerVk&>(sampler).Sampler, set, binding, index);
-}
-
-void CCommandContextVk::BindIndexBuffer(CBuffer& buffer, size_t offset, EFormat format)
-{
-    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
-    vkCmdBindIndexBuffer(CmdBuffer, bufferImpl.Buffer, offset,
-                         format == EFormat::R16_UINT ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32);
-}
-
-void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer& buffer, size_t offset)
-{
-    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
-    // On macOS, size_t is 32 bit and VkDeviceSize is 64
-    VkDeviceSize offsetDevice = offset;
-    vkCmdBindVertexBuffers(CmdBuffer, binding, 1, &bufferImpl.Buffer, &offsetDevice);
-}
-
-void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
-                             uint32_t firstInstance)
-{
-    ResolveBindings();
-    vkCmdDraw(CmdBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
-}
-
-void CCommandContextVk::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
-                                    uint32_t firstIndex, int32_t vertexOffset,
-                                    uint32_t firstInstance)
-{
-    ResolveBindings();
-    vkCmdDrawIndexed(CmdBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
-}
-
-void CCommandContextVk::DoneWithCmdBuffer(VkCommandBuffer b)
-{
-    assert(Kind == ECommandContextKind::Deferred);
-    vkFreeCommandBuffers(Parent.GetVkDevice(), CmdPool, 1, &b);
+    vkCmdEndRenderPass(CmdBuffer->GetHandle());
+    CurrRenderPass->UpdateImageFinalAccess(AccessTracker);
+    CurrRenderPass = nullptr;
 }
 
 void CCommandContextVk::ResolveBindings()
@@ -613,11 +579,16 @@ void CCommandContextVk::ResolveBindings()
                                 imageInfo.imageView = bindingInfo.pImageView->GetVkImageView();
                                 imageInfo.imageLayout =
                                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: fixme
-                                auto aspect =
-                                    GetImageAspectFlags(bindingInfo.pImageView->GetFormat());
-                                if (aspect != VK_IMAGE_ASPECT_COLOR_BIT)
+                                if (GetImageAspectFlags(bindingInfo.pImageView->GetFormat())
+                                    != VK_IMAGE_ASPECT_COLOR_BIT)
                                     imageInfo.imageLayout =
                                         VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+                                auto image = bindingInfo.pImageView->GetImage();
+                                AccessTracker.TransitionImage(
+                                    CmdBuffer->GetHandle(), image.get(),
+                                    bindingInfo.pImageView->GetResourceRange(),
+                                    VK_ACCESS_SHADER_READ_BIT, stageMask, imageInfo.imageLayout);
                             }
 
                             imageInfos.push_back(imageInfo);
@@ -647,7 +618,7 @@ void CCommandContextVk::ResolveBindings()
                                        descriptorWrites.data(), 0, nullptr);
 
                 // Store descriptor set binding for current stream encoder position.
-                vkCmdBindDescriptorSets(CmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                vkCmdBindDescriptorSets(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS,
                                         CurrPipeline->GetPipelineLayout(), set, 1, &descriptorSet,
                                         0, nullptr);
 

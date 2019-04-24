@@ -109,8 +109,6 @@ VkImageView CImageViewVk::GetVkImageView() const
 
 CImageVk::Ref CImageViewVk::GetImage() const
 {
-    if (bIsSwapChainProxy)
-        throw CRHIException("Proxy image view does not have actual image");
     return Image;
 }
 

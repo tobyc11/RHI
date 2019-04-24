@@ -1,4 +1,5 @@
 #pragma once
+#include "AccessTracker.h"
 #include "RenderPass.h"
 #include "SwapChain.h"
 #include "VkCommon.h"
@@ -19,9 +20,12 @@ public:
     VkRect2D GetArea() const { return Area; }
 
     // TODO: support multiple subpasses
+    uint32_t GetSubpassCount() const { return 1; }
     uint32_t SubpassColorAttachmentCount(uint32_t subpass) { return ColorAttachmentCount; }
 
     std::pair<VkFramebuffer, VkSemaphore> MakeFramebuffer();
+    void UpdateImageInitialAccess(CAccessTracker& tracker);
+    void UpdateImageFinalAccess(CAccessTracker& tracker);
 
 private:
     CDeviceVk& Parent;

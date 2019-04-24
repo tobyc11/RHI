@@ -15,7 +15,7 @@
 
 extern "C"
 {
-    _declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
+    __declspec(dllexport) DWORD NvOptimusEnablement = 0x00000001;
 }
 
 namespace RHI
@@ -168,7 +168,7 @@ CImage::Ref CDeviceD3D11::CreateImage2D(EFormat format, EImageUsageFlags usage, 
     auto image = std::make_shared<CImageD3D11>(*this, desc);
     if (bCreateImmediately)
         image->CreateFromMem(initialData);
-    return image;
+    return std::move(image);
 }
 
 CImage::Ref CDeviceD3D11::CreateImage3D(EFormat format, EImageUsageFlags usage, uint32_t width,
@@ -248,7 +248,7 @@ IRenderContext::Ref CDeviceD3D11::GetImmediateContext()
 
 IRenderContext::Ref CDeviceD3D11::CreateDeferredContext()
 {
-    throw std::runtime_error("unimplemented");
+    return std::make_shared<CContextD3D11>(*this, true);
 }
 
 CSwapChain::Ref CDeviceD3D11::CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format)

@@ -1,4 +1,5 @@
 #pragma once
+#include "CommandBufferVk.h"
 #include "VkCommon.h"
 #include <SpinLock.h>
 #include <array>
@@ -21,34 +22,23 @@ enum class ECommandContextKind : uint32_t
     Deferred
 };
 
-enum EQueueType
-{
-    QT_TRANSFER,
-    QT_COMPUTE,
-    QT_GRAPHICS,
-    NUM_QUEUE_TYPES
-};
-
 // Global resources swapped every frame
 struct CFrameResources
 {
     // This struct is locked when submitted
     tc::FSpinLock InFlightLock;
-    VkCommandPool CommandPool;
-    std::vector<VkCommandBuffer> CommandBuffers;
-    uint32_t NextFreeCommandBuffer;
-
-    VkCommandBuffer AllocateCmdBuffer() { return CommandBuffers[NextFreeCommandBuffer++]; }
+    CCommandPoolVk::Ref FrameCmdPool;
 };
 
 struct CGPUJobInfo
 {
-    CGPUJobInfo(const std::vector<VkCommandBuffer>& cmdBuffers,
+    CGPUJobInfo(std::vector<std::unique_ptr<CCommandBufferVk>> cmdBuffers, bool frameJob,
                 std::vector<VkSemaphore> waitSemaphores,
                 std::vector<VkPipelineStageFlags> waitStages,
                 std::vector<VkSemaphore> signalSemaphores, EQueueType queueType,
                 std::vector<std::function<void()>> deferredDeleters)
-        : CmdBuffers(cmdBuffers)
+        : CmdBuffers(std::move(cmdBuffers))
+        , bIsFrameJob(frameJob)
         , WaitSemaphores(std::move(waitSemaphores))
         , WaitStages(std::move(waitStages))
         , SignalSemaphores(std::move(signalSemaphores))
@@ -57,28 +47,12 @@ struct CGPUJobInfo
     {
     }
 
-    void SetImmediateJob(bool frameEnd = false)
-    {
-        Kind = ECommandContextKind::Immediate;
-        bIsFrameJob = frameEnd;
-    }
-
-    void SetTransientJob() { Kind = ECommandContextKind::Transient; }
-
-    void SetDeferredJob(std::shared_ptr<CCommandContextVk> ctx)
-    {
-        Kind = ECommandContextKind::Deferred;
-        DeferredContext = ctx;
-    }
-
-    ECommandContextKind Kind = ECommandContextKind::Invalid;
-    std::vector<VkCommandBuffer> CmdBuffers;
+    std::vector<std::unique_ptr<CCommandBufferVk>> CmdBuffers;
     bool bIsFrameJob = false;
-    std::shared_ptr<CCommandContextVk> DeferredContext;
     std::vector<VkSemaphore> WaitSemaphores;
     std::vector<VkPipelineStageFlags> WaitStages;
     std::vector<VkSemaphore> SignalSemaphores;
-    EQueueType QueueType = QT_GRAPHICS;
+    EQueueType QueueType;
     // Deleters that delete the transient resources only used by this command buffer
     std::vector<std::function<void()>> DeferredDeleters;
 
@@ -102,7 +76,7 @@ public:
     void SubmitJob(CGPUJobInfo jobInfo, bool wait = false);
     void PopFrontJob(bool wait = false);
 
-    VkCommandPool GetTransientPool(EQueueType queueType);
+    CCommandPoolVk::Ref GetTransientPool(EQueueType queueType);
     CFrameResources& GetCurrentFrameResources();
 
 private:
@@ -119,7 +93,7 @@ private:
     //   We have one transient pool per thread
     //   Frame pool goes with the immediate context, but is returned here every frame
     //   Deferred pool is managed by the context, and reference counted
-    std::unordered_map<std::thread::id, std::map<EQueueType, VkCommandPool>> TransientPools;
+    std::unordered_map<std::thread::id, std::map<EQueueType, CCommandPoolVk::Ref>> TransientPools;
 
     std::array<CFrameResources, MaxFramesInFlight> FrameResources;
     uint32_t CurrentFrameResourcesIndex;

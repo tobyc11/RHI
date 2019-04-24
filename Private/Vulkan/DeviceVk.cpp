@@ -464,9 +464,26 @@ CSampler::Ref CDeviceVk::CreateSampler(const CSamplerDesc& desc)
     return std::make_shared<CSamplerVk>(*this, desc);
 }
 
-IRenderContext::Ref CDeviceVk::GetImmediateContext() { return ImmediateContext; }
+IImmediateContext::Ref CDeviceVk::GetImmediateContext() { return ImmediateContext; }
 
-IRenderContext::Ref CDeviceVk::CreateDeferredContext() { throw "unimplemented"; }
+CCommandList::Ref CDeviceVk::CreateCommandList() { return CCommandList::Ref(); }
+
+ICopyContext::Ref CDeviceVk::CreateCopyContext(CCommandList& cmdList)
+{
+    return ICopyContext::Ref();
+}
+
+IComputeContext::Ref CDeviceVk::CreateComputeContext(CCommandList& cmdList)
+{
+    return IComputeContext::Ref();
+}
+
+IRenderPassContext::Ref
+CDeviceVk::CreateRenderPassContext(CCommandList& cmdList, CRenderPass& renderPass,
+                                   const std::vector<CClearValue>& clearValues)
+{
+    return IRenderPassContext::Ref();
+}
 
 CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format)
 {

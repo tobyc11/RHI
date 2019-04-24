@@ -95,7 +95,7 @@ struct CRenderPassDesc
     }
 };
 
-class CRenderPass : public tc::FNonCopyable
+class CRenderPass : public std::enable_shared_from_this<CRenderPass>, public tc::FNonCopyable
 {
 public:
     typedef std::shared_ptr<CRenderPass> Ref;

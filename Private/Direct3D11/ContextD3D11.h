@@ -44,13 +44,16 @@ struct CBoundResource
     }
 };
 
+class CCommandListD3D11 : public CCommandList
+{
+public:
+    ComPtr<ID3D11CommandList> CommandList;
+};
+
 class CContextD3D11 : public IRenderContext
 {
 public:
-    CContextD3D11(CDeviceD3D11& p)
-        : Parent(p)
-    {
-    }
+    CContextD3D11(CDeviceD3D11& p, bool isDeferred = false);
 
     // Inherited via ICopyContext
     void CopyBuffer(CBuffer& src, CBuffer& dst, const std::vector<CBufferCopy>& regions) override;
@@ -91,6 +94,7 @@ public:
 private:
     CDeviceD3D11& Parent;
     ID3D11DeviceContext* Imm();
+    ComPtr<ID3D11DeviceContext> DeferredContext;
     void ResolveResourceBindings();
     static std::pair<uint32_t, std::pair<uint32_t, uint32_t>>
     MakeTriple(uint32_t set, uint32_t binding, uint32_t index)
