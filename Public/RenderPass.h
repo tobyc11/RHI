@@ -102,6 +102,7 @@ public:
     typedef std::weak_ptr<CRenderPass> WeakRef;
 
     virtual ~CRenderPass() = default;
+    virtual void Resize(uint32_t width, uint32_t height) = 0;
 };
 
 }

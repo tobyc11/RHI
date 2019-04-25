@@ -62,6 +62,7 @@ public:
                                                     const std::vector<CClearValue>& clearValues);
 
     CSwapChain::Ref CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format);
+    void WaitIdle();
 
     // Vulkan specific getters
     VkInstance GetVkInstance() const;

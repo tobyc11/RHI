@@ -113,6 +113,11 @@ CSwapChain::Ref CDeviceBase<TDerived>::CreateSwapChain(const CPresentationSurfac
     return static_cast<TDerived*>(this)->CreateSwapChain(info, format);
 }
 
+template <typename TDerived> void CDeviceBase<TDerived>::WaitIdle()
+{
+    return static_cast<TDerived*>(this)->WaitIdle();
+}
+
 // Explicitly instanciate the wrapper for the chosen implementation
 template class RHI_API CDeviceBase<TChooseImpl<CDeviceBase>::TDerived>;
 

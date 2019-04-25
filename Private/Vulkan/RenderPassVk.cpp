@@ -116,6 +116,12 @@ CRenderPassVk::~CRenderPassVk()
     AttachmentViews.clear();
 }
 
+void CRenderPassVk::Resize(uint32_t width, uint32_t height)
+{
+    Area.extent.width = width;
+    Area.extent.height = height;
+}
+
 std::pair<VkFramebuffer, VkSemaphore> CRenderPassVk::MakeFramebuffer()
 {
     VkSemaphore waitSemaphore = VK_NULL_HANDLE;

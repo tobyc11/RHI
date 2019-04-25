@@ -210,35 +210,35 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 
     {
         VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[QT_GRAPHICS]).queueCount;
-        info.queueCount = queueCount;
+        queueFamilyProperites.at(QueueFamilies[QT_GRAPHICS]).queueCount = 1;
+        info.queueCount = queueFamilyProperites.at(QueueFamilies[QT_GRAPHICS]).queueCount;
         info.queueFamilyIndex = QueueFamilies[QT_GRAPHICS];
-        for (uint32_t unused = 0; unused < queueCount; unused++)
+        for (uint32_t unused = 0; unused < info.queueCount; unused++)
             queuePriorities.push_back(1.0f);
-        info.pQueuePriorities = &queuePriorities.back() - queueCount + 1;
+        info.pQueuePriorities = &queuePriorities.back() - info.queueCount + 1;
         queueInfos.push_back(info);
     }
     if (QueueFamilies[QT_COMPUTE] != QueueFamilies[QT_GRAPHICS])
     {
         VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[QT_COMPUTE]).queueCount;
-        info.queueCount = queueCount;
+        queueFamilyProperites.at(QueueFamilies[QT_COMPUTE]).queueCount = 1;
+        info.queueCount = queueFamilyProperites.at(QueueFamilies[QT_COMPUTE]).queueCount;
         info.queueFamilyIndex = QueueFamilies[QT_COMPUTE];
-        for (uint32_t unused = 0; unused < queueCount; unused++)
+        for (uint32_t unused = 0; unused < info.queueCount; unused++)
             queuePriorities.push_back(1.0f);
-        info.pQueuePriorities = &queuePriorities.back() - queueCount + 1;
+        info.pQueuePriorities = &queuePriorities.back() - info.queueCount + 1;
         queueInfos.push_back(info);
     }
     if (QueueFamilies[QT_TRANSFER] != QueueFamilies[QT_COMPUTE]
         && QueueFamilies[QT_TRANSFER] != QueueFamilies[QT_GRAPHICS])
     {
         VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-        uint32_t queueCount = queueFamilyProperites.at(QueueFamilies[QT_TRANSFER]).queueCount;
-        info.queueCount = queueCount;
+        queueFamilyProperites.at(QueueFamilies[QT_TRANSFER]).queueCount = 1;
+        info.queueCount = queueFamilyProperites.at(QueueFamilies[QT_TRANSFER]).queueCount;
         info.queueFamilyIndex = QueueFamilies[QT_TRANSFER];
-        for (uint32_t unused = 0; unused < queueCount; unused++)
+        for (uint32_t unused = 0; unused < info.queueCount; unused++)
             queuePriorities.push_back(1.0f);
-        info.pQueuePriorities = &queuePriorities.back() - queueCount + 1;
+        info.pQueuePriorities = &queuePriorities.back() - info.queueCount + 1;
         queueInfos.push_back(info);
     }
 
@@ -534,6 +534,8 @@ CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info,
     auto swapchain = std::make_shared<CSwapChainVk>(*this, swapchainCaps);
     return std::move(swapchain);
 }
+
+void CDeviceVk::WaitIdle() { vkDeviceWaitIdle(Device); }
 
 VkInstance CDeviceVk::GetVkInstance() const { return Instance; }
 
