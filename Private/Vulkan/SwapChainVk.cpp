@@ -254,7 +254,6 @@ void CSwapChainVk::ReleaseSwapChainAndImages(bool dontDeleteSwapchain)
     Images.clear();
     if (!dontDeleteSwapchain)
         vkDestroySwapchainKHR(Parent.GetVkDevice(), SwapChainHandle, nullptr);
-    ProxyImage.reset();
 }
 
 void CSwapChainVk::CreateSwapChainAndImages()

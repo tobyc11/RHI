@@ -17,6 +17,7 @@ public:
 
     virtual ~CSwapChain() = default;
 
+    void AutoResize() { Resize(UINT32_MAX, UINT32_MAX); }
     virtual void Resize(uint32_t width, uint32_t height) = 0;
     virtual void GetSize(uint32_t& width, uint32_t& height) const = 0;
 
