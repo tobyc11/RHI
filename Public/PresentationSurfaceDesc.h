@@ -1,4 +1,6 @@
 #pragma once
+#include <Platform.h>
+
 #ifdef _WIN32
 #define NOMINMAX
 #include <Windows.h>
@@ -39,8 +41,8 @@ struct CPresentationSurfaceDescMacOS
 struct CPresentationSurfaceDescLinux
 {
 #if TC_OS == TC_OS_LINUX
-xcb_window_t window;
-xcb_connection_t *xconn;
+    xcb_window_t window;
+    xcb_connection_t* xconn;
 #endif
 };
 

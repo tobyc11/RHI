@@ -62,7 +62,7 @@ public:
     // Windowing system interface
     CSwapChain::Ref CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format);
 
-	void WaitIdle();
+    void WaitIdle();
 
 protected:
     CDeviceBase() = default;

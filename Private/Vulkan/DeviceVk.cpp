@@ -9,8 +9,8 @@
 #include "SwapChainVk.h"
 #include "VkHelpers.h"
 
-#include <vector>
 #include <cstring>
+#include <vector>
 
 #if TC_OS == TC_OS_LINUX
 #include <vulkan/vulkan_xcb.h>
