@@ -6,6 +6,7 @@
 #include "SamplerVk.h"
 #include "VkHelpers.h"
 #include <unordered_set>
+#include <cstring>
 
 namespace RHI
 {

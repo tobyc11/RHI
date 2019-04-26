@@ -1,6 +1,8 @@
 #include "BufferVk.h"
 #include "DeviceVk.h"
 
+#include <cstring>
+
 namespace RHI
 {
 
