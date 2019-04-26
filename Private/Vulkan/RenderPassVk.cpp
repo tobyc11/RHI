@@ -163,7 +163,6 @@ void CRenderPassVk::UpdateImageInitialAccess(CAccessTracker& tracker)
         CImageVk* image = viewImpl->GetImage().get();
         CImageSubresourceRange imageRange = viewImpl->GetResourceRange();
         VkImageLayout layout = AttachmentsVk[i].initialLayout;
-        CAccessRecord record {};
         if (layout == VK_IMAGE_LAYOUT_UNDEFINED)
         {
             tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange, 0,

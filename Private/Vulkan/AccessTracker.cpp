@@ -89,10 +89,13 @@ void CAccessTracker::TransitionImageState(VkCommandBuffer cmdBuffer, CImageVk* i
 {
     auto dstAccess = StateToAccessMask(targetState);
     auto dstStages = StateToShaderStageMask(targetState, false);
-    if (isTransferQueue)
+    if (isTransferQueue && targetState != EResourceState::CopyDest
+        && targetState != EResourceState::CopySource)
     {
-        dstAccess = VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT;
-        dstStages = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        // Only do layout transitions if we are on the transfer queue and the target state is not
+        // supported on the transfer queue
+        dstAccess = 0;
+        dstStages = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     }
     auto dstLayout = StateToImageLayout(targetState);
     TransitionImage(cmdBuffer, image, range, dstAccess, dstStages, dstLayout);

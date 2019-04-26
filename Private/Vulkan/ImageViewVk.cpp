@@ -69,6 +69,12 @@ CImageViewVk::CImageViewVk(CDeviceVk& p, const CImageViewDesc& desc, CImageVk::R
         auto* swapImageVk = static_cast<CSwapChainImageVk*>(imgVk);
         bIsSwapChainProxy = true;
         SwapChain = swapImageVk->GetSwapChain();
+
+        // Set resource range in view create info to match the swap chain
+        ViewCreateInfo.subresourceRange.baseArrayLayer = 0;
+        ViewCreateInfo.subresourceRange.baseMipLevel = 0;
+        ViewCreateInfo.subresourceRange.layerCount = 1;
+        ViewCreateInfo.subresourceRange.levelCount = 1;
         return;
     }
 
@@ -107,10 +113,7 @@ VkImageView CImageViewVk::GetVkImageView() const
     return ImageView;
 }
 
-CImageVk::Ref CImageViewVk::GetImage() const
-{
-    return Image;
-}
+CImageVk::Ref CImageViewVk::GetImage() const { return Image; }
 
 VkFormat CImageViewVk::GetFormat() const
 {
