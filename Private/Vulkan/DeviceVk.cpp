@@ -198,12 +198,17 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     {
         VkQueueFlags flags = queueFamilyProperites[i].queueFlags;
         if ((flags & VK_QUEUE_GRAPHICS_BIT) != 0)
+        {
             QueueFamilies[QT_GRAPHICS] = i;
-        if ((flags & VK_QUEUE_COMPUTE_BIT) != 0)
             QueueFamilies[QT_COMPUTE] = i;
-        if ((flags & VK_QUEUE_TRANSFER_BIT) != 0)
+            QueueFamilies[QT_TRANSFER] = i;
+        }
+        if ((flags & VK_QUEUE_COMPUTE_BIT) != 0 && (flags & VK_QUEUE_GRAPHICS_BIT) == 0)
+            QueueFamilies[QT_COMPUTE] = i;
+        if ((flags & VK_QUEUE_TRANSFER_BIT) != 0 && (flags & VK_QUEUE_GRAPHICS_BIT) == 0)
             QueueFamilies[QT_TRANSFER] = i;
     }
+    QueueFamilies[QT_COMPUTE] = QueueFamilies[QT_TRANSFER] = QueueFamilies[QT_GRAPHICS];
 
     // Enable all features
     VkPhysicalDeviceFeatures requiredFeatures;
@@ -546,7 +551,7 @@ CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info,
 #endif
     else { throw CRHIException("CreateSwapChain received invalid presentation surface desc"); }
 
-    auto swapchainCaps = CSwapChainVk::GetDeviceSwapChainCaps(surface, PhysicalDevice);
+    auto swapchainCaps = CSwapChainVk::GetDeviceSwapChainCaps(*this, surface);
     if (!swapchainCaps.bIsSuitable)
         throw CRHIRuntimeError("Device is not suitable for presentation");
     auto swapchain = std::make_shared<CSwapChainVk>(*this, swapchainCaps);

@@ -26,8 +26,8 @@ public:
     typedef std::shared_ptr<CSwapChainVk> Ref;
     typedef std::weak_ptr<CSwapChainVk> WeakRef;
 
-    static CPhysicalDeviceSwapChainCaps GetDeviceSwapChainCaps(VkSurfaceKHR surface,
-                                                               VkPhysicalDevice device);
+    static CPhysicalDeviceSwapChainCaps GetDeviceSwapChainCaps(CDeviceVk& device,
+                                                               VkSurfaceKHR surface);
     static VkSurfaceFormatKHR SelectImageFormat(const CPhysicalDeviceSwapChainCaps& caps);
     static VkPresentModeKHR SelectPresentMode(const CPhysicalDeviceSwapChainCaps& caps);
     static VkExtent2D SelectSurfaceExtent(const CPhysicalDeviceSwapChainCaps& caps);

@@ -25,13 +25,20 @@ CRenderPassVk::CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc)
         r.storeOp = static_cast<VkAttachmentStoreOp>(attachment.StoreOp);
         r.stencilLoadOp = static_cast<VkAttachmentLoadOp>(attachment.StencilLoadOp);
         r.stencilStoreOp = static_cast<VkAttachmentStoreOp>(attachment.StencilStoreOp);
-        r.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // TODO: Layout undefined destroys content
+
+        bool isDepthStencil = GetImageAspectFlags(r.format) & VK_IMAGE_ASPECT_DEPTH_BIT;
+
+        r.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        if (attachment.LoadOp == EAttachmentLoadOp::Load)
+            r.initialLayout = isDepthStencil ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
+                                             : VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
         r.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
         if (viewImpl->bIsSwapChainProxy)
             r.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
         else
         {
-            if (GetImageAspectFlags(r.format) & VK_IMAGE_ASPECT_DEPTH_BIT)
+            if (isDepthStencil)
             {
                 r.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
                 if (Any(viewImpl->GetImage()->GetUsageFlags(), EImageUsageFlags::Sampled))
@@ -170,18 +177,23 @@ void CRenderPassVk::UpdateImageInitialAccess(CAccessTracker& tracker)
         }
         else if (layout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
         {
-            tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange, 0,
-                                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, layout);
+            tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange,
+                                    VK_ACCESS_COLOR_ATTACHMENT_READ_BIT
+                                        | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+                                    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, layout);
         }
         else if (layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
         {
-            tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange, 0,
-                                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, layout);
+            tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange,
+                                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+                                        | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                                    VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, layout);
         }
         else if (layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL)
         {
-            tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange, 0,
-                                    VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, layout);
+            tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange,
+                                    VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT,
+                                    VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT, layout);
         }
         else
         {
@@ -198,8 +210,9 @@ void CRenderPassVk::UpdateImageFinalAccess(CAccessTracker& tracker)
         CImageVk* image = viewImpl->GetImage().get();
         CImageSubresourceRange imageRange = viewImpl->GetResourceRange();
         VkImageLayout layout = AttachmentsVk[i].finalLayout;
+        // The implicit barrier at the end of the render pass should take care of everything
         tracker.TransitionImage(VK_NULL_HANDLE, image, imageRange, 0,
-                                VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, layout);
+                                VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, layout);
     }
 }
 

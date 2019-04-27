@@ -6,43 +6,55 @@
 namespace RHI
 {
 
-CPhysicalDeviceSwapChainCaps CSwapChainVk::GetDeviceSwapChainCaps(VkSurfaceKHR surface,
-                                                                  VkPhysicalDevice device)
+CPhysicalDeviceSwapChainCaps CSwapChainVk::GetDeviceSwapChainCaps(CDeviceVk& device,
+                                                                  VkSurfaceKHR surface)
 {
     CPhysicalDeviceSwapChainCaps caps;
     caps.AssociatedSurface = surface;
-    caps.PhysicalDevice = device;
+    caps.PhysicalDevice = device.GetVkPhysicalDevice();
 
     VkBool32 presentSupported;
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
-    for (uint32_t i = 0; i < queueFamilyCount; i++)
+    vkGetPhysicalDeviceSurfaceSupportKHR(caps.PhysicalDevice, device.GetQueueFamily(QT_GRAPHICS),
+                                         surface, &presentSupported);
+    if (presentSupported)
     {
-        vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupported);
-        if (presentSupported)
+        caps.PresentQueue = device.GetQueueFamily(QT_GRAPHICS);
+    }
+    else
+    {
+        uint32_t queueFamilyCount = 0;
+        vkGetPhysicalDeviceQueueFamilyProperties(caps.PhysicalDevice, &queueFamilyCount, nullptr);
+        for (uint32_t i = 0; i < queueFamilyCount; i++)
         {
-            caps.PresentQueue = i;
-            break;
+            vkGetPhysicalDeviceSurfaceSupportKHR(caps.PhysicalDevice, i, surface,
+                                                 &presentSupported);
+            if (presentSupported)
+            {
+                caps.PresentQueue = i;
+                break;
+            }
         }
     }
 
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &caps.Capabilities);
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(caps.PhysicalDevice, surface, &caps.Capabilities);
 
     uint32_t surfaceFormatCount;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &surfaceFormatCount, nullptr);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(caps.PhysicalDevice, surface, &surfaceFormatCount,
+                                         nullptr);
     if (surfaceFormatCount != 0)
     {
         caps.SurfaceFormats.resize(surfaceFormatCount);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &surfaceFormatCount,
+        vkGetPhysicalDeviceSurfaceFormatsKHR(caps.PhysicalDevice, surface, &surfaceFormatCount,
                                              caps.SurfaceFormats.data());
     }
 
     uint32_t presentModeCount;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount, nullptr);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(caps.PhysicalDevice, surface, &presentModeCount,
+                                              nullptr);
     if (presentModeCount != 0)
     {
         caps.PresentModes.resize(presentModeCount);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &presentModeCount,
+        vkGetPhysicalDeviceSurfacePresentModesKHR(caps.PhysicalDevice, surface, &presentModeCount,
                                                   caps.PresentModes.data());
     }
 
