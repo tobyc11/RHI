@@ -3,6 +3,8 @@
 #include "RenderPassVk.h"
 #include "SamplerVk.h"
 
+#include <string.h>
+
 namespace RHI
 {
 
