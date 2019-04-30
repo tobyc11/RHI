@@ -3,6 +3,8 @@
 #ifdef RHI_IMPL_DIRECT3D11
 #include <d3d11_4.h>
 #include <wrl/client.h>
+#elif defined(RHI_IMPL_VULKAN)
+#include <vulkan/vulkan.h>
 #endif
 
 namespace RHI
@@ -18,6 +20,14 @@ struct CNativeDevice
 };
 
 CNativeDevice GetNativeDevice(CDevice* device);
+#elif defined(RHI_IMPL_VULKAN)
+struct CNativeDevice
+{
+    VkInstance Instance;
+    VkDevice Device;
+};
+
+CNativeDevice GetNativeDevice(CDevice::Ref device);
 #endif
 
 } /* namespace RHI */

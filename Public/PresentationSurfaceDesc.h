@@ -17,7 +17,8 @@ enum class EPresentationSurfaceDescType
 {
     Win32,
     MacOS,
-    Linux
+    Linux,
+    Vulkan
 };
 
 struct CPresentationSurfaceDescWin32
@@ -46,6 +47,16 @@ struct CPresentationSurfaceDescLinux
 #endif
 };
 
+struct CPresentationSurfaceDescVulkan
+{
+    // Some windowing system supports creating vulkan surface directly, this struct is provided to support such use case
+    // We enable this if and only if the vulkan header is already included
+    //   as we don't want presentation subsystem to force the client to depend on vulkan headers
+#ifdef VK_VERSION_1_0
+    VkSurfaceKHR Surface;
+#endif
+};
+
 struct CPresentationSurfaceDesc
 {
     EPresentationSurfaceDescType Type;
@@ -53,6 +64,7 @@ struct CPresentationSurfaceDesc
         CPresentationSurfaceDescWin32 Win32;
         CPresentationSurfaceDescMacOS MacOS;
         CPresentationSurfaceDescLinux Linux;
+        CPresentationSurfaceDescVulkan Vulkan;
     };
 };
 

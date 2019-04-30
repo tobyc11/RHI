@@ -1,5 +1,5 @@
 #include "DeviceVk.h"
-
+#include "AbstractionBreaker.h"
 #include "ImageViewVk.h"
 #include "ImageVk.h"
 #include "PipelineVk.h"
@@ -549,6 +549,11 @@ CSwapChain::Ref CDeviceVk::CreateSwapChain(const CPresentationSurfaceDesc& info,
             throw CRHIRuntimeError("vkCreateXcbSurfaceKHR failed");
     }
 #endif
+    else if (info.Type == EPresentationSurfaceDescType::Vulkan)
+    {
+        // Use existing vulkan surface
+        surface = info.Vulkan.Surface;
+    }
     else { throw CRHIException("CreateSwapChain received invalid presentation surface desc"); }
 
     auto swapchainCaps = CSwapChainVk::GetDeviceSwapChainCaps(*this, surface);
@@ -567,6 +572,15 @@ CCommandContextVk::Ref CDeviceVk::MakeTransientContext(EQueueType qt)
     CCommandContextVk::Ref context =
         std::make_shared<CCommandContextVk>(*this, qt, ECommandContextKind::Transient);
     return context;
+}
+
+CNativeDevice GetNativeDevice(CDevice::Ref device)
+{
+    CNativeDevice result;
+    auto impl = std::static_pointer_cast<CDeviceVk>(device);
+    result.Instance = impl->GetVkInstance();
+    result.Device = impl->GetVkDevice();
+    return std::move(result);
 }
 
 } /* namespace RHI */
