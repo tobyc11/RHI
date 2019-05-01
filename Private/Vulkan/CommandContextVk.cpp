@@ -103,7 +103,7 @@ void CCommandContextVk::BeginBuffer()
     WaitSemaphores.clear();
     WaitStages.clear();
     VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    vkCreateSemaphore(Parent.GetVkDevice(), &semaphoreInfo, nullptr, &SignalSemaphore);
+    VK(vkCreateSemaphore(Parent.GetVkDevice(), &semaphoreInfo, nullptr, &SignalSemaphore));
 
     DeferredDeleters.clear();
 }

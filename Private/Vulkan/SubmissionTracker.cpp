@@ -23,7 +23,7 @@ void CSubmissionTracker::Init()
 
 void CSubmissionTracker::Shutdown()
 {
-    vkDeviceWaitIdle(Parent.GetVkDevice());
+    VK(vkDeviceWaitIdle(Parent.GetVkDevice()));
 
     while (!JobQueue.empty())
         PopFrontJob(true);
@@ -83,10 +83,10 @@ void CSubmissionTracker::SubmitJob(CGPUJobInfo jobInfo, bool wait)
     }
 
     VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-    vkCreateFence(Parent.GetVkDevice(), &fenceInfo, nullptr, &jobInfo.Fence);
+    VK(vkCreateFence(Parent.GetVkDevice(), &fenceInfo, nullptr, &jobInfo.Fence));
 
     VkQueue q = Parent.GetVkQueue(jobInfo.QueueType);
-    vkQueueSubmit(q, 1, &submitInfo, jobInfo.Fence);
+    VK(vkQueueSubmit(q, 1, &submitInfo, jobInfo.Fence));
 
     // Queue up
     std::swap(jobInfo.PendingDeletionBuffers, Parent.PendingDeletionBuffers);

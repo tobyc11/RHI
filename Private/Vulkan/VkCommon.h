@@ -1,5 +1,6 @@
 #pragma once
 #include <Platform.h>
+#include <RHIException.h>
 
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -23,5 +24,16 @@ class CDeviceVk;
 class CCommandContextVk;
 class CImageVk;
 class CImageViewVk;
+
+#define VK(fn)                                                                                     \
+    do                                                                                             \
+    {                                                                                              \
+        VkResult err = fn;                                                                         \
+        if (err != VK_SUCCESS)                                                                     \
+        {                                                                                          \
+            printf("%s\n", __FUNCSIG__);                                                           \
+            throw CRHIRuntimeError("Vulkan call did not return VK_SUCCESS");                       \
+        }                                                                                          \
+    } while (0);
 
 }

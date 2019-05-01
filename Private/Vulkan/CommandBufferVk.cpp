@@ -15,7 +15,7 @@ CCommandPoolVk::CCommandPoolVk(CDeviceVk& p, EQueueType queueType, bool resetInd
     if (resetIndividualBuffer)
         ci.flags |= VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     ci.queueFamilyIndex = Parent.GetQueueFamily(queueType);
-    vkCreateCommandPool(Parent.GetVkDevice(), &ci, nullptr, &Handle);
+    VK(vkCreateCommandPool(Parent.GetVkDevice(), &ci, nullptr, &Handle));
 }
 
 CCommandPoolVk::~CCommandPoolVk() { vkDestroyCommandPool(Parent.GetVkDevice(), Handle, nullptr); }
@@ -46,7 +46,7 @@ std::unique_ptr<CCommandBufferVk> CCommandPoolVk::AllocateCommandBuffer(bool sec
 
 void CCommandPoolVk::ResetPool()
 {
-    vkResetCommandPool(Parent.GetVkDevice(), Handle, 0);
+    VK(vkResetCommandPool(Parent.GetVkDevice(), Handle, 0));
     bCanAllocateFromFreedList = true;
 }
 
@@ -62,7 +62,7 @@ CCommandBufferVk::CCommandBufferVk(CCommandPoolVk::Ref pool, bool secondary)
         allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandBufferCount = 1;
 
-    vkAllocateCommandBuffers(CommandPool->GetParent().GetVkDevice(), &allocInfo, &Handle);
+    VK(vkAllocateCommandBuffers(CommandPool->GetParent().GetVkDevice(), &allocInfo, &Handle));
 }
 
 CCommandBufferVk::CCommandBufferVk(CCommandPoolVk::Ref pool, VkCommandBuffer handle, bool secondary)
@@ -111,7 +111,7 @@ void CCommandBufferVk::BeginRecording(CRenderPass::Ref renderPass, uint32_t subp
     }
 
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(Handle, &beginInfo);
+    VK(vkBeginCommandBuffer(Handle, &beginInfo));
 }
 
 void CCommandBufferVk::EndRecording()
