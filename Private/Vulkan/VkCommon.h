@@ -13,6 +13,7 @@
 
 #if TC_OS == TC_OS_LINUX
 #define VK_USE_PLATFORM_LINUX_KHR
+#define __FUNCSIG__ __PRETTY_FUNCTION__
 #endif
 
 #include "vk_mem_alloc.h"
