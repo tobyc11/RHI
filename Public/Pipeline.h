@@ -33,9 +33,9 @@ struct CPipelineDesc
         VertexAttributes.push_back(desc);
     }
 
-    void VertexBinding(uint32_t binding, bool bIsPerInstance = false)
+    void VertexBinding(uint32_t binding, uint32_t stride, bool bIsPerInstance = false)
     {
-        CVertexInputBindingDesc desc { binding, bIsPerInstance };
+        CVertexInputBindingDesc desc { binding, stride, bIsPerInstance };
         VertexBindings.push_back(desc);
     }
 };
