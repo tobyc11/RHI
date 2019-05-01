@@ -94,11 +94,11 @@ void CRHIImGuiBackend::NewFrame()
     ImGui_ImplVulkan_NewFrame();
 }
 
-void CRHIImGuiBackend::RenderDrawData(ImDrawData* draw_data, IRenderContext::Ref context)
+void CRHIImGuiBackend::RenderDrawData(ImDrawData* draw_data, IRenderContext& context)
 {
-    auto contextImpl = std::static_pointer_cast<CCommandContextVk>(context);
-    assert(contextImpl->IsInRenderPass());
-    auto cmdBuffer = contextImpl->GetBuffer();
+    auto& contextImpl = static_cast<CCommandContextVk&>(context);
+    assert(contextImpl.IsInRenderPass());
+    auto cmdBuffer = contextImpl.GetBuffer();
     ImGui_ImplVulkan_RenderDrawData(draw_data, cmdBuffer);
 }
 

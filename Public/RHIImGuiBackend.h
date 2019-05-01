@@ -16,7 +16,7 @@ public:
     // Start a new frame, called before platform and imgui NewFrame()
     static void NewFrame();
     // Must be called within a render pass (compatible with the one passed into Init)
-    static void RenderDrawData(ImDrawData* draw_data, IRenderContext::Ref context);
+    static void RenderDrawData(ImDrawData* draw_data, IRenderContext& context);
 };
 
 } /* namespace RHI */
