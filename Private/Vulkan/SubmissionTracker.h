@@ -88,7 +88,7 @@ private:
     std::deque<CGPUJobInfo> JobQueue;
     uint32_t FrameJobCount = 0;
     static const uint32_t MaxJobsInFlight = 8;
-    static const uint32_t MaxFramesInFlight = 2;
+    static const uint32_t MaxFramesInFlight = 3;
 
     // I envisage three kinds of pools: frame pool, transient pool, and deferred pool
     //   We have one transient pool per thread
