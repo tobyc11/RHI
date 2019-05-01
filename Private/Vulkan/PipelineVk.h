@@ -30,7 +30,7 @@ private:
     std::vector<VkPipelineShaderStageCreateInfo> StageInfos;
     std::vector<std::string> EntryPoints;
 
-    std::map<std::string, CPipelineResource> ResourceByName;
+    std::map<std::pair<uint32_t, uint32_t>, CPipelineResource> ResourceByBinding;
     std::set<uint32_t> BoundSets;
     std::array<CDescriptorSetLayoutVk*, kMaxBoundDescriptorSets> SetLayouts;
 

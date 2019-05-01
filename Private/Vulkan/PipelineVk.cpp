@@ -132,7 +132,7 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     std::array<std::vector<CPipelineResource>, kMaxBoundDescriptorSets> setBindings;
 
     // Catagorize each binding by set id
-    for (const auto& pair : ResourceByName)
+    for (const auto& pair : ResourceByBinding)
     {
         const auto& resource = pair.second;
         auto& set = setBindings[resource.Set];
@@ -158,7 +158,7 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
             setLayouts.push_back(it->GetHandle());
 
     std::vector<VkPushConstantRange> pushConstantRanges;
-    for (auto it : ResourceByName)
+    for (auto it : ResourceByBinding)
     {
         const auto& resource = it.second;
         if (resource.ResourceType == EPipelineResourceType::PushConstantBuffer)
@@ -373,17 +373,16 @@ void CPipelineVk::AddShaderModule(CShaderModule::Ref shaderModule, VkShaderStage
     // Grab all resources from each individual shader and put them into a big hash map
     for (const auto& resource : smImpl->GetShaderResources())
     {
-        // Is name really the best choice for the key???
-        auto key = std::string(resource.Name);
+        auto key = std::make_pair(resource.Set, resource.Binding);
         if (resource.ResourceType == EPipelineResourceType::StageOutput
             || resource.ResourceType == EPipelineResourceType::StageInput)
-            key = std::to_string(resource.Stages) + ":" + key;
+            key = std::make_pair(-1 * resource.Stages, resource.Location);
 
-        auto it = ResourceByName.find(key);
-        if (it != ResourceByName.end())
+        auto it = ResourceByBinding.find(key);
+        if (it != ResourceByBinding.end())
             it->second.Stages |= resource.Stages;
         else
-            ResourceByName.emplace(key, resource);
+            ResourceByBinding.emplace(key, resource);
     }
 }
 
