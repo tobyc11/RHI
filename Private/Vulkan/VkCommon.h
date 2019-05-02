@@ -9,6 +9,7 @@
 
 #if TC_OS == TC_OS_MAC_OS_X
 #define VK_USE_PLATFORM_MACOS_MVK
+#define __FUNCSIG__ __PRETTY_FUNCTION__
 #endif
 
 #if TC_OS == TC_OS_LINUX

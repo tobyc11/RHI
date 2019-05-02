@@ -100,6 +100,7 @@ CPersistentMappedRingBuffer::CPersistentMappedRingBuffer(CDeviceVk& p, size_t si
 
     VmaAllocationCreateInfo allocInfo = {};
     allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+    allocInfo.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
     vmaCreateBuffer(Parent.GetAllocator(), &bufferInfo, &allocInfo, &Handle, &Allocation, nullptr);
 
@@ -137,6 +138,8 @@ void* CPersistentMappedRingBuffer::Allocate(size_t size, size_t alignment, size_
 
 void CPersistentMappedRingBuffer::MarkBlockEnd()
 {
+    vmaFlushAllocation(Parent.GetAllocator(), Allocation, CurrBlock.Begin, CurrBlock.End - CurrBlock.Begin);
+
     AllocatedBlocks.push(CurrBlock);
     CurrBlock.Begin = CurrBlock.End;
     if (CurrBlock.Begin == TotalSize)
