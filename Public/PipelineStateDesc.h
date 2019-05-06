@@ -6,6 +6,10 @@
 #include <cstdint>
 #include <vector>
 
+#if TC_OS == TC_OS_LINUX
+#undef Always
+#endif
+
 namespace RHI
 {
 
