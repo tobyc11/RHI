@@ -112,6 +112,56 @@ enum class EShaderFormat
     DXBC
 };
 
+// The following 3 definitions are used for spriv shader reflection
+enum class EPipelineResourceType : uint8_t
+{
+    StageInput,
+    StageOutput,
+    SeparateSampler,
+    CombinedImageSampler,
+    SeparateImage,
+    StorageImage,
+    UniformTexelBuffer,
+    StorageTexelBuffer,
+    UniformBuffer,
+    StorageBuffer,
+    SubpassInput,
+    PushConstantBuffer,
+};
+
+enum class EBaseType
+{
+    Bool,
+    Char,
+    Int,
+    UInt,
+    Half,
+    Float,
+    Double,
+    Struct
+};
+
+const int MaxDescriptionSize = 256;
+
+struct CPipelineResource
+{
+    uint32_t Stages;
+    EPipelineResourceType ResourceType;
+    EBaseType BaseType;
+    uint32_t Access;
+    uint32_t Set;
+    uint32_t Binding;
+    uint32_t Location;
+    uint32_t InputAttachmentIndex;
+    uint32_t VecSize;
+    uint32_t Columns;
+    uint32_t ArraySize;
+    uint32_t Offset;
+    uint32_t Size;
+    char Name[MaxDescriptionSize];
+};
+
+
 class RHI_API CShaderModule : public tc::FNonCopyable
 {
 public:
@@ -132,6 +182,8 @@ public:
             return EShaderFormat::DXBC;
         return EShaderFormat::HLSLFile;
     }
+
+    virtual const std::vector<CPipelineResource>& GetShaderResources() const = 0;
 
 private:
     friend class CShaderD3D11;
