@@ -9,6 +9,10 @@
 #include <variant>
 #include <vector>
 
+#if TC_OS == TC_OS_LINUX
+#undef Bool
+#endif
+
 namespace RHI
 {
 
