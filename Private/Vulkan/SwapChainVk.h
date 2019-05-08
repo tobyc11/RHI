@@ -20,6 +20,12 @@ struct CPhysicalDeviceSwapChainCaps
     uint32_t PresentQueue;
 };
 
+struct CAcquiredImageInfo
+{
+    VkSemaphore AvailableSemaphore = VK_NULL_HANDLE;
+    VkSemaphore RenderSemaphore = VK_NULL_HANDLE;
+};
+
 class CSwapChainVk : public CSwapChain
 {
 public:
@@ -46,7 +52,7 @@ public:
     const VkFormat& GetChosenFormat() const { return CreateInfo.imageFormat; }
     const std::vector<VkImage>& GetVkImages() const { return Images; }
     const std::vector<VkImageView>& GetVkImageViews() const { return ImageViews; }
-    std::queue<std::pair<uint32_t, VkSemaphore>> AcquiredImages;
+    std::queue<std::pair<uint32_t, CAcquiredImageInfo>> AcquiredImages;
 
 private:
     void ReleaseSwapChainAndImages(bool dontDeleteSwapchain = false);

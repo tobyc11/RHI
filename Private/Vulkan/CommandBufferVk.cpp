@@ -86,6 +86,10 @@ CCommandBufferVk::~CCommandBufferVk()
             CommandPool->FreedPrimaryBuffers.push(Handle);
         CommandPool->bCanAllocateFromFreedList = false;
     }
+
+    if (BufferAllocator)
+        BufferAllocator->UnlockPool(AllocatorPoolIndex);
+    BufferAllocator = nullptr;
 }
 
 void CCommandBufferVk::BeginRecording(CRenderPass::Ref renderPass, uint32_t subpass)
@@ -119,6 +123,44 @@ void CCommandBufferVk::EndRecording()
     VkResult result = vkEndCommandBuffer(Handle);
     if (result != VK_SUCCESS)
         throw CRHIRuntimeError("Could not end command buffer");
+
+    if (BufferAllocator)
+        BufferAllocator->UnlockPool(AllocatorPoolIndex);
+    BufferAllocator = nullptr;
+}
+
+CCommandBufferAllocatorVk::CCommandBufferAllocatorVk(CDeviceVk& deviceVk, EQueueType queueType)
+{
+    for (size_t i = 0; i < kNumPools; i++)
+    {
+        auto pool = std::make_shared<CCommandPoolVk>(deviceVk, queueType, true);
+        Pools.emplace_back(std::move(pool));
+        AvailablePools.push(i);
+    }
+}
+
+std::unique_ptr<CCommandBufferVk> CCommandBufferAllocatorVk::Allocate(bool secondary)
+{
+    Mutex.Lock();
+    while (AvailablePools.empty())
+    {
+        Mutex.Unlock();
+        Mutex.Lock();
+    }
+    size_t poolIndex = AvailablePools.top();
+    AvailablePools.pop();
+    Mutex.Unlock();
+
+    auto cmdBuffer = Pools[poolIndex]->AllocateCommandBuffer(secondary);
+    cmdBuffer->BufferAllocator = this;
+    cmdBuffer->AllocatorPoolIndex = poolIndex;
+    return std::move(cmdBuffer);
+}
+
+void CCommandBufferAllocatorVk::UnlockPool(size_t index)
+{
+    std::lock_guard<tc::FSpinLock> lk(Mutex);
+    AvailablePools.push(index);
 }
 
 }

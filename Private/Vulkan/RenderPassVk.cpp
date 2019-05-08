@@ -129,7 +129,7 @@ void CRenderPassVk::Resize(uint32_t width, uint32_t height)
     Area.extent.height = height;
 }
 
-std::pair<VkFramebuffer, VkSemaphore> CRenderPassVk::MakeFramebuffer()
+VkFramebuffer CRenderPassVk::MakeFramebuffer(std::vector<VkSemaphore>& outWaitSemaphores, std::vector<VkSemaphore>& outSignalSemaphores)
 {
     VkSemaphore waitSemaphore = VK_NULL_HANDLE;
 
@@ -147,7 +147,17 @@ std::pair<VkFramebuffer, VkSemaphore> CRenderPassVk::MakeFramebuffer()
                 throw CRHIException("Did not acquire any image from the swap chain");
             attachments.push_back(
                 swapChainImpl->GetVkImageViews()[swapChainImpl->AcquiredImages.front().first]);
-            waitSemaphore = swapChainImpl->AcquiredImages.front().second;
+
+            // Grab the available semaphore and clear it since a semaphore cannot be waited twice
+            outWaitSemaphores.push_back(swapChainImpl->AcquiredImages.front().second.AvailableSemaphore);
+            swapChainImpl->AcquiredImages.front().second.AvailableSemaphore = VK_NULL_HANDLE;
+
+            VkSemaphore signalSemaphore;
+            VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+            vkCreateSemaphore(Parent.GetVkDevice(), &semaphoreInfo, nullptr, &signalSemaphore);
+            outSignalSemaphores.push_back(signalSemaphore);
+            assert(swapChainImpl->AcquiredImages.front().second.RenderSemaphore == VK_NULL_HANDLE);
+            swapChainImpl->AcquiredImages.front().second.RenderSemaphore = signalSemaphore;
         }
         else
             attachments.push_back(viewImpl->GetVkImageView());
@@ -159,7 +169,7 @@ std::pair<VkFramebuffer, VkSemaphore> CRenderPassVk::MakeFramebuffer()
     fbInfo.layers = Layers;
     VkFramebuffer fb;
     vkCreateFramebuffer(Parent.GetVkDevice(), &fbInfo, nullptr, &fb);
-    return std::make_pair(fb, waitSemaphore);
+    return fb;
 }
 
 void CRenderPassVk::UpdateImageInitialAccess(CAccessTracker& tracker)

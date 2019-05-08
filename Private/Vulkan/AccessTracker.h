@@ -93,6 +93,9 @@ public:
 
     void DeployAllBarriers(VkCommandBuffer cmdBuffer);
 
+    // Merge two access trackers together, and record the intermediate transitions
+    void Merge(VkCommandBuffer cmdBuffer, const CAccessTracker& rhs);
+
     void Clear()
     {
         ImageFirstAccess.clear();

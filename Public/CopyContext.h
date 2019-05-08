@@ -58,14 +58,6 @@ struct CImageResolve
     CExtent3D Extent;
 };
 
-class CCommandList
-{
-public:
-    typedef std::shared_ptr<CCommandList> Ref;
-
-    virtual ~CCommandList() = default;
-};
-
 class ICopyContext
 {
 public:

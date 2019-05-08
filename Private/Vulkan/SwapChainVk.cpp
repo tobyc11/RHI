@@ -14,11 +14,11 @@ CPhysicalDeviceSwapChainCaps CSwapChainVk::GetDeviceSwapChainCaps(CDeviceVk& dev
     caps.PhysicalDevice = device.GetVkPhysicalDevice();
 
     VkBool32 presentSupported;
-    vkGetPhysicalDeviceSurfaceSupportKHR(caps.PhysicalDevice, device.GetQueueFamily(QT_GRAPHICS),
+    vkGetPhysicalDeviceSurfaceSupportKHR(caps.PhysicalDevice, device.GetQueueFamily(EQueueType::Render),
                                          surface, &presentSupported);
     if (presentSupported)
     {
-        caps.PresentQueue = device.GetQueueFamily(QT_GRAPHICS);
+        caps.PresentQueue = device.GetQueueFamily(EQueueType::Render);
     }
     else
     {
@@ -217,13 +217,10 @@ bool CSwapChainVk::AcquireNextImage()
 {
     VkSemaphore imageAvailableSemaphore;
     VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    VkResult result;
-    result =
-        vkCreateSemaphore(Parent.GetVkDevice(), &semaphoreInfo, nullptr, &imageAvailableSemaphore);
-    if (result != VK_SUCCESS)
-        throw CRHIRuntimeError("failed to create semaphores!");
+    VK(vkCreateSemaphore(Parent.GetVkDevice(), &semaphoreInfo, nullptr, &imageAvailableSemaphore));
 
     uint32_t imageIndex;
+    VkResult result;
     result = vkAcquireNextImageKHR(Parent.GetVkDevice(), SwapChainHandle, UINT64_MAX,
                                    imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
     if (result != VK_SUCCESS)
@@ -233,7 +230,9 @@ bool CSwapChainVk::AcquireNextImage()
         return false;
     }
 
-    AcquiredImages.push(std::make_pair(imageIndex, imageAvailableSemaphore));
+    CAcquiredImageInfo imageInfo;
+    imageInfo.AvailableSemaphore = imageAvailableSemaphore;
+    AcquiredImages.push(std::make_pair(imageIndex, imageInfo));
     std::static_pointer_cast<CSwapChainImageVk>(ProxyImage)
         ->InitializeAccess(0, 0, VK_IMAGE_LAYOUT_UNDEFINED);
     return true;
@@ -241,20 +240,24 @@ bool CSwapChainVk::AcquireNextImage()
 
 void CSwapChainVk::Present(const CSwapChainPresentInfo& info)
 {
-    auto ctx = std::static_pointer_cast<CCommandContextVk>(Parent.GetImmediateContext());
-    VkSemaphore renderJobDone = ctx->GetSignalSemaphore();
-    ctx->Flush(false, true);
+    Parent.GetDefaultRenderQueue()->SubmitFrame();
+
+    auto& imageInfo = AcquiredImages.front();
+    VkSemaphore waitSemaphore = imageInfo.second.RenderSemaphore;
 
     VkPresentInfoKHR presentInfo = { VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
     presentInfo.waitSemaphoreCount = 1;
-    presentInfo.pWaitSemaphores = &renderJobDone;
+    presentInfo.pWaitSemaphores = &waitSemaphore;
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = &SwapChainHandle;
-    presentInfo.pImageIndices = &AcquiredImages.front().first;
+    presentInfo.pImageIndices = &imageInfo.first;
     presentInfo.pResults = nullptr;
-    vkQueuePresentKHR(Parent.GetVkQueue(QT_GRAPHICS), &presentInfo);
+    vkQueuePresentKHR(Parent.GetVkQueue(EQueueType::Render), &presentInfo);
 
-    vkDestroySemaphore(Parent.GetVkDevice(), AcquiredImages.front().second, nullptr);
+    // Waiter cleans up the semaphore
+    Parent.AddPostFrameCleanup([waitSemaphore](CDeviceVk& p){
+        vkDestroySemaphore(p.GetVkDevice(), waitSemaphore, nullptr);
+    });
     AcquiredImages.pop();
 }
 

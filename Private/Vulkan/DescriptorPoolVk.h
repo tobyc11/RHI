@@ -35,7 +35,7 @@ class CDescriptorSetLayoutVk;
 class CDescriptorPoolVk
 {
 public:
-    CDescriptorPoolVk(CDescriptorSetLayoutVk* layout);
+    explicit CDescriptorPoolVk(const CDescriptorSetLayoutVk* layout);
 
     ~CDescriptorPoolVk();
 
@@ -44,7 +44,7 @@ public:
     VkResult FreeDescriptorSet(VkDescriptorSet descriptorSet);
 
 private:
-    CDescriptorSetLayoutVk* Layout = nullptr;
+    const CDescriptorSetLayoutVk* Layout = nullptr;
     std::vector<VkDescriptorPoolSize> PoolSizes;
     std::vector<VkDescriptorPool> Pools;
     std::vector<uint32_t> AllocatedSets;

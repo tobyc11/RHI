@@ -26,7 +26,7 @@
 namespace RHI
 {
 
-CDescriptorPoolVk::CDescriptorPoolVk(CDescriptorSetLayoutVk* layout)
+CDescriptorPoolVk::CDescriptorPoolVk(const CDescriptorSetLayoutVk* layout)
     : Layout(layout)
 {
     // Get the layout's binding information.

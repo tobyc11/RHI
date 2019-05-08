@@ -1,4 +1,6 @@
 #pragma once
+#include "CommandQueue.h"
+#include "DescriptorSet.h"
 #include "Pipeline.h"
 #include "RHIException.h"
 #include "RenderContext.h"
@@ -45,6 +47,8 @@ public:
 
     // Shader and resource binding
     CShaderModule::Ref CreateShaderModule(size_t size, const void* pCode);
+    CDescriptorSetLayout::Ref CreateDescriptorSetLayout(const std::vector<CDescriptorSetLayoutBinding>& bindings);
+    CPipelineLayout::Ref CreatePipelineLayout(const std::vector<CDescriptorSetLayout::Ref>& setLayouts);
 
     // States
     CRenderPass::Ref CreateRenderPass(const CRenderPassDesc& desc);
@@ -52,12 +56,7 @@ public:
     CSampler::Ref CreateSampler(const CSamplerDesc& desc);
 
     // Command submission
-    IImmediateContext::Ref GetImmediateContext();
-    CCommandList::Ref CreateCommandList();
-    ICopyContext::Ref CreateCopyContext(CCommandList& cmdList);
-    IComputeContext::Ref CreateComputeContext(CCommandList& cmdList);
-    IRenderPassContext::Ref CreateRenderPassContext(CCommandList& cmdList, CRenderPass& renderPass,
-                                                    const std::vector<CClearValue>& clearValues);
+    CCommandQueue::Ref CreateCommandQueue();
 
     // Windowing system interface
     CSwapChain::Ref CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format);

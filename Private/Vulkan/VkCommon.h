@@ -23,9 +23,11 @@ namespace RHI
 {
 
 class CDeviceVk;
+class CCommandQueueVk;
 class CCommandContextVk;
 class CImageVk;
 class CImageViewVk;
+class CPipelineVk;
 
 #define VK(fn)                                                                                     \
     do                                                                                             \
@@ -36,6 +38,6 @@ class CImageViewVk;
             printf("%s\n", __FUNCSIG__);                                                           \
             throw CRHIRuntimeError("Vulkan call did not return VK_SUCCESS");                       \
         }                                                                                          \
-    } while (0);
+    } while (0)
 
 }

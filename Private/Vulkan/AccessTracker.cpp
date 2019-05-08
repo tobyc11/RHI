@@ -129,6 +129,27 @@ void CAccessTracker::DeployAllBarriers(VkCommandBuffer cmdBuffer)
     }
 }
 
+void CAccessTracker::Merge(VkCommandBuffer cmdBuffer, const CAccessTracker& rhs)
+{
+    for (const auto& iter : rhs.ImageFirstAccess)
+    {
+        if (iter.second.ImageLayout == VK_IMAGE_LAYOUT_UNDEFINED
+            || iter.second.ImageLayout == VK_IMAGE_LAYOUT_PREINITIALIZED)
+            continue;
+        auto* image = iter.first.Image;
+        const auto& range = iter.first.Range;
+        const auto& access = iter.second;
+        HandleImageFirstAccess(image, range, access);
+        HandleImageLastAccess(cmdBuffer, image, range, access);
+    }
+    for (const auto& iter : ImageLastAccess)
+    {
+        auto* image = iter.first.Image;
+        const auto& range = iter.first.Range;
+        HandleImageLastAccess(VK_NULL_HANDLE, image, range, iter.second);
+    }
+}
+
 void CAccessTracker::HandleImageFirstAccess(CImageVk* image, const CImageSubresourceRange& range,
                                             const CAccessRecord& record)
 {
@@ -379,4 +400,5 @@ void CAccessTracker::HandleImageLastAccess(VkCommandBuffer cmdBuffer, CImageVk* 
     // We insert the whole range if we've found no overlapping
     ImageLastAccess.emplace(CImageRange { image, range }, record);
 }
+
 }

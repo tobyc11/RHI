@@ -31,11 +31,11 @@ namespace RHI
 
 struct BindingInfo
 {
-    VkDeviceSize offset;
-    VkDeviceSize range;
+    VkDeviceSize Offset;
+    VkDeviceSize Range;
     VkBuffer BufferHandle;
-    CImageViewVk* pImageView;
-    VkSampler sampler;
+    CImageViewVk* ImageView;
+    VkSampler SamplerHandle;
 };
 
 typedef std::map<uint32_t, BindingInfo> ArrayBindings;
@@ -46,7 +46,7 @@ struct SetBindings
     bool bDirty;
 };
 
-class ResourceBindings
+class CResourceBindings
 {
 public:
     bool IsDirty() const { return bDirty; }

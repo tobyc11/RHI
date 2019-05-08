@@ -1,4 +1,5 @@
 #pragma once
+#include "DescriptorSet.h"
 #include "PipelineStateDesc.h"
 #include "RenderPass.h"
 #include "ShaderModule.h"
@@ -24,6 +25,7 @@ struct CPipelineDesc
     CMultisampleStateDesc MultisampleState;
     CDepthStencilDesc DepthStencilState;
     CBlendDesc BlendState;
+    CPipelineLayout::Ref Layout;
     CRenderPass::WeakRef RenderPass;
     uint32_t Subpass = 0;
 

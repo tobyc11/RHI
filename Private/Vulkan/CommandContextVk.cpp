@@ -1,15 +1,133 @@
 #include "CommandContextVk.h"
-#include "DeferredContextVk.h"
-#include "DeviceVk.h"
+#include "CommandQueueVk.h"
+#include "BufferVk.h"
+#include "DescriptorSetVk.h"
+#include "ImageVk.h"
+#include "ImageViewVk.h"
 #include "PipelineVk.h"
 #include "RenderPassVk.h"
-#include "SamplerVk.h"
-#include "VkHelpers.h"
-#include <cstring>
-#include <unordered_set>
+#include "DeviceVk.h"
 
 namespace RHI
 {
+
+CRenderPassContextVk::CRenderPassContextVk(CCommandListVk::Ref cmdList, CRenderPass::Ref renderPass,
+                                           std::vector<CClearValue> clearValues)
+    : CmdList(std::move(cmdList)), RenderPass(std::move(renderPass)), ClearValues(std::move(clearValues))
+{
+    if (CmdList->IsCommitted())
+        throw CRHIRuntimeError("A committed command list can no longer be recorded into");
+    if (CmdList->bIsContextActive)
+        throw CRHIRuntimeError("One context is already active on this command list");
+    CmdList->bIsContextActive = true;
+
+    auto rpImpl = std::static_pointer_cast<CRenderPassVk>(RenderPass);
+    SubpassInfos.resize(rpImpl->GetSubpassCount());
+}
+
+CRenderPassContextVk::~CRenderPassContextVk()
+{
+    if (CmdList && CmdList->bIsContextActive)
+    {
+        throw CRHIRuntimeError("Command Context destroyed before FinishRecording");
+    }
+}
+
+uint32_t CRenderPassContextVk::MakeSubpassInfo(uint32_t subpass)
+{
+    std::lock_guard<tc::FSpinLock> lk(SpinLock);
+    uint32_t ret = static_cast<uint32_t>(SubpassInfos[subpass].size());
+    SubpassInfos[subpass].emplace_back();
+    return ret;
+}
+
+IRenderContext::Ref CRenderPassContextVk::CreateRenderContext(uint32_t subpass)
+{
+    std::lock_guard<tc::FSpinLock> lk(SpinLock);
+    return std::make_shared<CCommandContextVk>(shared_from_this(), subpass);
+}
+
+void CRenderPassContextVk::FinishRecording()
+{
+    static_assert(sizeof(VkClearValue) == sizeof(CClearValue), "Struct sizes mismatch");
+    // TODO: make sure all those render contexts are done
+
+    CCommandListSection section;
+    auto& allocator = CmdList->GetQueue().GetCmdBufferAllocator();
+    section.CmdBuffer = allocator.Allocate(false);
+    // Record all those render lists
+    {
+        section.CmdBuffer->BeginRecording(VK_NULL_HANDLE, 0);
+        VkCommandBuffer handle = section.CmdBuffer->GetHandle();
+
+        auto renderPass = std::static_pointer_cast<CRenderPassVk>(RenderPass);
+        std::vector<VkSemaphore> waitSemaphores;
+        auto framebuffer = renderPass->MakeFramebuffer(waitSemaphores, section.SignalSemaphores);
+        for (VkSemaphore semaphore : waitSemaphores)
+        {
+            section.WaitSemaphores.push_back(semaphore);
+            section.WaitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
+
+            CmdList->GetQueue().GetDevice().AddPostFrameCleanup([semaphore](CDeviceVk& p){
+                vkDestroySemaphore(p.GetVkDevice(), semaphore, nullptr);
+            });
+        }
+
+        VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+        beginInfo.renderPass = renderPass->GetHandle();
+        beginInfo.framebuffer = framebuffer;
+        beginInfo.renderArea = renderPass->GetArea();
+        beginInfo.clearValueCount = ClearValues.size();
+        beginInfo.pClearValues = reinterpret_cast<VkClearValue*>(ClearValues.data());
+        vkCmdBeginRenderPass(handle, &beginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+        for (uint32_t i = 0; i < renderPass->GetSubpassCount(); i++)
+        {
+            std::vector<VkCommandBuffer> secondaryBuffers;
+            for (auto& subpassInfo : SubpassInfos[i])
+            {
+                auto& bufferRef = subpassInfo.SecondaryBuffer;
+                secondaryBuffers.emplace_back(bufferRef->GetHandle());
+                section.SecondaryBuffers.emplace_back(std::move(bufferRef));
+
+                section.AccessTracker.Merge(VK_NULL_HANDLE, subpassInfo.AccessTracker);
+            }
+
+            vkCmdExecuteCommands(handle, secondaryBuffers.size(), secondaryBuffers.data());
+
+            if (i == renderPass->GetSubpassCount() - 1)
+                vkCmdEndRenderPass(handle);
+            else
+                vkCmdNextSubpass(handle, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+        }
+        section.CmdBuffer->EndRecording();
+    }
+    CmdList->Sections.emplace_back(std::move(section));
+
+    // Grab a new command buffer to write all the resource transitions
+    if (CmdList->Sections.size() > 1)
+    {
+        CmdList->Sections.back().PreCmdBuffer = CmdList->GetQueue().GetCmdBufferAllocator().Allocate();
+        CmdList->Sections[0].AccessTracker
+            .Merge(CmdList->Sections.back().PreCmdBuffer->GetHandle(), CmdList->Sections.back().AccessTracker);
+        CmdList->Sections.back().AccessTracker.Clear();
+    }
+
+    // Drop reference
+    CmdList->bIsContextActive = false;
+    CmdList.reset();
+}
+
+void CCommandContextVk::Convert(VkOffset2D& dst, const COffset2D& src)
+{
+    static_assert(sizeof(VkOffset2D) == sizeof(COffset2D), "struct size mismatch");
+    dst = reinterpret_cast<const VkOffset2D&>(src);
+}
+
+void CCommandContextVk::Convert(VkExtent2D& dst, const CExtent2D& src)
+{
+    static_assert(sizeof(VkExtent2D) == sizeof(CExtent2D), "struct size mismatch");
+    dst = reinterpret_cast<const VkExtent2D&>(src);
+}
 
 void CCommandContextVk::Convert(VkOffset3D& dst, const COffset3D& src)
 {
@@ -69,49 +187,58 @@ void CCommandContextVk::Convert(VkImageBlit& dst, const CImageBlit& src)
     Convert(dst.dstOffsets[1], src.DstOffsets[1]);
 }
 
-CCommandContextVk::CCommandContextVk(CDeviceVk& p, EQueueType queueType, ECommandContextKind kind)
-    : Parent(p)
-    , QueueType(queueType)
-    , Kind(kind)
+void CCommandContextVk::Convert(VkViewport& dst, const CViewportDesc& src)
 {
-    BeginBuffer();
+    dst.x = src.X;
+    dst.y = src.Y;
+    dst.width = src.Width;
+    dst.height = src.Height;
+    dst.minDepth = src.MinDepth;
+    dst.maxDepth = src.MaxDepth;
+}
+
+void CCommandContextVk::Convert(VkRect2D& dst, const CRect2D& src)
+{
+    Convert(dst.offset, src.Offset);
+    Convert(dst.extent, src.Extent);
+}
+
+CCommandContextVk::CCommandContextVk(const CCommandListVk::Ref& cmdList)
+    : CmdList(cmdList)
+{
+    if (CmdList->IsCommitted())
+        throw CRHIRuntimeError("A committed command list can no longer be recorded into");
+    if (CmdList->bIsContextActive)
+        throw CRHIRuntimeError("One context is already active on this command list");
+    CmdList->bIsContextActive = true;
+
+    CCommandListSection section;
+    auto& allocator = cmdList->GetQueue().GetCmdBufferAllocator();
+    section.CmdBuffer = allocator.Allocate(false);
+    section.CmdBuffer->BeginRecording(nullptr, 0);
+    CmdList->Sections.emplace_back(std::move(section));
+}
+
+CCommandContextVk::CCommandContextVk(const CRenderPassContextVk::Ref& renderPassContext, uint32_t subpass)
+{
+    RenderPassContext = renderPassContext;
+    SubpassIndex = subpass;
+    CmdBufferIndex = renderPassContext->MakeSubpassInfo(subpass);
+
+    auto& allocator = renderPassContext->GetCmdList()->GetQueue().GetCmdBufferAllocator();
+    auto cmdBuffer = allocator.Allocate(true);
+    cmdBuffer->BeginRecording(renderPassContext->GetRenderPass(), subpass);
+
+    auto& subpassInfo = renderPassContext->GetSubpassInfo(subpass, CmdBufferIndex);
+    subpassInfo.SecondaryBuffer = std::move(cmdBuffer);
 }
 
 CCommandContextVk::~CCommandContextVk()
 {
-    EndBuffer();
-    vkDestroySemaphore(Parent.GetVkDevice(), SignalSemaphore, nullptr);
-}
-
-void CCommandContextVk::BeginBuffer()
-{
-    if (Kind != ECommandContextKind::Immediate)
+    if (CmdList && CmdList->bIsContextActive)
     {
-        CmdBuffer =
-            Parent.GetSubmissionTracker().GetTransientPool(QueueType)->AllocateCommandBuffer();
+        throw CRHIRuntimeError("Command Context destroyed before FinishRecording");
     }
-    else
-    {
-        CmdBuffer = Parent.GetSubmissionTracker()
-                        .GetCurrentFrameResources()
-                        .FrameCmdPool->AllocateCommandBuffer();
-    }
-
-    CmdBuffer->BeginRecording(nullptr, 0);
-
-    AccessTracker.Clear();
-    WaitSemaphores.clear();
-    WaitStages.clear();
-    VkSemaphoreCreateInfo semaphoreInfo = { VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    VK(vkCreateSemaphore(Parent.GetVkDevice(), &semaphoreInfo, nullptr, &SignalSemaphore));
-
-    DeferredDeleters.clear();
-}
-
-void CCommandContextVk::EndBuffer()
-{
-    CmdBuffer->EndRecording();
-    CurrBindings.Reset();
 }
 
 void CCommandContextVk::TransitionImage(CImage& image, EResourceState newState)
@@ -122,17 +249,16 @@ void CCommandContextVk::TransitionImage(CImage& image, EResourceState newState)
     range.BaseMipLevel = 0;
     range.LayerCount = imageImpl.GetArrayLayers();
     range.LevelCount = imageImpl.GetMipLevels();
-    AccessTracker.TransitionImageState(CmdBuffer->GetHandle(), &imageImpl, range, newState,
-                                       QueueType == QT_TRANSFER);
+    AccessTracker().TransitionImageState(CmdBuffer(), &imageImpl, range, newState,
+                                         CmdList->GetQueue().GetType() == EQueueType::Copy);
 }
 
-void CCommandContextVk::CopyBuffer(CBuffer& src, CBuffer& dst,
-                                   const std::vector<CBufferCopy>& regions)
+void CCommandContextVk::CopyBuffer(CBuffer& src, CBuffer& dst, const std::vector<CBufferCopy>& regions)
 {
     static_assert(sizeof(CBufferCopy) == sizeof(VkBufferCopy), "struct size mismatch");
-    const VkBufferCopy* r = reinterpret_cast<const VkBufferCopy*>(regions.data());
+    const auto* r = reinterpret_cast<const VkBufferCopy*>(regions.data());
 
-    vkCmdCopyBuffer(CmdBuffer->GetHandle(), static_cast<CBufferVk&>(src).Buffer,
+    vkCmdCopyBuffer(CmdBuffer(), static_cast<CBufferVk&>(src).Buffer,
                     static_cast<CBufferVk&>(dst).Buffer, static_cast<uint32_t>(regions.size()), r);
 }
 
@@ -149,7 +275,7 @@ void CCommandContextVk::CopyImage(CImage& src, CImage& dst, const std::vector<CI
     TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdCopyImage(CmdBuffer->GetHandle(), srcImpl.GetVkImage(),
+    vkCmdCopyImage(CmdBuffer(), srcImpl.GetVkImage(),
                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImpl.GetVkImage(),
                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(r.size()), r.data());
 }
@@ -166,7 +292,7 @@ void CCommandContextVk::CopyBufferToImage(CBuffer& src, CImage& dst,
     }
     TransitionImage(dst, EResourceState::CopyDest);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdCopyBufferToImage(CmdBuffer->GetHandle(), static_cast<CBufferVk&>(src).Buffer,
+    vkCmdCopyBufferToImage(CmdBuffer(), static_cast<CBufferVk&>(src).Buffer,
                            dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                            static_cast<uint32_t>(vkregions.size()), vkregions.data());
 }
@@ -183,7 +309,7 @@ void CCommandContextVk::CopyImageToBuffer(CImage& src, CBuffer& dst,
     }
     TransitionImage(src, EResourceState::CopySource);
     auto& srcImpl = static_cast<CImageVk&>(src);
-    vkCmdCopyImageToBuffer(CmdBuffer->GetHandle(), srcImpl.GetVkImage(),
+    vkCmdCopyImageToBuffer(CmdBuffer(), srcImpl.GetVkImage(),
                            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            static_cast<CBufferVk&>(dst).Buffer,
                            static_cast<uint32_t>(vkregions.size()), vkregions.data());
@@ -203,7 +329,7 @@ void CCommandContextVk::BlitImage(CImage& src, CImage& dst, const std::vector<CI
     TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdBlitImage(CmdBuffer->GetHandle(), srcImpl.GetVkImage(),
+    vkCmdBlitImage(CmdBuffer(), srcImpl.GetVkImage(),
                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImpl.GetVkImage(),
                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(r.size()), r.data(),
                    VkCast(filter));
@@ -223,413 +349,170 @@ void CCommandContextVk::ResolveImage(CImage& src, CImage& dst,
     TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdResolveImage(CmdBuffer->GetHandle(), srcImpl.GetVkImage(),
+    vkCmdResolveImage(CmdBuffer(), srcImpl.GetVkImage(),
                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImpl.GetVkImage(),
                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(r.size()),
                       r.data());
 }
 
-void CCommandContextVk::FinishRecording()
+void CCommandContextVk::BindComputePipeline(CPipeline& pipeline)
 {
-    throw CRHIException("Can't call this on an immediate context");
+    auto& impl = static_cast<CPipelineVk&>(pipeline);
+    CurrPipeline = &impl;
+    vkCmdBindPipeline(CmdBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE, impl.GetHandle());
 }
 
-void CCommandContextVk::BindPipeline(CPipeline& pipeline)
+void CCommandContextVk::BindComputeDescriptorSet(uint32_t set, CDescriptorSet& descriptorSet)
 {
-    CurrPipeline = static_cast<CPipelineVk*>(&pipeline);
-    vkCmdBindPipeline(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-                      CurrPipeline->GetHandle());
-
-    // Bind the default viewport and scissors
-    auto renderArea = CurrRenderPass->GetArea();
-    VkViewport vp;
-    vp.x = 0;
-    vp.y = 0;
-    vp.width = static_cast<float>(renderArea.extent.width);
-    vp.height = static_cast<float>(renderArea.extent.height);
-    vp.minDepth = 0.0f;
-    vp.maxDepth = 1.0f;
-    vkCmdSetViewport(CmdBuffer->GetHandle(), 0, 1, &vp);
-    vkCmdSetScissor(CmdBuffer->GetHandle(), 0, 1, &renderArea);
-    const float blendFactor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-    vkCmdSetBlendConstants(CmdBuffer->GetHandle(), blendFactor);
-    vkCmdSetStencilReference(CmdBuffer->GetHandle(), VK_STENCIL_FRONT_AND_BACK, 0);
-}
-
-void CCommandContextVk::BindBuffer(CBuffer& buffer, size_t offset, size_t range, uint32_t set,
-                                   uint32_t binding, uint32_t index)
-{
-    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
-    CurrBindings.BindBuffer(bufferImpl.Buffer, offset, range, set, binding, index);
-}
-
-void CCommandContextVk::BindBufferView(CBufferView& bufferView, uint32_t set, uint32_t binding,
-                                       uint32_t index)
-{
-    throw "unimplemented";
-}
-
-void CCommandContextVk::BindConstants(const void* pData, size_t size, uint32_t set,
-                                      uint32_t binding, uint32_t index)
-{
-    auto* bufferImpl = Parent.GetHugeConstantBuffer();
-    size_t offset;
-    size_t minAlignment = Parent.GetVkLimits().minUniformBufferOffsetAlignment;
-    void* bufferData = bufferImpl->Allocate(size, minAlignment, offset);
-    memcpy(bufferData, pData, size);
-    CurrBindings.BindBuffer(bufferImpl->GetHandle(), offset, size, set, binding, index);
-}
-
-void CCommandContextVk::BindImageView(CImageView& imageView, uint32_t set, uint32_t binding,
-                                      uint32_t index)
-{
-    auto& impl = static_cast<CImageViewVk&>(imageView);
-    CurrBindings.BindImageView(&impl, VK_NULL_HANDLE, set, binding, index);
-}
-
-void CCommandContextVk::BindSampler(CSampler& sampler, uint32_t set, uint32_t binding,
-                                    uint32_t index)
-{
-    CurrBindings.BindSampler(static_cast<CSamplerVk&>(sampler).Sampler, set, binding, index);
+    // TODO: access tracking
+    auto& impl = static_cast<CDescriptorSetVk&>(descriptorSet);
+    VkDescriptorSet setHandle = impl.GetHandle(true);
+    vkCmdBindDescriptorSets(CmdBuffer(),
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            CurrPipeline->GetPipelineLayout(),
+                            set,
+                            1,
+                            &setHandle,
+                            0,
+                            nullptr);
 }
 
 void CCommandContextVk::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
 {
-    throw "unimplemented";
+    vkCmdDispatch(CmdBuffer(), groupCountX, groupCountY, groupCountZ);
+}
+
+void CCommandContextVk::DispatchIndirect(CBuffer& buffer, size_t offset)
+{
+    auto& impl = static_cast<CBufferVk&>(buffer);
+    vkCmdDispatchIndirect(CmdBuffer(), impl.Buffer, offset);
+}
+
+void CCommandContextVk::BindRenderPipeline(CPipeline& pipeline)
+{
+    auto& impl = static_cast<CPipelineVk&>(pipeline);
+    CurrPipeline = &impl;
+    vkCmdBindPipeline(CmdBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS, impl.GetHandle());
+}
+
+void CCommandContextVk::SetViewport(const CViewportDesc& viewportDesc)
+{
+    VkViewport vp;
+    Convert(vp, viewportDesc);
+    vkCmdSetViewport(CmdBuffer(), 0, 1, &vp);
+}
+
+void CCommandContextVk::SetScissor(const CRect2D& scissor)
+{
+    VkRect2D region;
+    Convert(region, scissor);
+    vkCmdSetScissor(CmdBuffer(), 0, 1, &region);
+}
+
+void CCommandContextVk::SetBlendConstants(const std::array<float, 4>& blendConstants)
+{
+    vkCmdSetBlendConstants(CmdBuffer(), blendConstants.data());
+}
+
+void CCommandContextVk::SetStencilReference(uint32_t reference)
+{
+    vkCmdSetStencilReference(CmdBuffer(), VK_STENCIL_FRONT_AND_BACK, reference);
+}
+
+void CCommandContextVk::BindRenderDescriptorSet(uint32_t set, CDescriptorSet& descriptorSet)
+{
+    // TODO: access tracking
+    auto& impl = static_cast<CDescriptorSetVk&>(descriptorSet);
+    VkDescriptorSet setHandle = impl.GetHandle(true);
+    vkCmdBindDescriptorSets(CmdBuffer(),
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            CurrPipeline->GetPipelineLayout(),
+                            set,
+                            1,
+                            &setHandle,
+                            0,
+                            nullptr);
 }
 
 void CCommandContextVk::BindIndexBuffer(CBuffer& buffer, size_t offset, EFormat format)
 {
-    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
-    vkCmdBindIndexBuffer(CmdBuffer->GetHandle(), bufferImpl.Buffer, offset,
-                         format == EFormat::R16_UINT ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32);
+    auto& impl = static_cast<CBufferVk&>(buffer);
+    VkIndexType indexType = format == EFormat::R16_UINT ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
+    vkCmdBindIndexBuffer(CmdBuffer(), impl.Buffer, offset, indexType);
 }
 
 void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer& buffer, size_t offset)
 {
-    auto& bufferImpl = static_cast<CBufferVk&>(buffer);
-    // On macOS, size_t is 32 bit and VkDeviceSize is 64
-    VkDeviceSize offsetDevice = offset;
-    vkCmdBindVertexBuffers(CmdBuffer->GetHandle(), binding, 1, &bufferImpl.Buffer, &offsetDevice);
+    auto& impl = static_cast<CBufferVk&>(buffer);
+    // Workaround for systems where size_t != 8
+    VkDeviceSize vkOffset = offset;
+    vkCmdBindVertexBuffers(CmdBuffer(), binding, 1, &impl.Buffer, &vkOffset);
 }
 
-void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
-                             uint32_t firstInstance)
+void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
 {
-    ResolveBindings();
-    vkCmdDraw(CmdBuffer->GetHandle(), vertexCount, instanceCount, firstVertex, firstInstance);
+    vkCmdDraw(CmdBuffer(), vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
-void CCommandContextVk::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
-                                    uint32_t firstIndex, int32_t vertexOffset,
+void CCommandContextVk::DrawIndexed(uint32_t indexCount,
+                                    uint32_t instanceCount,
+                                    uint32_t firstIndex,
+                                    int32_t vertexOffset,
                                     uint32_t firstInstance)
 {
-    ResolveBindings();
-    vkCmdDrawIndexed(CmdBuffer->GetHandle(), indexCount, instanceCount, firstIndex, vertexOffset,
-                     firstInstance);
+    vkCmdDrawIndexed(CmdBuffer(), indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 }
 
-void CCommandContextVk::ExecuteCommandList(CCommandList& commandList)
+void CCommandContextVk::DrawIndirect(CBuffer& buffer, size_t offset, uint32_t drawCount, uint32_t stride)
 {
-    if (IsInRenderPass())
-        throw CRHIRuntimeError(
-            "CCommandContextVk::ExecuteCommandList can only be called outside of a render pass");
-
-    auto& impl = static_cast<CCommandListVk&>(commandList);
-    if (impl.IsRecording())
-        throw CRHIRuntimeError("Cannot execute a command list currently being recorded into");
-
-    Flush(false);
-
-    // Create a new command buffer for all the resource transitions
-    std::unique_ptr<CCommandBufferVk> preCmdBufferRef;
-    preCmdBufferRef = Parent.GetSubmissionTracker()
-                          .GetCurrentFrameResources()
-                          .FrameCmdPool->AllocateCommandBuffer();
-    impl.Submit(Parent.GetSubmissionTracker(), std::move(preCmdBufferRef));
+    VkBuffer vkBuffer = static_cast<CBufferVk&>(buffer).Buffer;
+    vkCmdDrawIndirect(CmdBuffer(), vkBuffer, offset, drawCount, stride);
 }
 
-void CCommandContextVk::Flush(bool wait, bool isPresent)
+void CCommandContextVk::DrawIndexedIndirect(CBuffer& buffer, size_t offset, uint32_t drawCount, uint32_t stride)
 {
-    EndBuffer();
+    VkBuffer vkBuffer = static_cast<CBufferVk&>(buffer).Buffer;
+    vkCmdDrawIndirect(CmdBuffer(), vkBuffer, offset, drawCount, stride);
+}
 
-    // Can't flush a deferred context
-    assert(Kind == ECommandContextKind::Immediate || Kind == ECommandContextKind::Transient);
-
-    // Create a new command buffer for all the resource transitions
-    std::unique_ptr<CCommandBufferVk> preCmdBufferRef;
-    if (Kind == ECommandContextKind::Immediate)
+void CCommandContextVk::FinishRecording()
+{
+    if (CmdList)
     {
-        preCmdBufferRef = Parent.GetSubmissionTracker()
-                              .GetCurrentFrameResources()
-                              .FrameCmdPool->AllocateCommandBuffer();
+        CmdList->Sections.back().CmdBuffer->EndRecording();
+
+        // Grab a new command buffer to write all the resource transitions
+        if (CmdList->Sections.size() > 1)
+        {
+            CmdList->Sections.back().PreCmdBuffer = CmdList->GetQueue().GetCmdBufferAllocator().Allocate();
+            CmdList->Sections[0].AccessTracker
+                .Merge(CmdList->Sections.back().PreCmdBuffer->GetHandle(), CmdList->Sections.back().AccessTracker);
+            CmdList->Sections.back().AccessTracker.Clear();
+        }
+
+        // Drop reference
+        CmdList->bIsContextActive = false;
+        CmdList.reset();
     }
     else
     {
-        preCmdBufferRef =
-            Parent.GetSubmissionTracker().GetTransientPool(QueueType)->AllocateCommandBuffer();
+        RenderPassContext->GetSubpassInfo(SubpassIndex, CmdBufferIndex).SecondaryBuffer->EndRecording();
+        RenderPassContext.reset();
     }
-    preCmdBufferRef->BeginRecording(nullptr, 0);
-    AccessTracker.DeployAllBarriers(preCmdBufferRef->GetHandle());
-    preCmdBufferRef->EndRecording();
-    AccessTracker.Clear();
-
-    auto& tracker = Parent.GetSubmissionTracker();
-    // Bye bye command buffer, I hope you all well on the GPU side
-    std::vector<std::unique_ptr<CCommandBufferVk>> cmdBuffers;
-    cmdBuffers.emplace_back(std::move(preCmdBufferRef));
-    cmdBuffers.emplace_back(std::move(CmdBuffer));
-    CGPUJobInfo job(std::move(cmdBuffers), isPresent, std::move(WaitSemaphores),
-                    std::move(WaitStages), { SignalSemaphore }, QueueType,
-                    std::move(DeferredDeleters));
-    tracker.SubmitJob(std::move(job), wait);
-
-    // Small regression: the signal semaphore might get destroyed before vkQueueSubmit if max frames
-    // in flight == 1
-    BeginBuffer();
 }
 
-void CCommandContextVk::BeginRenderPass(CRenderPass& renderPass,
-                                        const std::vector<CClearValue>& clearValues)
+CAccessTracker& CCommandContextVk::AccessTracker()
 {
-    if (CurrRenderPass)
-        throw CRHIRuntimeError("A render pass is already bound to the context");
-
-    auto& rpImpl = static_cast<CRenderPassVk&>(renderPass);
-    auto framebufferInfo = rpImpl.MakeFramebuffer();
-    VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-    beginInfo.renderPass = rpImpl.GetHandle();
-    beginInfo.framebuffer = framebufferInfo.first;
-    // If the framebuffer comes with a semaphore, put it into the wait list
-    if (framebufferInfo.second != VK_NULL_HANDLE)
-    {
-        WaitSemaphores.emplace_back(framebufferInfo.second);
-        WaitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
-    }
-    std::vector<VkClearValue> clear;
-    size_t i = 0;
-    for (const auto& c : clearValues)
-    {
-        if (i >= rpImpl.GetAttachmentDesc().size())
-            break;
-
-        VkClearValue vkClear;
-        auto aspect = GetImageAspectFlags(rpImpl.GetAttachmentDesc()[i].format);
-        if (aspect & VK_IMAGE_ASPECT_COLOR_BIT)
-            memcpy(vkClear.color.int32, c.ColorInt32, sizeof(vkClear.color));
-        else
-        {
-            vkClear.depthStencil.depth = c.Depth;
-            vkClear.depthStencil.stencil = c.Stencil;
-        }
-        clear.push_back(vkClear);
-        i++;
-    }
-    beginInfo.clearValueCount = static_cast<uint32_t>(clear.size());
-    beginInfo.pClearValues = clear.data();
-    beginInfo.renderArea = rpImpl.GetArea();
-
-    vkCmdBeginRenderPass(CmdBuffer->GetHandle(), &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-
-    VkDevice device = Parent.GetVkDevice();
-    VkFramebuffer fb = framebufferInfo.first;
-    DeferredDeleters.emplace_back([device, fb]() { vkDestroyFramebuffer(device, fb, nullptr); });
-
-    rpImpl.UpdateImageInitialAccess(AccessTracker);
-    CurrRenderPass = &rpImpl;
+    if (CmdList)
+        return CmdList->Sections.back().AccessTracker;
+    return RenderPassContext->GetSubpassInfo(SubpassIndex, CmdBufferIndex).AccessTracker;
 }
 
-void CCommandContextVk::NextSubpass() { throw "unimplemented"; }
-
-void CCommandContextVk::EndRenderPass()
+VkCommandBuffer CCommandContextVk::CmdBuffer()
 {
-    vkCmdEndRenderPass(CmdBuffer->GetHandle());
-    CurrRenderPass->UpdateImageFinalAccess(AccessTracker);
-    CurrRenderPass = nullptr;
-}
-
-void CCommandContextVk::ResolveBindings()
-{
-    if (CurrPipeline)
-    {
-        std::set<uint32_t> setConflicts;
-        const auto& pipelineSets = CurrPipeline->GetBoundSets();
-        for (const auto& set : pipelineSets)
-        {
-            // For given set index, if descriptor set layouts differ, store set index in conflicts
-            // map.
-            if (BoundDescriptorSetLayouts.find(set) != BoundDescriptorSetLayouts.end())
-            {
-                if (BoundDescriptorSetLayouts.at(set) != CurrPipeline->GetSetLayout(set))
-                    setConflicts.emplace(set);
-            }
-        }
-
-        // Remove entries from boundDescriptorSetLayouts that do not exist in pipeline.
-        auto it = BoundDescriptorSetLayouts.begin();
-        while (it != BoundDescriptorSetLayouts.end())
-        {
-            if (!CurrPipeline->GetSetLayout(it->first))
-                it = BoundDescriptorSetLayouts.erase(it);
-            else
-                ++it;
-        }
-
-        // Evaluate whether a new descriptor set must be created and bound.
-        if (CurrBindings.IsDirty() || !setConflicts.empty())
-        {
-            // Reset resource bindings dirty bit.
-            CurrBindings.ClearDirtyBit();
-
-            // Iterate over each set binding.
-            for (auto& setBindingsItr : CurrBindings.GetSetBindings())
-            {
-                // Skip if no bindings having changes.
-                auto set = setBindingsItr.first;
-                auto& setBindings = setBindingsItr.second;
-                if (!setBindings.bDirty && (setConflicts.find(set) == setConflicts.end()))
-                    continue;
-
-                // Reset set binding dirty flag.
-                setBindings.bDirty = false;
-
-                // Retrieve the descriptor set layout for the given set index.
-                // If set index is not used with bound pipeline, skip it.
-                auto descriptorSetLayout = CurrPipeline->GetSetLayout(set);
-                if (!descriptorSetLayout)
-                    continue;
-
-                // Allocate a new descriptor set. (TODO! Log or report error if allocation fails)
-                auto descriptorSet = descriptorSetLayout->AllocateDescriptorSet();
-                if (!descriptorSet)
-                    continue;
-
-                // Set descriptor set layout as active for given set index.
-                BoundDescriptorSetLayouts[set] = descriptorSetLayout;
-
-                // Update all of the set's bindings.
-                std::vector<VkDescriptorBufferInfo> bufferInfos;
-                std::vector<VkDescriptorImageInfo> imageInfos;
-                std::vector<VkWriteDescriptorSet> descriptorWrites;
-                for (const auto& bindingItr : setBindings.Bindings)
-                {
-                    // Get layout binding for given binding index.
-                    auto binding = bindingItr.first;
-                    VkDescriptorSetLayoutBinding* layoutBinding = nullptr;
-                    if (!descriptorSetLayout->GetLayoutBinding(binding, &layoutBinding))
-                        continue;
-
-                    // Determine binding's access and pipeline stage flags.
-                    auto shaderStages = static_cast<VkShaderStageFlags>(layoutBinding->stageFlags);
-
-                    VkPipelineStageFlags stageMask = 0;
-                    if (shaderStages & VK_SHADER_STAGE_VERTEX_BIT)
-                        stageMask |= VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
-                    if (shaderStages & VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT)
-                        stageMask |= VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT;
-                    if (shaderStages & VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT)
-                        stageMask |= VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT;
-                    if (shaderStages & VK_SHADER_STAGE_GEOMETRY_BIT)
-                        stageMask |= VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT;
-                    if (shaderStages & VK_SHADER_STAGE_FRAGMENT_BIT)
-                        stageMask |= VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-                    if (shaderStages & VK_SHADER_STAGE_COMPUTE_BIT)
-                        stageMask |= VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-
-                    // Iterate over all array elements.
-                    auto& arrayElementBindings = bindingItr.second;
-                    for (const auto& arrayElementItr : arrayElementBindings)
-                    {
-                        // Get the binding info.
-                        auto arrayElement = arrayElementItr.first;
-                        auto& bindingInfo = arrayElementItr.second;
-
-                        // Fill in descriptor set write structure.
-                        VkWriteDescriptorSet dsWrite = {};
-                        dsWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                        dsWrite.dstSet = descriptorSet;
-                        dsWrite.dstBinding = binding;
-                        dsWrite.dstArrayElement = arrayElement;
-                        dsWrite.descriptorType = layoutBinding->descriptorType;
-                        dsWrite.descriptorCount = 1;
-
-                        // Handle buffers.
-                        if (bindingInfo.BufferHandle)
-                        {
-                            VkDescriptorBufferInfo bufferInfo = {};
-                            bufferInfo.buffer = bindingInfo.BufferHandle;
-                            bufferInfo.offset = bindingInfo.offset;
-                            bufferInfo.range = bindingInfo.range;
-                            bufferInfos.push_back(bufferInfo);
-                            dsWrite.pBufferInfo =
-                                reinterpret_cast<const VkDescriptorBufferInfo*>(bufferInfos.size());
-                        }
-                        // Handle images and samplers.
-                        else if (bindingInfo.pImageView || bindingInfo.sampler != VK_NULL_HANDLE)
-                        {
-                            VkDescriptorImageInfo imageInfo = {};
-
-                            if (bindingInfo.sampler != VK_NULL_HANDLE)
-                            {
-                                imageInfo.sampler =
-                                    reinterpret_cast<VkSampler>(bindingInfo.sampler);
-                            }
-
-                            if (bindingInfo.pImageView)
-                            {
-                                imageInfo.imageView = bindingInfo.pImageView->GetVkImageView();
-                                imageInfo.imageLayout =
-                                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL; // TODO: fixme
-                                if (GetImageAspectFlags(bindingInfo.pImageView->GetFormat())
-                                    != VK_IMAGE_ASPECT_COLOR_BIT)
-                                    imageInfo.imageLayout =
-                                        VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-
-                                auto image = bindingInfo.pImageView->GetImage();
-                                AccessTracker.TransitionImage(
-                                    CmdBuffer->GetHandle(), image.get(),
-                                    bindingInfo.pImageView->GetResourceRange(),
-                                    VK_ACCESS_SHADER_READ_BIT, stageMask, imageInfo.imageLayout);
-                            }
-
-                            imageInfos.push_back(imageInfo);
-                            dsWrite.pImageInfo =
-                                reinterpret_cast<const VkDescriptorImageInfo*>(imageInfos.size());
-                        }
-
-                        // Add the descriptor set write to the list.
-                        descriptorWrites.push_back(dsWrite);
-                    }
-                }
-
-                // Iterate back over descriptorWrites array and fix pointer addresses.
-                for (auto& dswrite : descriptorWrites)
-                {
-                    if (dswrite.pBufferInfo)
-                        dswrite.pBufferInfo =
-                            &bufferInfos[reinterpret_cast<uint64_t>(dswrite.pBufferInfo) - 1];
-                    else if (dswrite.pImageInfo)
-                        dswrite.pImageInfo =
-                            &imageInfos[reinterpret_cast<uint64_t>(dswrite.pImageInfo) - 1];
-                }
-
-                // Update descriptor set.
-                vkUpdateDescriptorSets(Parent.GetVkDevice(),
-                                       static_cast<uint32_t>(descriptorWrites.size()),
-                                       descriptorWrites.data(), 0, nullptr);
-
-                // Store descriptor set binding for current stream encoder position.
-                vkCmdBindDescriptorSets(CmdBuffer->GetHandle(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                        CurrPipeline->GetPipelineLayout(), set, 1, &descriptorSet,
-                                        0, nullptr);
-
-                // Add descriptor set to transient resource list.
-                DeferredDeleters.push_back([descriptorSetLayout, descriptorSet]() -> void {
-                    descriptorSetLayout->FreeDescriptorSet(descriptorSet);
-                });
-            }
-        }
-    }
+    if (CmdList)
+        return CmdList->Sections.back().CmdBuffer->GetHandle();
+    return RenderPassContext->GetSubpassInfo(SubpassIndex, CmdBufferIndex).SecondaryBuffer->GetHandle();
 }
 
 }

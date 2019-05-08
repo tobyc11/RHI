@@ -1,28 +1,8 @@
-//
-// Copyright (c) 2018 Advanced Micro Devices, Inc. All rights reserved.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is
-// furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included in
-// all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-// THE SOFTWARE.
-//
 #pragma once
-
-#include "DescriptorSetLayoutCacheVk.h"
+#include "DescriptorSet.h"
+#include "DescriptorPoolVk.h"
 #include "VkCommon.h"
+#include "VkHelpers.h"
 
 #include <thread>
 #include <unordered_map>
@@ -31,36 +11,48 @@
 namespace RHI
 {
 
-class CDescriptorPoolVk;
-
-class CDescriptorSetLayoutVk
+class CDescriptorSetLayoutVk : public CDescriptorSetLayout
 {
 public:
-    CDescriptorSetLayoutVk(CDeviceVk& p, const DescriptorSetLayoutHash& hash,
-                           const std::vector<CPipelineResource>& setResources);
+    typedef std::shared_ptr<CDescriptorSetLayoutVk> Ref;
 
-    ~CDescriptorSetLayoutVk();
+    CDescriptorSetLayoutVk(CDeviceVk& p, const std::vector<CDescriptorSetLayoutBinding>& bindings);
+    ~CDescriptorSetLayoutVk() override;
 
-    CDeviceVk& GetDevice() { return Parent; }
+    // Allocate and create a descriptor set from this layout
+    CDescriptorSet::Ref CreateDescriptorSet() override;
 
+    CDeviceVk& GetDevice() const { return Parent; }
     VkDescriptorSetLayout GetHandle() const { return Handle; }
+    const std::vector<VkDescriptorSetLayoutBinding>& GetBindings() const { return Bindings; }
 
-    std::vector<VkDescriptorSetLayoutBinding> GetBindings() { return Bindings; }
-
-    const DescriptorSetLayoutHash& GetHash() const { return Hash; }
-
-    bool GetLayoutBinding(uint32_t bindingIndex, VkDescriptorSetLayoutBinding** pBinding);
-
-    VkDescriptorSet AllocateDescriptorSet();
-
-    VkResult FreeDescriptorSet(VkDescriptorSet descriptorSet);
+    const std::unique_ptr<CDescriptorPoolVk>& GetDescriptorPool() const;
 
 private:
     CDeviceVk& Parent;
-    DescriptorSetLayoutHash Hash;
     VkDescriptorSetLayout Handle = VK_NULL_HANDLE;
     std::vector<VkDescriptorSetLayoutBinding> Bindings;
-    std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> BindingsLookup;
-    CDescriptorPoolVk* DescriptorPool;
+
+    mutable std::unique_ptr<CDescriptorPoolVk> Pool;
 };
+
+class CPipelineLayoutVk : public CPipelineLayout
+{
+public:
+    typedef std::shared_ptr<CPipelineLayoutVk> Ref;
+
+    CPipelineLayoutVk(CDeviceVk& p, const std::vector<CDescriptorSetLayout::Ref>& setLayouts);
+    ~CPipelineLayoutVk() override;
+
+    CDeviceVk& GetDevice() const { return Parent; }
+    VkPipelineLayout GetHandle() const { return Handle; }
+    const std::vector<CDescriptorSetLayoutVk::Ref>& GetSetLayouts() const { return SetLayouts; }
+
+private:
+    CDeviceVk& Parent;
+    std::vector<CDescriptorSetLayoutVk::Ref> SetLayouts;
+
+    VkPipelineLayout Handle;
+};
+
 }

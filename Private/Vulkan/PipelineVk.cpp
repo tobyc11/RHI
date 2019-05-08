@@ -129,65 +129,15 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     AddShaderModule(desc.DS, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
     AddShaderModule(desc.HS, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 
-    std::array<std::vector<CPipelineResource>, kMaxBoundDescriptorSets> setBindings;
-
-    // Catagorize each binding by set id
-    for (const auto& pair : ResourceByBinding)
-    {
-        const auto& resource = pair.second;
-        auto& set = setBindings[resource.Set];
-        set.push_back(resource);
-        BoundSets.insert(resource.Set);
-    }
-
-    // Create descriptor set layout
-    SetLayouts.fill(nullptr);
-    for (uint32_t set = 0; set < kMaxBoundDescriptorSets; set++)
-    {
-        if (BoundSets.find(set) == BoundSets.end())
-            continue;
-        CDescriptorSetLayoutVk* layout = nullptr;
-        Parent.GetDescriptorSetLayoutCache()->CreateLayout(set, setBindings[set], &layout);
-        SetLayouts[set] = layout;
-    }
-
-    // Create pipeline layout
-    std::vector<VkDescriptorSetLayout> setLayouts;
-    for (auto it : SetLayouts)
-        if (it)
-            setLayouts.push_back(it->GetHandle());
-
-    std::vector<VkPushConstantRange> pushConstantRanges;
-    for (auto it : ResourceByBinding)
-    {
-        const auto& resource = it.second;
-        if (resource.ResourceType == EPipelineResourceType::PushConstantBuffer)
-        {
-            VkPushConstantRange range = {};
-            range.stageFlags = static_cast<VkShaderStageFlags>(resource.Stages);
-            range.offset = resource.Offset;
-            range.size = resource.Size;
-            pushConstantRanges.push_back(range);
-        }
-    }
-
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo = {};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
-    pipelineLayoutInfo.pSetLayouts = setLayouts.data();
-    pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
-    pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
-    VkResult result =
-        vkCreatePipelineLayout(Parent.GetVkDevice(), &pipelineLayoutInfo, nullptr, &PipelineLayout);
-    if (result != VK_SUCCESS)
-        throw CRHIRuntimeError("Vulkan pipeline layout create failed");
+    assert(desc.Layout);
+    PipelineLayout = std::static_pointer_cast<CPipelineLayoutVk>(desc.Layout);
 
     // Create a pipeline create info and fill in handles
     auto renderpass = std::static_pointer_cast<CRenderPassVk>(desc.RenderPass.lock());
     VkGraphicsPipelineCreateInfo pipelineInfo = { VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
     pipelineInfo.stageCount = static_cast<uint32_t>(StageInfos.size());
     pipelineInfo.pStages = StageInfos.data();
-    pipelineInfo.layout = PipelineLayout;
+    pipelineInfo.layout = GetPipelineLayout();
     pipelineInfo.renderPass = renderpass->GetHandle();
     pipelineInfo.subpass = desc.Subpass;
 
@@ -329,27 +279,20 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     dynamicStateInfo.pDynamicStates = dynamicStates.data();
     pipelineInfo.pDynamicState = &dynamicStateInfo;
 
-    result = vkCreateGraphicsPipelines(Parent.GetVkDevice(), Parent.GetPipelineCache(), 1,
-                                       &pipelineInfo, nullptr, &PipelineHandle);
-    if (result != VK_SUCCESS)
-        throw CRHIRuntimeError("Failed to create vulkan pipeline");
+    VK(vkCreateGraphicsPipelines(Parent.GetVkDevice(), Parent.GetPipelineCache(), 1,
+                                       &pipelineInfo, nullptr, &PipelineHandle));
 }
 
 CPipelineVk::~CPipelineVk()
 {
     if (PipelineHandle != VK_NULL_HANDLE)
         vkDestroyPipeline(Parent.GetVkDevice(), PipelineHandle, nullptr);
-
-    if (PipelineLayout != VK_NULL_HANDLE)
-        vkDestroyPipelineLayout(Parent.GetVkDevice(), PipelineLayout, nullptr);
-
-    for (auto it : SetLayouts)
-        Parent.GetDescriptorSetLayoutCache()->DestroyLayout(it);
 }
 
-const std::set<uint32_t>& CPipelineVk::GetBoundSets() const { return BoundSets; }
-
-CDescriptorSetLayoutVk* CPipelineVk::GetSetLayout(uint32_t set) const { return SetLayouts[set]; }
+VkPipelineLayout CPipelineVk::GetPipelineLayout() const
+{
+    return PipelineLayout->GetHandle();
+}
 
 void CPipelineVk::AddShaderModule(CShaderModule::Ref shaderModule, VkShaderStageFlagBits stage)
 {

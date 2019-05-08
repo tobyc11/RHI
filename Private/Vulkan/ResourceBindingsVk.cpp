@@ -3,39 +3,39 @@
 namespace RHI
 {
 
-void ResourceBindings::Clear(uint32_t set) { BindingsBySet.erase(set); }
+void CResourceBindings::Clear(uint32_t set) { BindingsBySet.erase(set); }
 
-void ResourceBindings::Reset()
+void CResourceBindings::Reset()
 {
     BindingsBySet.clear();
     bDirty = false;
 }
 
-void ResourceBindings::BindBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
+void CResourceBindings::BindBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
                                   uint32_t set, uint32_t binding, uint32_t arrayElement)
 {
     Bind(set, binding, arrayElement,
          BindingInfo { offset, range, buffer, VK_NULL_HANDLE, VK_NULL_HANDLE });
 }
 
-void ResourceBindings::BindImageView(CImageViewVk* pImageView, VkSampler sampler, uint32_t set,
+void CResourceBindings::BindImageView(CImageViewVk* pImageView, VkSampler sampler, uint32_t set,
                                      uint32_t binding, uint32_t arrayElement)
 {
     Bind(set, binding, arrayElement, BindingInfo { 0, 0, VK_NULL_HANDLE, pImageView, sampler });
 }
 
-void ResourceBindings::BindSampler(VkSampler sampler, uint32_t set, uint32_t binding,
+void CResourceBindings::BindSampler(VkSampler sampler, uint32_t set, uint32_t binding,
                                    uint32_t arrayElement)
 {
     Bind(set, binding, arrayElement, BindingInfo { 0, 0, VK_NULL_HANDLE, VK_NULL_HANDLE, sampler });
 }
 
-void ResourceBindings::Bind(uint32_t set, uint32_t binding, uint32_t arrayElement,
+void CResourceBindings::Bind(uint32_t set, uint32_t binding, uint32_t arrayElement,
                             const BindingInfo& info)
 {
     // If resource is being removed from binding, erase the entry.
-    if (info.BufferHandle == VK_NULL_HANDLE && info.pImageView == VK_NULL_HANDLE
-        && info.sampler == VK_NULL_HANDLE)
+    if (info.BufferHandle == VK_NULL_HANDLE && info.ImageView == VK_NULL_HANDLE
+        && info.SamplerHandle == VK_NULL_HANDLE)
     {
         auto it = BindingsBySet.find(set);
         if (it != BindingsBySet.end())
@@ -92,7 +92,7 @@ void ResourceBindings::Bind(uint32_t set, uint32_t binding, uint32_t arrayElemen
         }
     }
 
-    // Always mark ResourceBindings as dirty for fast checking during descriptor set binding.
+    // Always mark CResourceBindings as dirty for fast checking during descriptor set binding.
     bDirty = true;
 }
 

@@ -59,6 +59,20 @@ CShaderModule::Ref CDeviceBase<TDerived>::CreateShaderModule(size_t size, const 
 }
 
 template <typename TDerived>
+CDescriptorSetLayout::Ref
+CDeviceBase<TDerived>::CreateDescriptorSetLayout(const std::vector<CDescriptorSetLayoutBinding>& bindings)
+{
+    return static_cast<TDerived*>(this)->CreateDescriptorSetLayout(bindings);
+}
+
+template <typename TDerived>
+CPipelineLayout::Ref
+CDeviceBase<TDerived>::CreatePipelineLayout(const std::vector<CDescriptorSetLayout::Ref>& setLayouts)
+{
+    return static_cast<TDerived*>(this)->CreatePipelineLayout(setLayouts);
+}
+
+template <typename TDerived>
 CRenderPass::Ref CDeviceBase<TDerived>::CreateRenderPass(const CRenderPassDesc& desc)
 {
     return static_cast<TDerived*>(this)->CreateRenderPass(desc);
@@ -76,34 +90,10 @@ CSampler::Ref CDeviceBase<TDerived>::CreateSampler(const CSamplerDesc& desc)
     return static_cast<TDerived*>(this)->CreateSampler(desc);
 }
 
-template <typename TDerived> IImmediateContext::Ref CDeviceBase<TDerived>::GetImmediateContext()
-{
-    return static_cast<TDerived*>(this)->GetImmediateContext();
-}
-
-template <typename TDerived> CCommandList::Ref CDeviceBase<TDerived>::CreateCommandList()
-{
-    return static_cast<TDerived*>(this)->CreateCommandList();
-}
-
 template <typename TDerived>
-ICopyContext::Ref CDeviceBase<TDerived>::CreateCopyContext(CCommandList& cmdList)
+CCommandQueue::Ref CDeviceBase<TDerived>::CreateCommandQueue()
 {
-    return static_cast<TDerived*>(this)->CreateCopyContext(cmdList);
-}
-
-template <typename TDerived>
-IComputeContext::Ref CDeviceBase<TDerived>::CreateComputeContext(CCommandList& cmdList)
-{
-    return static_cast<TDerived*>(this)->CreateComputeContext(cmdList);
-}
-
-template <typename TDerived>
-IRenderPassContext::Ref
-CDeviceBase<TDerived>::CreateRenderPassContext(CCommandList& cmdList, CRenderPass& renderPass,
-                                               const std::vector<CClearValue>& clearValues)
-{
-    return static_cast<TDerived*>(this)->CreateRenderPassContext(cmdList, renderPass, clearValues);
+    return static_cast<TDerived*>(this)->CreateCommandQueue();
 }
 
 template <typename TDerived>

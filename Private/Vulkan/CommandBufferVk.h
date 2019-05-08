@@ -1,20 +1,15 @@
 #pragma once
+#include "CommandQueue.h"
 #include "RenderPass.h"
 #include "VkCommon.h"
 #include <SpinLock.h>
 #include <memory>
 #include <queue>
+#include <stack>
+#include <vector>
 
 namespace RHI
 {
-
-enum EQueueType
-{
-    QT_TRANSFER,
-    QT_COMPUTE,
-    QT_GRAPHICS,
-    NUM_QUEUE_TYPES
-};
 
 class CCommandBufferVk;
 
@@ -46,10 +41,27 @@ private:
     bool bCanAllocateFromFreedList;
 };
 
+// Purpose is to allow dynamic assignment of pools
+class CCommandBufferAllocatorVk
+{
+public:
+    CCommandBufferAllocatorVk(CDeviceVk& deviceVk, EQueueType queueType);
+
+    std::unique_ptr<CCommandBufferVk> Allocate(bool secondary = false);
+
+    void UnlockPool(size_t index);
+
+private:
+    tc::FSpinLock Mutex;
+    static const size_t kNumPools = 12;
+    std::vector<CCommandPoolVk::Ref> Pools;
+    std::stack<size_t> AvailablePools;
+};
+
 class CCommandBufferVk
 {
 public:
-    CCommandBufferVk(CCommandPoolVk::Ref pool, bool secondary = false);
+    explicit CCommandBufferVk(CCommandPoolVk::Ref pool, bool secondary = false);
     CCommandBufferVk(CCommandPoolVk::Ref pool, VkCommandBuffer handle, bool secondary = false);
     ~CCommandBufferVk();
 
@@ -61,6 +73,11 @@ private:
     CCommandPoolVk::Ref CommandPool;
     VkCommandBuffer Handle;
     bool bIsSecondary;
+
+    // If this command buffer is allocated from an allocator, we need to unlock the pool
+    friend class CCommandBufferAllocatorVk;
+    CCommandBufferAllocatorVk* BufferAllocator = nullptr;
+    size_t AllocatorPoolIndex = 0;
 };
 
 }

@@ -1,26 +1,52 @@
 #pragma once
-#include "BufferVk.h"
-#include "CommandBufferVk.h"
+#include "CommandListVk.h"
 #include "CopyContext.h"
-#include "ImageVk.h"
-#include "PipelineVk.h"
+#include "ComputeContext.h"
 #include "RenderContext.h"
-#include "ResourceBindingsVk.h"
-#include "SubmissionTracker.h"
-#include "VkCommon.h"
-#include <memory>
-#include <mutex>
-#include <vector>
+#include "DescriptorSet.h"
+#include <SpinLock.h>
 
 namespace RHI
 {
 
-class CRenderPassVk;
-
-// A general command buffer recorder
-class CCommandContextVk : public std::enable_shared_from_this<CCommandContextVk>,
-                          public IImmediateContext
+struct CSubpassInfo
 {
+    std::unique_ptr<CCommandBufferVk> SecondaryBuffer;
+    CAccessTracker AccessTracker;
+};
+
+class CRenderPassContextVk : public std::enable_shared_from_this<CRenderPassContextVk>, public IRenderPassContext
+{
+public:
+    typedef std::shared_ptr<CRenderPassContextVk> Ref;
+
+    CRenderPassContextVk(CCommandListVk::Ref cmdList, CRenderPass::Ref renderPass,
+                         std::vector<CClearValue> clearValues);
+    ~CRenderPassContextVk() override;
+
+    CCommandListVk::Ref GetCmdList() const { return CmdList; }
+    CRenderPass::Ref GetRenderPass() const { return RenderPass; }
+    CSubpassInfo& GetSubpassInfo(uint32_t subpass, uint32_t index) { return SubpassInfos[subpass][index]; }
+    uint32_t MakeSubpassInfo(uint32_t subpass);
+
+    IRenderContext::Ref CreateRenderContext(uint32_t subpass) override;
+    void FinishRecording() override;
+
+private:
+    // The target we are recording into
+    CCommandListVk::Ref CmdList;
+    CRenderPass::Ref RenderPass;
+    std::vector<CClearValue> ClearValues;
+
+    // Holds info for render contexts to write to. Cleared when FinishRecording
+    tc::FSpinLock SpinLock;
+    std::vector<std::vector<CSubpassInfo>> SubpassInfos;
+};
+
+class CCommandContextVk : public ICopyContext, public IComputeContext, public IRenderContext
+{
+    static void Convert(VkOffset2D& dst, const COffset2D& src);
+    static void Convert(VkExtent2D& dst, const CExtent2D& src);
     static void Convert(VkOffset3D& dst, const COffset3D& src);
     static void Convert(VkExtent3D& dst, const CExtent3D& src);
     static void Convert(VkImageSubresourceLayers& dst, const CImageSubresourceLayers& src);
@@ -28,81 +54,68 @@ class CCommandContextVk : public std::enable_shared_from_this<CCommandContextVk>
     static void Convert(VkImageResolve& dst, const CImageResolve& src);
     static void Convert(VkBufferImageCopy& dst, const CBufferImageCopy& src);
     static void Convert(VkImageBlit& dst, const CImageBlit& src);
+    static void Convert(VkViewport& dst, const CViewportDesc& src);
+    static void Convert(VkRect2D& dst, const CRect2D& src);
 
 public:
     typedef std::shared_ptr<CCommandContextVk> Ref;
 
-    CCommandContextVk(CDeviceVk& p, EQueueType queueType, ECommandContextKind kind);
-    virtual ~CCommandContextVk();
-
-    void BeginBuffer();
-    void EndBuffer();
-
-    // For internal use only
-    VkCommandBuffer GetBuffer() const { return CmdBuffer->GetHandle(); }
-    VkSemaphore GetSignalSemaphore() const { return SignalSemaphore; }
-    bool IsInRenderPass() const { return CurrRenderPass; }
+    explicit CCommandContextVk(const CCommandListVk::Ref& cmdList);
+    explicit CCommandContextVk(const CRenderPassContextVk::Ref& renderPassContext, uint32_t subpass);
+    ~CCommandContextVk() override;
 
     void TransitionImage(CImage& image, EResourceState newState);
+    VkCommandBuffer GetCmdBuffer() { return CmdBuffer(); }
 
     // Copy commands
-    void CopyBuffer(CBuffer& src, CBuffer& dst, const std::vector<CBufferCopy>& regions);
-    void CopyImage(CImage& src, CImage& dst, const std::vector<CImageCopy>& regions);
-    void CopyBufferToImage(CBuffer& src, CImage& dst, const std::vector<CBufferImageCopy>& regions);
-    void CopyImageToBuffer(CImage& src, CBuffer& dst, const std::vector<CBufferImageCopy>& regions);
-    void BlitImage(CImage& src, CImage& dst, const std::vector<CImageBlit>& regions,
-                   EFilter filter);
-    void ResolveImage(CImage& src, CImage& dst, const std::vector<CImageResolve>& regions);
-    void FinishRecording();
+    void CopyBuffer(CBuffer& src, CBuffer& dst, const std::vector<CBufferCopy>& regions) override;
+    void CopyImage(CImage& src, CImage& dst, const std::vector<CImageCopy>& regions) override;
+    void CopyBufferToImage(CBuffer& src, CImage& dst, const std::vector<CBufferImageCopy>& regions) override;
+    void CopyImageToBuffer(CImage& src, CBuffer& dst, const std::vector<CBufferImageCopy>& regions) override;
+    void BlitImage(CImage& src, CImage& dst, const std::vector<CImageBlit>& regions, EFilter filter) override;
+    void ResolveImage(CImage& src, CImage& dst, const std::vector<CImageResolve>& regions) override;
 
-    // Compute/Render commands
-    void BindPipeline(CPipeline& pipeline);
-    void BindBuffer(CBuffer& buffer, size_t offset, size_t range, uint32_t set, uint32_t binding,
-                    uint32_t index);
-    void BindBufferView(CBufferView& bufferView, uint32_t set, uint32_t binding, uint32_t index);
-    void BindConstants(const void* pData, size_t size, uint32_t set, uint32_t binding,
-                       uint32_t index);
-    void BindImageView(CImageView& imageView, uint32_t set, uint32_t binding, uint32_t index);
-    void BindSampler(CSampler& sampler, uint32_t set, uint32_t binding, uint32_t index);
-    void Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ);
+    // Compute commands
+    void BindComputePipeline(CPipeline& pipeline) override;
+    void BindComputeDescriptorSet(uint32_t set, CDescriptorSet& descriptorSet) override;
+    void Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) override;
+    void DispatchIndirect(CBuffer& buffer, size_t offset) override;
 
     // Render commands
-    void BindIndexBuffer(CBuffer& buffer, size_t offset, EFormat format);
-    void BindVertexBuffer(uint32_t binding, CBuffer& buffer, size_t offset);
+    void BindRenderPipeline(CPipeline& pipeline) override;
+    void SetViewport(const CViewportDesc& viewportDesc) override;
+    void SetScissor(const CRect2D& scissor) override;
+    void SetBlendConstants(const std::array<float, 4>& blendConstants) override;
+    void SetStencilReference(uint32_t reference) override;
+    void BindRenderDescriptorSet(uint32_t set, CDescriptorSet& descriptorSet) override;
+    void BindIndexBuffer(CBuffer& buffer, size_t offset, EFormat format) override;
+    void BindVertexBuffer(uint32_t binding, CBuffer& buffer, size_t offset) override;
     void Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
-              uint32_t firstInstance);
-    void DrawIndexed(uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex,
-                     int32_t vertexOffset, uint32_t firstInstance);
+              uint32_t firstInstance) override;
+    void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
+                     uint32_t firstIndex, int32_t vertexOffset,
+                     uint32_t firstInstance) override;
+    void DrawIndirect(CBuffer& buffer, size_t offset, uint32_t drawCount, uint32_t stride) override;
+    void DrawIndexedIndirect(CBuffer& buffer, size_t offset, uint32_t drawCount, uint32_t stride) override;
 
-    // Immediate context commands
-    void ExecuteCommandList(CCommandList& commandList);
-    void Flush(bool wait = false) { Flush(wait, false); }
-    void Flush(bool wait, bool isPresent);
-    void BeginRenderPass(CRenderPass& renderPass, const std::vector<CClearValue>& clearValues);
-    void NextSubpass();
-    void EndRenderPass();
+    // Finish this context and save the commands into the command list
+    void FinishRecording() override;
+
+protected:
+    CAccessTracker& AccessTracker();
+    VkCommandBuffer CmdBuffer();
 
 private:
-    void ResolveBindings();
+    // The target we are recording into
+    CCommandListVk::Ref CmdList;
 
-private:
-    CDeviceVk& Parent;
-    ECommandContextKind Kind;
-    EQueueType QueueType;
+    // The target when we are a render pass
+    CRenderPassContextVk::Ref RenderPassContext;
+    uint32_t SubpassIndex;
+    uint32_t CmdBufferIndex;
 
-    std::unique_ptr<CCommandBufferVk> CmdBuffer;
-
-    // Render states kept track of
-    CAccessTracker AccessTracker;
-    CRenderPassVk* CurrRenderPass = nullptr;
-
+    // Temporary states
     CPipelineVk* CurrPipeline = nullptr;
-    ResourceBindings CurrBindings;
-    std::map<uint32_t, CDescriptorSetLayoutVk*> BoundDescriptorSetLayouts;
-    std::vector<std::function<void()>> DeferredDeleters;
-    std::vector<VkSemaphore> WaitSemaphores;
-    std::vector<VkPipelineStageFlags> WaitStages;
-    VkSemaphore SignalSemaphore = VK_NULL_HANDLE;
 };
 
-} /* namespace RHI */
+}

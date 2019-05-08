@@ -25,7 +25,7 @@ public:
     uint32_t GetSubpassCount() const { return 1; }
     uint32_t SubpassColorAttachmentCount(uint32_t subpass) { return ColorAttachmentCount; }
 
-    std::pair<VkFramebuffer, VkSemaphore> MakeFramebuffer();
+    VkFramebuffer MakeFramebuffer(std::vector<VkSemaphore>& outWaitSemaphores, std::vector<VkSemaphore>& outSignalSemaphores);
     void UpdateImageInitialAccess(CAccessTracker& tracker);
     void UpdateImageFinalAccess(CAccessTracker& tracker);
 

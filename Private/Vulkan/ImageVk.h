@@ -21,7 +21,7 @@ public:
 
     // Access tracking for barrier deduction
     void InitializeAccess(VkAccessFlags access, VkPipelineStageFlags stages, VkImageLayout layout);
-    /// Transitoin a subset of this image to new access record. Inserts the barriers into cmdBuffer
+    /// Transition a subset of this image to new access record. Inserts the barriers into cmdBuffer
     void TransitionAccess(VkCommandBuffer cmdBuffer, const CImageSubresourceRange& range,
                           const CAccessRecord& accessRecord);
     /// Doesn't do any transition, but updates the LastAccess map

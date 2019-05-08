@@ -3,8 +3,9 @@
 
 #include "BufferVk.h"
 #include "CommandContextVk.h"
-#include "DescriptorSetLayoutCacheVk.h"
+#include "DescriptorSet.h"
 #include "VkCommon.h"
+#include "CommandQueueVk.h"
 
 #include <mutex>
 #include <queue>
@@ -17,7 +18,7 @@ class CDeviceVk : public CDevice
 public:
     typedef std::shared_ptr<CDeviceVk> Ref;
 
-    CDeviceVk(EDeviceCreateHints hints);
+    explicit CDeviceVk(EDeviceCreateHints hints);
     ~CDeviceVk() override;
 
     CImage::Ref InternalCreateImage(VkImageType type, EFormat format, EImageUsageFlags usage,
@@ -42,11 +43,8 @@ public:
 
     // Shader and resource binding
     CShaderModule::Ref CreateShaderModule(size_t size, const void* pCode);
-    // CDescriptorSetLayout::Ref CreateDescriptorSetLayout(const CDescriptorSetLayoutDesc& desc);
-    // CPipelineLayout::Ref CreatePipelineLayout(const CPipelineLayoutDesc& desc);
-
-    // CDescriptorPool::Ref CreateDescriptorPool();
-    // CDescriptorSet::Ref CreateDescriptorSet(CDescriptorPool& pool, CDescriptorSetLayout& layout);
+    CDescriptorSetLayout::Ref CreateDescriptorSetLayout(const std::vector<CDescriptorSetLayoutBinding>& bindings);
+    CPipelineLayout::Ref CreatePipelineLayout(const std::vector<CDescriptorSetLayout::Ref>& setLayouts);
 
     // States
     CRenderPass::Ref CreateRenderPass(const CRenderPassDesc& desc);
@@ -54,12 +52,8 @@ public:
     CSampler::Ref CreateSampler(const CSamplerDesc& desc);
 
     // Command submission
-    IImmediateContext::Ref GetImmediateContext();
-    CCommandList::Ref CreateCommandList();
-    ICopyContext::Ref CreateCopyContext(CCommandList& cmdList);
-    IComputeContext::Ref CreateComputeContext(CCommandList& cmdList);
-    IRenderPassContext::Ref CreateRenderPassContext(CCommandList& cmdList, CRenderPass& renderPass,
-                                                    const std::vector<CClearValue>& clearValues);
+    CCommandQueue::Ref CreateCommandQueue();
+    CCommandQueue::Ref CreateCommandQueue(EQueueType queueType);
 
     CSwapChain::Ref CreateSwapChain(const CPresentationSurfaceDesc& info, EFormat format);
     void WaitIdle();
@@ -73,26 +67,25 @@ public:
     // Otherwise transfer and graphics are the same queue
     bool IsTransferQueueSeparate() const
     {
-        return QueueFamilies[QT_TRANSFER] != QueueFamilies[QT_GRAPHICS];
+        return GetQueueFamily(EQueueType::Copy) != GetQueueFamily(EQueueType::Render);
     }
     bool IsComputeQueueSeparate() const
     {
-        return QueueFamilies[QT_COMPUTE] != QueueFamilies[QT_GRAPHICS];
+        return GetQueueFamily(EQueueType::Compute) != GetQueueFamily(EQueueType::Render);
     }
 
     // Getters for global objects
-    uint32_t GetQueueFamily(uint32_t type) const { return QueueFamilies[type]; }
-    VkQueue GetVkQueue(uint32_t type) const { return Queues[type][0]; }
+    uint32_t GetQueueFamily(EQueueType t) const { return QueueFamilies[static_cast<int>(t)]; }
+    VkQueue GetVkQueue(EQueueType t) const { return Queues[static_cast<int>(t)][0]; }
     VmaAllocator GetAllocator() const { return Allocator; }
 
-    CDescriptorSetLayoutCacheVk* GetDescriptorSetLayoutCache() const
-    {
-        return DescriptorSetLayoutCache.get();
-    }
     CPersistentMappedRingBuffer* GetHugeConstantBuffer() const { return HugeConstantBuffer.get(); }
-    CSubmissionTracker& GetSubmissionTracker() { return SubmissionTracker; }
-    CCommandContextVk::Ref MakeTransientContext(EQueueType qt);
     VkPipelineCache GetPipelineCache() const { return PipelineCache; }
+
+    CCommandQueueVk::Ref GetDefaultRenderQueue() const { return DefaultRenderQueue; }
+    CCommandQueueVk::Ref GetDefaultCopyQueue() const { return DefaultCopyQueue; }
+
+    void AddPostFrameCleanup(std::function<void(CDeviceVk&)> callback);
 
 private:
     VkDevice Device;
@@ -103,19 +96,17 @@ private:
     VkPhysicalDeviceProperties Properties;
 
     // Global objects
-    uint32_t QueueFamilies[NUM_QUEUE_TYPES];
-    std::vector<VkQueue> Queues[NUM_QUEUE_TYPES];
+    uint32_t QueueFamilies[static_cast<int>(EQueueType::Count)];
+    std::vector<VkQueue> Queues[static_cast<int>(EQueueType::Count)];
     VmaAllocator Allocator;
-    std::unique_ptr<CDescriptorSetLayoutCacheVk> DescriptorSetLayoutCache;
     std::unique_ptr<CPersistentMappedRingBuffer> HugeConstantBuffer;
-    CSubmissionTracker SubmissionTracker;
-    CCommandContextVk::Ref ImmediateContext;
     VkPipelineCache PipelineCache;
+    CCommandQueueVk::Ref DefaultRenderQueue;
+    CCommandQueueVk::Ref DefaultCopyQueue;
 
-    // Every job submission collects those, and deletes them when job is finished
-    friend class CSubmissionTracker;
-    std::vector<std::pair<VkBuffer, VmaAllocation>> PendingDeletionBuffers;
-    std::vector<std::pair<VkImage, VmaAllocation>> PendingDeletionImages;
+    friend class CCommandQueueVk; // Allow queues to grab cleanup functors
+    std::mutex DeviceMutex;
+    std::vector<std::function<void(CDeviceVk&)>> PostFrameCleanup;
 };
 
 } /* namespace RHI */

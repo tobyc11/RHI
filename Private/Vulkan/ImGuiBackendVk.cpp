@@ -59,8 +59,8 @@ void CRHIImGuiBackend::Init(CDevice::Ref device, CRenderPass::Ref renderPass)
     init_info.Instance = DeviceImpl->GetVkInstance();
     init_info.PhysicalDevice = DeviceImpl->GetVkPhysicalDevice();
     init_info.Device = DeviceImpl->GetVkDevice();
-    init_info.QueueFamily = DeviceImpl->GetQueueFamily(QT_GRAPHICS);
-    init_info.Queue = DeviceImpl->GetVkQueue(QT_GRAPHICS);
+    init_info.QueueFamily = DeviceImpl->GetQueueFamily(EQueueType::Render);
+    init_info.Queue = DeviceImpl->GetVkQueue(EQueueType::Render);
     init_info.PipelineCache = PipelineCache;
     init_info.DescriptorPool = DescriptorPool;
     init_info.Allocator = nullptr;
@@ -81,11 +81,13 @@ void CRHIImGuiBackend::NewFrame()
 {
     if (!bFontsUploaded)
     {
-        auto ctx = DeviceImpl->MakeTransientContext(QT_GRAPHICS);
-
-        ImGui_ImplVulkan_CreateFontsTexture(ctx->GetBuffer());
-
-        ctx->Flush(true); // TODO: might cause hitching
+        auto cmdList = DeviceImpl->GetDefaultRenderQueue()->CreateCommandList();
+        cmdList->Enqueue();
+        auto ctx = std::static_pointer_cast<CCommandContextVk>(cmdList->CreateCopyContext());
+        ImGui_ImplVulkan_CreateFontsTexture(ctx->GetCmdBuffer());
+        ctx->FinishRecording();
+        cmdList->Commit();
+        DeviceImpl->GetDefaultRenderQueue()->Finish();
         ImGui_ImplVulkan_InvalidateFontUploadObjects();
 
         bFontsUploaded = true;
@@ -97,8 +99,7 @@ void CRHIImGuiBackend::NewFrame()
 void CRHIImGuiBackend::RenderDrawData(ImDrawData* draw_data, IRenderContext& context)
 {
     auto& contextImpl = static_cast<CCommandContextVk&>(context);
-    assert(contextImpl.IsInRenderPass());
-    auto cmdBuffer = contextImpl.GetBuffer();
+    auto cmdBuffer = contextImpl.GetCmdBuffer();
     ImGui_ImplVulkan_RenderDrawData(draw_data, cmdBuffer);
 }
 

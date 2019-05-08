@@ -63,14 +63,18 @@ CBufferVk::CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const v
         vmaUnmapMemory(Parent.GetAllocator(), stagingAlloc);
 
         // Synchronously copy the content
-        auto ctx = Parent.MakeTransientContext(QT_TRANSFER);
-        auto cmdBuffer = ctx->GetBuffer();
+        auto cmdList = Parent.GetDefaultCopyQueue()->CreateCommandList();
+        cmdList->Enqueue();
+        auto ctx = std::static_pointer_cast<CCommandContextVk>(cmdList->CreateCopyContext());
+        auto cmdBuffer = ctx->GetCmdBuffer();
         VkBufferCopy copy;
         copy.srcOffset = 0;
         copy.dstOffset = 0;
         copy.size = size;
         vkCmdCopyBuffer(cmdBuffer, stagingBuffer, Buffer, 1, &copy);
-        ctx->Flush(true);
+        ctx->FinishRecording();
+        cmdList->Commit();
+        Parent.GetDefaultCopyQueue()->Finish();
 
         vmaDestroyBuffer(Parent.GetAllocator(), stagingBuffer, stagingAlloc);
     }

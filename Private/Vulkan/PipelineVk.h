@@ -18,9 +18,7 @@ public:
 
     VkPipeline GetHandle() const { return PipelineHandle; }
 
-    VkPipelineLayout GetPipelineLayout() const { return PipelineLayout; }
-    const std::set<uint32_t>& GetBoundSets() const;
-    CDescriptorSetLayoutVk* GetSetLayout(uint32_t set) const;
+    VkPipelineLayout GetPipelineLayout() const;
 
 private:
     void AddShaderModule(CShaderModule::Ref shaderModule, VkShaderStageFlagBits stage);
@@ -31,10 +29,8 @@ private:
     std::vector<std::string> EntryPoints;
 
     std::map<std::pair<uint32_t, uint32_t>, CPipelineResource> ResourceByBinding;
-    std::set<uint32_t> BoundSets;
-    std::array<CDescriptorSetLayoutVk*, kMaxBoundDescriptorSets> SetLayouts;
 
-    VkPipelineLayout PipelineLayout = VK_NULL_HANDLE;
+    CPipelineLayoutVk::Ref PipelineLayout;
     VkPipeline PipelineHandle = VK_NULL_HANDLE;
 };
 
