@@ -36,6 +36,7 @@ public:
     virtual ~CDescriptorSet() = default;
 
     virtual void BindBuffer(CBuffer::Ref buffer, size_t offset, size_t range, uint32_t binding, uint32_t index) = 0;
+    virtual void BindConstants(const void* data, size_t size, uint32_t binding, uint32_t index) = 0;
     virtual void BindImageView(CImageView::Ref imageView, uint32_t binding, uint32_t index) = 0;
     virtual void BindSampler(CSampler::Ref sampler, uint32_t binding, uint32_t index) = 0;
     virtual void BindBufferView(CBufferView::Ref bufferView, uint32_t binding, uint32_t index) = 0;

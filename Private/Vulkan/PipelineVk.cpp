@@ -294,7 +294,7 @@ VkPipelineLayout CPipelineVk::GetPipelineLayout() const
     return PipelineLayout->GetHandle();
 }
 
-void CPipelineVk::AddShaderModule(CShaderModule::Ref shaderModule, VkShaderStageFlagBits stage)
+void CPipelineVk::AddShaderModule(const CShaderModule::Ref& shaderModule, VkShaderStageFlagBits stage)
 {
     if (!shaderModule)
         return;
@@ -312,21 +312,6 @@ void CPipelineVk::AddShaderModule(CShaderModule::Ref shaderModule, VkShaderStage
     stageInfo.pSpecializationInfo = nullptr;
 
     StageInfos.push_back(stageInfo);
-
-    // Grab all resources from each individual shader and put them into a big hash map
-    for (const auto& resource : smImpl->GetShaderResources())
-    {
-        auto key = std::make_pair(resource.Set, resource.Binding);
-        if (resource.ResourceType == EPipelineResourceType::StageOutput
-            || resource.ResourceType == EPipelineResourceType::StageInput)
-            key = std::make_pair(-1 * resource.Stages, resource.Location);
-
-        auto it = ResourceByBinding.find(key);
-        if (it != ResourceByBinding.end())
-            it->second.Stages |= resource.Stages;
-        else
-            ResourceByBinding.emplace(key, resource);
-    }
 }
 
 }

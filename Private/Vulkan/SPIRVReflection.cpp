@@ -77,7 +77,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         const auto& spirType = compiler.get_type_from_variable(resource.id);
 
         CPipelineResource pipelineResource = {};
-        pipelineResource.Stages = stage;
+        pipelineResource.Stages = static_cast<EShaderStageFlags>(stage);
         pipelineResource.ResourceType = EPipelineResourceType::StageInput;
         pipelineResource.Access = VK_ACCESS_SHADER_READ_BIT;
         pipelineResource.Location = compiler.get_decoration(resource.id, spv::DecorationLocation);
@@ -101,7 +101,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         const auto& spirType = compiler.get_type_from_variable(resource.id);
 
         CPipelineResource pipelineResource = {};
-        pipelineResource.Stages = stage;
+        pipelineResource.Stages = static_cast<EShaderStageFlags>(stage);
         pipelineResource.ResourceType = EPipelineResourceType::StageOutput;
         pipelineResource.Access = VK_ACCESS_SHADER_WRITE_BIT;
         pipelineResource.Location = compiler.get_decoration(resource.id, spv::DecorationLocation);
@@ -125,7 +125,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         const auto& spirType = compiler.get_type_from_variable(resource.id);
 
         CPipelineResource pipelineResource = {};
-        pipelineResource.Stages = stage;
+        pipelineResource.Stages = static_cast<EShaderStageFlags>(stage);
         pipelineResource.ResourceType = EPipelineResourceType::UniformBuffer;
         pipelineResource.Access = VK_ACCESS_UNIFORM_READ_BIT;
         pipelineResource.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
@@ -143,7 +143,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         const auto& spirType = compiler.get_type_from_variable(resource.id);
 
         CPipelineResource pipelineResource = {};
-        pipelineResource.Stages = stage;
+        pipelineResource.Stages = static_cast<EShaderStageFlags>(stage);
         pipelineResource.ResourceType = EPipelineResourceType::StorageBuffer;
         pipelineResource.Access =
             VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT; // TODO: assume the worst
@@ -162,7 +162,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         const auto& spirType = compiler.get_type_from_variable(resource.id);
 
         CPipelineResource pipelineResource = {};
-        pipelineResource.Stages = stage;
+        pipelineResource.Stages = static_cast<EShaderStageFlags>(stage);
         pipelineResource.ResourceType = EPipelineResourceType::SeparateSampler;
         pipelineResource.Access = VK_ACCESS_SHADER_READ_BIT;
         pipelineResource.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
@@ -179,7 +179,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         const auto& spirType = compiler.get_type_from_variable(resource.id);
 
         CPipelineResource pipelineResource = {};
-        pipelineResource.Stages = stage;
+        pipelineResource.Stages = static_cast<EShaderStageFlags>(stage);
         pipelineResource.ResourceType = (spirType.image.dim == spv::Dim::DimBuffer)
             ? EPipelineResourceType::UniformTexelBuffer
             : EPipelineResourceType::CombinedImageSampler;
@@ -198,7 +198,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         const auto& spirType = compiler.get_type_from_variable(resource.id);
 
         CPipelineResource pipelineResource = {};
-        pipelineResource.Stages = stage;
+        pipelineResource.Stages = static_cast<EShaderStageFlags>(stage);
         pipelineResource.ResourceType = EPipelineResourceType::SeparateImage;
         pipelineResource.Access = VK_ACCESS_SHADER_READ_BIT;
         pipelineResource.Set = compiler.get_decoration(resource.id, spv::DecorationDescriptorSet);
@@ -223,7 +223,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         const auto& spirType = compiler.get_type_from_variable(resource.id);
 
         CPipelineResource pipelineResource = {};
-        pipelineResource.Stages = stage;
+        pipelineResource.Stages = static_cast<EShaderStageFlags>(stage);
         pipelineResource.ResourceType = (spirType.image.dim == spv::Dim::DimBuffer)
             ? EPipelineResourceType::StorageTexelBuffer
             : EPipelineResourceType::StorageImage;
@@ -241,7 +241,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
     {
         CPipelineResource pipelineResource = {};
         pipelineResource.ResourceType = EPipelineResourceType::SubpassInput;
-        pipelineResource.Stages = VK_SHADER_STAGE_FRAGMENT_BIT;
+        pipelineResource.Stages = EShaderStageFlags::Pixel;
         pipelineResource.Access = VK_ACCESS_SHADER_READ_BIT;
         pipelineResource.InputAttachmentIndex =
             compiler.get_decoration(resource.id, spv::DecorationInputAttachmentIndex);
@@ -269,7 +269,7 @@ bool SPIRVReflectResources(spirv_cross::CompilerGLSL& compiler, VkShaderStageFla
         }
 
         CPipelineResource pipelineResource = {};
-        pipelineResource.Stages = stage;
+        pipelineResource.Stages = static_cast<EShaderStageFlags>(stage);
         pipelineResource.ResourceType = EPipelineResourceType::PushConstantBuffer;
         pipelineResource.Access = VK_ACCESS_SHADER_READ_BIT;
         pipelineResource.Offset = offset;

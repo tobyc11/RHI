@@ -14,6 +14,7 @@ public:
     ~CDescriptorSetVk() override;
 
     void BindBuffer(CBuffer::Ref buffer, size_t offset, size_t range, uint32_t binding, uint32_t index) override;
+    void BindConstants(const void* data, size_t size, uint32_t binding, uint32_t index) override;
     void BindImageView(CImageView::Ref imageView, uint32_t binding, uint32_t index) override;
     void BindSampler(CSampler::Ref sampler, uint32_t binding, uint32_t index) override;
     void BindBufferView(CBufferView::Ref bufferView, uint32_t binding, uint32_t index) override;
@@ -22,6 +23,7 @@ public:
     // Internal API
     VkDescriptorSet GetHandle(bool isUsedByCommand);
     void DiscardAndRecreate(); // Similar to the DX11 MapDiscard semantics
+    void WriteUpdates();
 
 private:
     // Holds the layout alive

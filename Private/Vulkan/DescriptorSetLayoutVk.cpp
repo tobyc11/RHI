@@ -15,6 +15,8 @@ inline VkShaderStageFlags VkCast(EShaderStageFlags stageFlags)
 CDescriptorSetLayoutVk::CDescriptorSetLayoutVk(CDeviceVk& p, const std::vector<CDescriptorSetLayoutBinding>& bindings)
     : Parent(p)
 {
+    // TODO: hashing and caching
+
     static const std::unordered_map<EDescriptorType, VkDescriptorType>
         descriptorTypeMap = {
             { EDescriptorType::Sampler, VK_DESCRIPTOR_TYPE_SAMPLER },
@@ -38,6 +40,7 @@ CDescriptorSetLayoutVk::CDescriptorSetLayoutVk(CDeviceVk& p, const std::vector<C
         vkBinding.stageFlags = VkCast(b.StageFlags);
         vkBinding.pImmutableSamplers = nullptr;
         Bindings.push_back(vkBinding);
+        BindingToType[b.Binding] = vkBinding.descriptorType;
     }
 
     VkDescriptorSetLayoutCreateInfo layoutCreateInfo = {};

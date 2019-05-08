@@ -85,6 +85,12 @@ CPipeline::Ref CDeviceBase<TDerived>::CreatePipeline(const CPipelineDesc& desc)
 }
 
 template <typename TDerived>
+CManagedPipeline::Ref CDeviceBase<TDerived>::CreateManagedPipeline(CPipelineDesc& desc)
+{
+    return std::make_shared<CManagedPipeline>(*this, desc);
+}
+
+template <typename TDerived>
 CSampler::Ref CDeviceBase<TDerived>::CreateSampler(const CSamplerDesc& desc)
 {
     return static_cast<TDerived*>(this)->CreateSampler(desc);

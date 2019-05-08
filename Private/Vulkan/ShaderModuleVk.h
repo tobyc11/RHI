@@ -14,7 +14,7 @@ public:
     const std::string& GetEntryPoint() const { return EntryPoint; }
     VkShaderModule GetVkModule() const { return ShaderModule; }
 
-    const std::vector<CPipelineResource>& GetShaderResources() const { return Resources; }
+    const std::vector<CPipelineResource>& GetShaderResources() const override { return Resources; }
 
 private:
     CDeviceVk& Parent;

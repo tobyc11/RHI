@@ -367,6 +367,7 @@ void CCommandContextVk::BindComputeDescriptorSet(uint32_t set, CDescriptorSet& d
     // TODO: access tracking
     auto& impl = static_cast<CDescriptorSetVk&>(descriptorSet);
     VkDescriptorSet setHandle = impl.GetHandle(true);
+    impl.WriteUpdates();
     vkCmdBindDescriptorSets(CmdBuffer(),
                             VK_PIPELINE_BIND_POINT_COMPUTE,
                             CurrPipeline->GetPipelineLayout(),
@@ -424,6 +425,7 @@ void CCommandContextVk::BindRenderDescriptorSet(uint32_t set, CDescriptorSet& de
     // TODO: access tracking
     auto& impl = static_cast<CDescriptorSetVk&>(descriptorSet);
     VkDescriptorSet setHandle = impl.GetHandle(true);
+    impl.WriteUpdates();
     vkCmdBindDescriptorSets(CmdBuffer(),
                             VK_PIPELINE_BIND_POINT_GRAPHICS,
                             CurrPipeline->GetPipelineLayout(),

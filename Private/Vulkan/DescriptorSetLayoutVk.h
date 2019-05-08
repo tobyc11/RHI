@@ -25,6 +25,7 @@ public:
     CDeviceVk& GetDevice() const { return Parent; }
     VkDescriptorSetLayout GetHandle() const { return Handle; }
     const std::vector<VkDescriptorSetLayoutBinding>& GetBindings() const { return Bindings; }
+    VkDescriptorType GetDescriptorType(uint32_t binding) const { return BindingToType.at(binding); }
 
     const std::unique_ptr<CDescriptorPoolVk>& GetDescriptorPool() const;
 
@@ -32,6 +33,7 @@ private:
     CDeviceVk& Parent;
     VkDescriptorSetLayout Handle = VK_NULL_HANDLE;
     std::vector<VkDescriptorSetLayoutBinding> Bindings;
+    std::map<uint32_t, VkDescriptorType> BindingToType;
 
     mutable std::unique_ptr<CDescriptorPoolVk> Pool;
 };

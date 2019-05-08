@@ -21,14 +21,12 @@ public:
     VkPipelineLayout GetPipelineLayout() const;
 
 private:
-    void AddShaderModule(CShaderModule::Ref shaderModule, VkShaderStageFlagBits stage);
+    void AddShaderModule(const CShaderModule::Ref& shaderModule, VkShaderStageFlagBits stage);
 
     CDeviceVk& Parent;
 
     std::vector<VkPipelineShaderStageCreateInfo> StageInfos;
     std::vector<std::string> EntryPoints;
-
-    std::map<std::pair<uint32_t, uint32_t>, CPipelineResource> ResourceByBinding;
 
     CPipelineLayoutVk::Ref PipelineLayout;
     VkPipeline PipelineHandle = VK_NULL_HANDLE;

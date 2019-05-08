@@ -1,6 +1,7 @@
 #pragma once
 #include "CommandQueue.h"
 #include "DescriptorSet.h"
+#include "ManagedPipeline.h"
 #include "Pipeline.h"
 #include "RHIException.h"
 #include "RenderContext.h"
@@ -53,6 +54,7 @@ public:
     // States
     CRenderPass::Ref CreateRenderPass(const CRenderPassDesc& desc);
     CPipeline::Ref CreatePipeline(const CPipelineDesc& desc);
+    CManagedPipeline::Ref CreateManagedPipeline(CPipelineDesc& desc);
     CSampler::Ref CreateSampler(const CSamplerDesc& desc);
 
     // Command submission

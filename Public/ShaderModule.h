@@ -149,7 +149,7 @@ const int MaxDescriptionSize = 256;
 
 struct CPipelineResource
 {
-    uint32_t Stages;
+    EShaderStageFlags Stages;
     EPipelineResourceType ResourceType;
     EBaseType BaseType;
     uint32_t Access;
@@ -190,8 +190,6 @@ public:
     virtual const std::vector<CPipelineResource>& GetShaderResources() const = 0;
 
 private:
-    friend class CShaderD3D11;
-
     bool bIsDXBC = false;
 
     std::string SourcePath;
