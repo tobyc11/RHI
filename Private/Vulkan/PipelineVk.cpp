@@ -129,7 +129,8 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     AddShaderModule(desc.DS, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT);
     AddShaderModule(desc.HS, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT);
 
-    assert(desc.Layout);
+    if (!desc.Layout)
+        throw CRHIRuntimeError("No pipeline layout specified for pipeline");
     PipelineLayout = std::static_pointer_cast<CPipelineLayoutVk>(desc.Layout);
 
     // Create a pipeline create info and fill in handles

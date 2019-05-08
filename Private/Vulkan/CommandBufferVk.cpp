@@ -156,7 +156,7 @@ std::unique_ptr<CCommandBufferVk> CCommandBufferAllocatorVk::Allocate(bool secon
     auto cmdBuffer = Pools[poolIndex]->AllocateCommandBuffer(secondary);
     cmdBuffer->BufferAllocator = this;
     cmdBuffer->AllocatorPoolIndex = poolIndex;
-    return std::move(cmdBuffer);
+    return cmdBuffer;
 }
 
 void CCommandBufferAllocatorVk::UnlockPool(size_t index)

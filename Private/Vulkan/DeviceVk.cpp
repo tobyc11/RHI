@@ -582,7 +582,7 @@ CNativeDevice GetNativeDevice(CDevice::Ref device)
     auto impl = std::static_pointer_cast<CDeviceVk>(device);
     result.Instance = impl->GetVkInstance();
     result.Device = impl->GetVkDevice();
-    return std::move(result);
+    return result;
 }
 
 } /* namespace RHI */

@@ -79,6 +79,11 @@ void CCommandQueueVk::SubmitFrame()
     // Do Submit() and advance frame index
     Submit(true);
 
+    GetDevice().GetHugeConstantBuffer()->MarkBlockEnd();
+    FrameResources[CurrFrameIndex].PostFrameCleanup.emplace_back([](CDeviceVk& p){
+        p.GetHugeConstantBuffer()->FreeBlock();
+    });
+
     // Advance
     CurrFrameIndex++;
     CurrFrameIndex %= FrameIndexCount;
