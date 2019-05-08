@@ -1,6 +1,6 @@
 #include "CommandListVk.h"
-#include "CommandQueueVk.h"
 #include "CommandContextVk.h"
+#include "CommandQueueVk.h"
 
 namespace RHI
 {
@@ -10,7 +10,7 @@ VkSubmitInfo CCommandListSection::MakeSubmitInfo(std::vector<VkCommandBuffer>& s
     stagingArray.push_back(PreCmdBuffer->GetHandle());
     stagingArray.push_back(CmdBuffer->GetHandle());
 
-    VkSubmitInfo submitInfo = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
     submitInfo.waitSemaphoreCount = WaitSemaphores.size();
     submitInfo.pWaitSemaphores = WaitSemaphores.data();
     submitInfo.pWaitDstStageMask = WaitStages.data();
@@ -51,23 +51,26 @@ void CCommandListVk::Commit()
 
 ICopyContext::Ref CCommandListVk::CreateCopyContext()
 {
-    return std::make_shared<CCommandContextVk>(std::static_pointer_cast<CCommandListVk>(shared_from_this()));
+    return std::make_shared<CCommandContextVk>(
+        std::static_pointer_cast<CCommandListVk>(shared_from_this()));
 }
 
 IComputeContext::Ref CCommandListVk::CreateComputeContext()
 {
-    return std::make_shared<CCommandContextVk>(std::static_pointer_cast<CCommandListVk>(shared_from_this()));
+    return std::make_shared<CCommandContextVk>(
+        std::static_pointer_cast<CCommandListVk>(shared_from_this()));
 }
 
-IParallelRenderContext::Ref CCommandListVk::CreateParallelRenderContext(CRenderPass::Ref renderPass,
-                                                                        const std::vector<CClearValue>& clearValues)
+IParallelRenderContext::Ref
+CCommandListVk::CreateParallelRenderContext(CRenderPass::Ref renderPass,
+                                            const std::vector<CClearValue>& clearValues)
 {
-    return std::make_shared<CRenderPassContextVk>(std::static_pointer_cast<CCommandListVk>(shared_from_this()),
-                                                  renderPass,
-                                                  clearValues);
+    return std::make_shared<CRenderPassContextVk>(
+        std::static_pointer_cast<CCommandListVk>(shared_from_this()), renderPass, clearValues);
 }
 
-void CCommandListVk::MakeSubmitInfos(std::vector<VkSubmitInfo>& submitInfos, std::vector<VkCommandBuffer>& stagingArray)
+void CCommandListVk::MakeSubmitInfos(std::vector<VkSubmitInfo>& submitInfos,
+                                     std::vector<VkCommandBuffer>& stagingArray)
 {
     if (!Sections.empty())
     {
@@ -83,9 +86,6 @@ void CCommandListVk::MakeSubmitInfos(std::vector<VkSubmitInfo>& submitInfos, std
         submitInfos.emplace_back(iter.MakeSubmitInfo(stagingArray));
 }
 
-void CCommandListVk::ReleaseAllResources()
-{
-    Sections.clear();
-}
+void CCommandListVk::ReleaseAllResources() { Sections.clear(); }
 
 }

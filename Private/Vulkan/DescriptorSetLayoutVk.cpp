@@ -12,24 +12,24 @@ inline VkShaderStageFlags VkCast(EShaderStageFlags stageFlags)
     return static_cast<VkShaderStageFlags>(stageFlags);
 }
 
-CDescriptorSetLayoutVk::CDescriptorSetLayoutVk(CDeviceVk& p, const std::vector<CDescriptorSetLayoutBinding>& bindings)
+CDescriptorSetLayoutVk::CDescriptorSetLayoutVk(
+    CDeviceVk& p, const std::vector<CDescriptorSetLayoutBinding>& bindings)
     : Parent(p)
 {
     // TODO: hashing and caching
 
-    static const std::unordered_map<EDescriptorType, VkDescriptorType>
-        descriptorTypeMap = {
-            { EDescriptorType::Sampler, VK_DESCRIPTOR_TYPE_SAMPLER },
-            { EDescriptorType::Image, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE },
-            { EDescriptorType::StorageImage, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
-            { EDescriptorType::UniformTexelBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER },
-            { EDescriptorType::StorageTexelBuffer, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER },
-            { EDescriptorType::UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
-            { EDescriptorType::StorageBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
-            { EDescriptorType::UniformBufferDynamic, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC },
-            { EDescriptorType::StorageBufferDynamic, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC },
-            { EDescriptorType::InputAttachment, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT },
-        };
+    static const std::unordered_map<EDescriptorType, VkDescriptorType> descriptorTypeMap = {
+        { EDescriptorType::Sampler, VK_DESCRIPTOR_TYPE_SAMPLER },
+        { EDescriptorType::Image, VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE },
+        { EDescriptorType::StorageImage, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE },
+        { EDescriptorType::UniformTexelBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER },
+        { EDescriptorType::StorageTexelBuffer, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER },
+        { EDescriptorType::UniformBuffer, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER },
+        { EDescriptorType::StorageBuffer, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER },
+        { EDescriptorType::UniformBufferDynamic, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC },
+        { EDescriptorType::StorageBufferDynamic, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC },
+        { EDescriptorType::InputAttachment, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT },
+    };
 
     for (const auto& b : bindings)
     {
@@ -61,7 +61,8 @@ CDescriptorSetLayoutVk::~CDescriptorSetLayoutVk()
 CDescriptorSet::Ref CDescriptorSetLayoutVk::CreateDescriptorSet()
 {
     // TODO: what if layout is empty
-    return std::make_shared<CDescriptorSetVk>(std::static_pointer_cast<CDescriptorSetLayoutVk>(shared_from_this()));
+    return std::make_shared<CDescriptorSetVk>(
+        std::static_pointer_cast<CDescriptorSetLayoutVk>(shared_from_this()));
 }
 
 const std::unique_ptr<CDescriptorPoolVk>& CDescriptorSetLayoutVk::GetDescriptorPool() const
@@ -71,7 +72,8 @@ const std::unique_ptr<CDescriptorPoolVk>& CDescriptorSetLayoutVk::GetDescriptorP
     return Pool;
 }
 
-CPipelineLayoutVk::CPipelineLayoutVk(CDeviceVk& p, const std::vector<CDescriptorSetLayout::Ref>& setLayouts)
+CPipelineLayoutVk::CPipelineLayoutVk(CDeviceVk& p,
+                                     const std::vector<CDescriptorSetLayout::Ref>& setLayouts)
     : Parent(p)
 {
     assert(!setLayouts.empty());

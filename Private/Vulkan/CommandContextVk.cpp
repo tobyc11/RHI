@@ -1,19 +1,21 @@
 #include "CommandContextVk.h"
-#include "CommandQueueVk.h"
 #include "BufferVk.h"
+#include "CommandQueueVk.h"
 #include "DescriptorSetVk.h"
-#include "ImageVk.h"
+#include "DeviceVk.h"
 #include "ImageViewVk.h"
+#include "ImageVk.h"
 #include "PipelineVk.h"
 #include "RenderPassVk.h"
-#include "DeviceVk.h"
 
 namespace RHI
 {
 
 CRenderPassContextVk::CRenderPassContextVk(CCommandListVk::Ref cmdList, CRenderPass::Ref renderPass,
                                            std::vector<CClearValue> clearValues)
-    : CmdList(std::move(cmdList)), RenderPass(std::move(renderPass)), ClearValues(std::move(clearValues))
+    : CmdList(std::move(cmdList))
+    , RenderPass(std::move(renderPass))
+    , ClearValues(std::move(clearValues))
 {
     if (CmdList->IsCommitted())
         throw CRHIRuntimeError("A committed command list can no longer be recorded into");
@@ -67,7 +69,7 @@ void CRenderPassContextVk::FinishRecording()
             section.WaitSemaphores.push_back(semaphore);
             section.WaitStages.push_back(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
 
-            CmdList->GetQueue().GetDevice().AddPostFrameCleanup([semaphore](CDeviceVk& p){
+            CmdList->GetQueue().GetDevice().AddPostFrameCleanup([semaphore](CDeviceVk& p) {
                 vkDestroySemaphore(p.GetVkDevice(), semaphore, nullptr);
             });
         }
@@ -105,10 +107,11 @@ void CRenderPassContextVk::FinishRecording()
     // Grab a new command buffer to write all the resource transitions
     if (CmdList->Sections.size() > 1)
     {
-        CmdList->Sections.back().PreCmdBuffer = CmdList->GetQueue().GetCmdBufferAllocator().Allocate();
+        CmdList->Sections.back().PreCmdBuffer =
+            CmdList->GetQueue().GetCmdBufferAllocator().Allocate();
         CmdList->Sections.back().PreCmdBuffer->BeginRecording(VK_NULL_HANDLE, 0);
-        CmdList->Sections[0].AccessTracker
-            .Merge(CmdList->Sections.back().PreCmdBuffer->GetHandle(), CmdList->Sections.back().AccessTracker);
+        CmdList->Sections[0].AccessTracker.Merge(CmdList->Sections.back().PreCmdBuffer->GetHandle(),
+                                                 CmdList->Sections.back().AccessTracker);
         CmdList->Sections.back().PreCmdBuffer->EndRecording();
         CmdList->Sections.back().AccessTracker.Clear();
     }
@@ -220,7 +223,8 @@ CCommandContextVk::CCommandContextVk(const CCommandListVk::Ref& cmdList)
     CmdList->Sections.emplace_back(std::move(section));
 }
 
-CCommandContextVk::CCommandContextVk(const CRenderPassContextVk::Ref& renderPassContext, uint32_t subpass)
+CCommandContextVk::CCommandContextVk(const CRenderPassContextVk::Ref& renderPassContext,
+                                     uint32_t subpass)
 {
     RenderPassContext = renderPassContext;
     SubpassIndex = subpass;
@@ -234,7 +238,7 @@ CCommandContextVk::CCommandContextVk(const CRenderPassContextVk::Ref& renderPass
     subpassInfo.SecondaryBuffer = std::move(cmdBuffer);
 
     auto rpImpl = std::static_pointer_cast<CRenderPassVk>(RenderPassContext->GetRenderPass());
-    CViewportDesc vp{};
+    CViewportDesc vp {};
     vp.X = 0;
     vp.Y = 0;
     vp.Width = rpImpl->GetArea().extent.width;
@@ -243,7 +247,7 @@ CCommandContextVk::CCommandContextVk(const CRenderPassContextVk::Ref& renderPass
     vp.MaxDepth = 1.0f;
     SetViewport(vp);
 
-    CRect2D scissor{};
+    CRect2D scissor {};
     scissor.Offset.Set(0, 0);
     scissor.Extent.Set(vp.Width, vp.Height);
     SetScissor(scissor);
@@ -269,7 +273,8 @@ void CCommandContextVk::TransitionImage(CImage& image, EResourceState newState)
                                          CmdList->GetQueue().GetType() == EQueueType::Copy);
 }
 
-void CCommandContextVk::CopyBuffer(CBuffer& src, CBuffer& dst, const std::vector<CBufferCopy>& regions)
+void CCommandContextVk::CopyBuffer(CBuffer& src, CBuffer& dst,
+                                   const std::vector<CBufferCopy>& regions)
 {
     static_assert(sizeof(CBufferCopy) == sizeof(VkBufferCopy), "struct size mismatch");
     const auto* r = reinterpret_cast<const VkBufferCopy*>(regions.data());
@@ -291,9 +296,9 @@ void CCommandContextVk::CopyImage(CImage& src, CImage& dst, const std::vector<CI
     TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdCopyImage(CmdBuffer(), srcImpl.GetVkImage(),
-                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImpl.GetVkImage(),
-                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(r.size()), r.data());
+    vkCmdCopyImage(CmdBuffer(), srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   static_cast<uint32_t>(r.size()), r.data());
 }
 
 void CCommandContextVk::CopyBufferToImage(CBuffer& src, CImage& dst,
@@ -308,8 +313,8 @@ void CCommandContextVk::CopyBufferToImage(CBuffer& src, CImage& dst,
     }
     TransitionImage(dst, EResourceState::CopyDest);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdCopyBufferToImage(CmdBuffer(), static_cast<CBufferVk&>(src).Buffer,
-                           dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    vkCmdCopyBufferToImage(CmdBuffer(), static_cast<CBufferVk&>(src).Buffer, dstImpl.GetVkImage(),
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                            static_cast<uint32_t>(vkregions.size()), vkregions.data());
 }
 
@@ -325,8 +330,7 @@ void CCommandContextVk::CopyImageToBuffer(CImage& src, CBuffer& dst,
     }
     TransitionImage(src, EResourceState::CopySource);
     auto& srcImpl = static_cast<CImageVk&>(src);
-    vkCmdCopyImageToBuffer(CmdBuffer(), srcImpl.GetVkImage(),
-                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    vkCmdCopyImageToBuffer(CmdBuffer(), srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            static_cast<CBufferVk&>(dst).Buffer,
                            static_cast<uint32_t>(vkregions.size()), vkregions.data());
 }
@@ -345,10 +349,9 @@ void CCommandContextVk::BlitImage(CImage& src, CImage& dst, const std::vector<CI
     TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdBlitImage(CmdBuffer(), srcImpl.GetVkImage(),
-                   VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImpl.GetVkImage(),
-                   VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(r.size()), r.data(),
-                   VkCast(filter));
+    vkCmdBlitImage(CmdBuffer(), srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   static_cast<uint32_t>(r.size()), r.data(), VkCast(filter));
 }
 
 void CCommandContextVk::ResolveImage(CImage& src, CImage& dst,
@@ -365,10 +368,9 @@ void CCommandContextVk::ResolveImage(CImage& src, CImage& dst,
     TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdResolveImage(CmdBuffer(), srcImpl.GetVkImage(),
-                      VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, dstImpl.GetVkImage(),
-                      VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(r.size()),
-                      r.data());
+    vkCmdResolveImage(CmdBuffer(), srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                      dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                      static_cast<uint32_t>(r.size()), r.data());
 }
 
 void CCommandContextVk::BindComputePipeline(CPipeline& pipeline)
@@ -384,14 +386,8 @@ void CCommandContextVk::BindComputeDescriptorSet(uint32_t set, CDescriptorSet& d
     auto& impl = static_cast<CDescriptorSetVk&>(descriptorSet);
     VkDescriptorSet setHandle = impl.GetHandle(true);
     impl.WriteUpdates();
-    vkCmdBindDescriptorSets(CmdBuffer(),
-                            VK_PIPELINE_BIND_POINT_COMPUTE,
-                            CurrPipeline->GetPipelineLayout(),
-                            set,
-                            1,
-                            &setHandle,
-                            0,
-                            nullptr);
+    vkCmdBindDescriptorSets(CmdBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE,
+                            CurrPipeline->GetPipelineLayout(), set, 1, &setHandle, 0, nullptr);
 }
 
 void CCommandContextVk::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
@@ -444,20 +440,15 @@ void CCommandContextVk::BindRenderDescriptorSet(uint32_t set, CDescriptorSet& de
     auto& impl = static_cast<CDescriptorSetVk&>(descriptorSet);
     VkDescriptorSet setHandle = impl.GetHandle(true);
     impl.WriteUpdates();
-    vkCmdBindDescriptorSets(CmdBuffer(),
-                            VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            CurrPipeline->GetPipelineLayout(),
-                            set,
-                            1,
-                            &setHandle,
-                            0,
-                            nullptr);
+    vkCmdBindDescriptorSets(CmdBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            CurrPipeline->GetPipelineLayout(), set, 1, &setHandle, 0, nullptr);
 }
 
 void CCommandContextVk::BindIndexBuffer(CBuffer& buffer, size_t offset, EFormat format)
 {
     auto& impl = static_cast<CBufferVk&>(buffer);
-    VkIndexType indexType = format == EFormat::R16_UINT ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
+    VkIndexType indexType =
+        format == EFormat::R16_UINT ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
     vkCmdBindIndexBuffer(CmdBuffer(), impl.Buffer, offset, indexType);
 }
 
@@ -469,27 +460,29 @@ void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer& buffer, size
     vkCmdBindVertexBuffers(CmdBuffer(), binding, 1, &impl.Buffer, &vkOffset);
 }
 
-void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex, uint32_t firstInstance)
+void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
+                             uint32_t firstInstance)
 {
     vkCmdDraw(CmdBuffer(), vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
-void CCommandContextVk::DrawIndexed(uint32_t indexCount,
-                                    uint32_t instanceCount,
-                                    uint32_t firstIndex,
-                                    int32_t vertexOffset,
+void CCommandContextVk::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
+                                    uint32_t firstIndex, int32_t vertexOffset,
                                     uint32_t firstInstance)
 {
-    vkCmdDrawIndexed(CmdBuffer(), indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
+    vkCmdDrawIndexed(CmdBuffer(), indexCount, instanceCount, firstIndex, vertexOffset,
+                     firstInstance);
 }
 
-void CCommandContextVk::DrawIndirect(CBuffer& buffer, size_t offset, uint32_t drawCount, uint32_t stride)
+void CCommandContextVk::DrawIndirect(CBuffer& buffer, size_t offset, uint32_t drawCount,
+                                     uint32_t stride)
 {
     VkBuffer vkBuffer = static_cast<CBufferVk&>(buffer).Buffer;
     vkCmdDrawIndirect(CmdBuffer(), vkBuffer, offset, drawCount, stride);
 }
 
-void CCommandContextVk::DrawIndexedIndirect(CBuffer& buffer, size_t offset, uint32_t drawCount, uint32_t stride)
+void CCommandContextVk::DrawIndexedIndirect(CBuffer& buffer, size_t offset, uint32_t drawCount,
+                                            uint32_t stride)
 {
     VkBuffer vkBuffer = static_cast<CBufferVk&>(buffer).Buffer;
     vkCmdDrawIndirect(CmdBuffer(), vkBuffer, offset, drawCount, stride);
@@ -504,10 +497,12 @@ void CCommandContextVk::FinishRecording()
         // Grab a new command buffer to write all the resource transitions
         if (CmdList->Sections.size() > 1)
         {
-            CmdList->Sections.back().PreCmdBuffer = CmdList->GetQueue().GetCmdBufferAllocator().Allocate();
+            CmdList->Sections.back().PreCmdBuffer =
+                CmdList->GetQueue().GetCmdBufferAllocator().Allocate();
             CmdList->Sections.back().PreCmdBuffer->BeginRecording(VK_NULL_HANDLE, 0);
-            CmdList->Sections[0].AccessTracker
-                .Merge(CmdList->Sections.back().PreCmdBuffer->GetHandle(), CmdList->Sections.back().AccessTracker);
+            CmdList->Sections[0].AccessTracker.Merge(
+                CmdList->Sections.back().PreCmdBuffer->GetHandle(),
+                CmdList->Sections.back().AccessTracker);
             CmdList->Sections.back().PreCmdBuffer->EndRecording();
             CmdList->Sections.back().AccessTracker.Clear();
         }
@@ -518,7 +513,8 @@ void CCommandContextVk::FinishRecording()
     }
     else
     {
-        RenderPassContext->GetSubpassInfo(SubpassIndex, CmdBufferIndex).SecondaryBuffer->EndRecording();
+        RenderPassContext->GetSubpassInfo(SubpassIndex, CmdBufferIndex)
+            .SecondaryBuffer->EndRecording();
         RenderPassContext.reset();
     }
 }
@@ -534,7 +530,8 @@ VkCommandBuffer CCommandContextVk::CmdBuffer()
 {
     if (CmdList)
         return CmdList->Sections.back().CmdBuffer->GetHandle();
-    return RenderPassContext->GetSubpassInfo(SubpassIndex, CmdBufferIndex).SecondaryBuffer->GetHandle();
+    return RenderPassContext->GetSubpassInfo(SubpassIndex, CmdBufferIndex)
+        .SecondaryBuffer->GetHandle();
 }
 
 }

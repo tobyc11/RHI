@@ -14,8 +14,8 @@ CPhysicalDeviceSwapChainCaps CSwapChainVk::GetDeviceSwapChainCaps(CDeviceVk& dev
     caps.PhysicalDevice = device.GetVkPhysicalDevice();
 
     VkBool32 presentSupported;
-    vkGetPhysicalDeviceSurfaceSupportKHR(caps.PhysicalDevice, device.GetQueueFamily(EQueueType::Render),
-                                         surface, &presentSupported);
+    vkGetPhysicalDeviceSurfaceSupportKHR(
+        caps.PhysicalDevice, device.GetQueueFamily(EQueueType::Render), surface, &presentSupported);
     if (presentSupported)
     {
         caps.PresentQueue = device.GetQueueFamily(EQueueType::Render);
@@ -90,14 +90,14 @@ VkPresentModeKHR CSwapChainVk::SelectPresentMode(const CPhysicalDeviceSwapChainC
     // FIFO present mode is always available
     // MAILBOX is the lowest latency V-Sync enabled mode (something like triple-buffering) so use it
     // if available
-    //for (VkPresentModeKHR mode : caps.PresentModes)
+    // for (VkPresentModeKHR mode : caps.PresentModes)
     //{
     //    if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
     //    {
     //        return mode;
     //    }
     //}
-    //for (VkPresentModeKHR mode : caps.PresentModes)
+    // for (VkPresentModeKHR mode : caps.PresentModes)
     //{
     //    if (mode == VK_PRESENT_MODE_FIFO_RELAXED_KHR)
     //    {
@@ -233,8 +233,6 @@ bool CSwapChainVk::AcquireNextImage()
     CAcquiredImageInfo imageInfo;
     imageInfo.AvailableSemaphore = imageAvailableSemaphore;
     AcquiredImages.push(std::make_pair(imageIndex, imageInfo));
-    std::static_pointer_cast<CSwapChainImageVk>(ProxyImage)
-        ->InitializeAccess(0, 0, VK_IMAGE_LAYOUT_UNDEFINED);
     return true;
 }
 
@@ -255,10 +253,13 @@ void CSwapChainVk::Present(const CSwapChainPresentInfo& info)
     vkQueuePresentKHR(Parent.GetVkQueue(EQueueType::Render), &presentInfo);
 
     // Waiter cleans up the semaphore
-    Parent.AddPostFrameCleanup([waitSemaphore](CDeviceVk& p){
+    Parent.AddPostFrameCleanup([waitSemaphore](CDeviceVk& p) {
         vkDestroySemaphore(p.GetVkDevice(), waitSemaphore, nullptr);
     });
     AcquiredImages.pop();
+
+    std::static_pointer_cast<CSwapChainImageVk>(ProxyImage)
+        ->InitializeAccess(0, 0, VK_IMAGE_LAYOUT_UNDEFINED);
 }
 
 void CSwapChainVk::ReleaseSwapChainAndImages(bool dontDeleteSwapchain)

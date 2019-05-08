@@ -1,10 +1,10 @@
 #pragma once
 #include "AccessTracker.h"
 #include "CommandBufferVk.h"
-#include "VkCommon.h"
-#include "CopyContext.h"
 #include "ComputeContext.h"
+#include "CopyContext.h"
 #include "RenderContext.h"
+#include "VkCommon.h"
 #include <memory>
 #include <vector>
 
@@ -47,10 +47,12 @@ public:
 
     ICopyContext::Ref CreateCopyContext() override;
     IComputeContext::Ref CreateComputeContext() override;
-    IParallelRenderContext::Ref CreateParallelRenderContext(CRenderPass::Ref renderPass,
-                                                            const std::vector<CClearValue>& clearValues) override;
+    IParallelRenderContext::Ref
+    CreateParallelRenderContext(CRenderPass::Ref renderPass,
+                                const std::vector<CClearValue>& clearValues) override;
 
-    void MakeSubmitInfos(std::vector<VkSubmitInfo>& submitInfos, std::vector<VkCommandBuffer>& stagingArray);
+    void MakeSubmitInfos(std::vector<VkSubmitInfo>& submitInfos,
+                         std::vector<VkCommandBuffer>& stagingArray);
     void ReleaseAllResources();
 
 private:

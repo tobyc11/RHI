@@ -6,26 +6,24 @@ namespace RHI
 {
 
 CCommandQueueVk::CCommandQueueVk(CDeviceVk& p, EQueueType queueType, VkQueue handle)
-    : Parent(p), Type(queueType), Handle(handle), CmdBufferAllocator(p, queueType), FrameResources{p, p, p}
+    : Parent(p)
+    , Type(queueType)
+    , Handle(handle)
+    , CmdBufferAllocator(p, queueType)
+    , FrameResources { p, p, p }
 {
     // Fences are created signaled, unsignal the first one
     VK(vkResetFences(Parent.GetVkDevice(), 1, &FrameResources[0].Fence));
 }
 
-CCommandQueueVk::~CCommandQueueVk()
-{
-    Finish();
-}
+CCommandQueueVk::~CCommandQueueVk() { Finish(); }
 
 CCommandList::Ref CCommandQueueVk::CreateCommandList()
 {
     return std::make_shared<CCommandListVk>(*this);
 }
 
-void CCommandQueueVk::Flush()
-{
-    Submit();
-}
+void CCommandQueueVk::Flush() { Submit(); }
 
 void CCommandQueueVk::Finish()
 {
@@ -64,13 +62,15 @@ void CCommandQueueVk::Submit(bool setFence)
     if (cmdBufferStaging.size() > 512)
         throw CRHIException("Umm, tell Toby about this");
     if (setFence)
-        VK(vkQueueSubmit(GetHandle(), submitInfos.size(), submitInfos.data(), FrameResources[CurrFrameIndex].Fence));
+        VK(vkQueueSubmit(GetHandle(), submitInfos.size(), submitInfos.data(),
+                         FrameResources[CurrFrameIndex].Fence));
     else
         VK(vkQueueSubmit(GetHandle(), submitInfos.size(), submitInfos.data(), VK_NULL_HANDLE));
 
     std::lock_guard<std::mutex> lkd(GetDevice().DeviceMutex);
     auto& fnList = FrameResources[CurrFrameIndex].PostFrameCleanup;
-    fnList.insert(fnList.end(), GetDevice().PostFrameCleanup.begin(), GetDevice().PostFrameCleanup.end());
+    fnList.insert(fnList.end(), GetDevice().PostFrameCleanup.begin(),
+                  GetDevice().PostFrameCleanup.end());
     GetDevice().PostFrameCleanup.clear();
 }
 
@@ -80,14 +80,14 @@ void CCommandQueueVk::SubmitFrame()
     Submit(true);
 
     GetDevice().GetHugeConstantBuffer()->MarkBlockEnd();
-    FrameResources[CurrFrameIndex].PostFrameCleanup.emplace_back([](CDeviceVk& p){
-        p.GetHugeConstantBuffer()->FreeBlock();
-    });
+    FrameResources[CurrFrameIndex].PostFrameCleanup.emplace_back(
+        [](CDeviceVk& p) { p.GetHugeConstantBuffer()->FreeBlock(); });
 
     // Advance
     CurrFrameIndex++;
     CurrFrameIndex %= FrameIndexCount;
-    VK(vkWaitForFences(Parent.GetVkDevice(), 1, &FrameResources[CurrFrameIndex].Fence, VK_TRUE, 1000000));
+    VK(vkWaitForFences(Parent.GetVkDevice(), 1, &FrameResources[CurrFrameIndex].Fence, VK_TRUE,
+                       1000000));
     VK(vkResetFences(Parent.GetVkDevice(), 1, &FrameResources[CurrFrameIndex].Fence));
     FrameResources[CurrFrameIndex].Reset();
 }
@@ -96,7 +96,7 @@ CCommandQueueVk::CFrameResources::CFrameResources(CDeviceVk& deviceVk)
     : DeviceVk(deviceVk)
 {
     // We create the fences signaled so that vkWaitForFences returns immediately
-    VkFenceCreateInfo fenceInfo = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+    VkFenceCreateInfo fenceInfo = { VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
     VK(vkCreateFence(DeviceVk.GetVkDevice(), &fenceInfo, nullptr, &Fence));
 }
