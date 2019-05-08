@@ -43,7 +43,6 @@ uint32_t CRenderPassContextVk::MakeSubpassInfo(uint32_t subpass)
 
 IRenderContext::Ref CRenderPassContextVk::CreateRenderContext(uint32_t subpass)
 {
-    std::lock_guard<tc::FSpinLock> lk(SpinLock);
     return std::make_shared<CCommandContextVk>(shared_from_this(), subpass);
 }
 
@@ -107,8 +106,10 @@ void CRenderPassContextVk::FinishRecording()
     if (CmdList->Sections.size() > 1)
     {
         CmdList->Sections.back().PreCmdBuffer = CmdList->GetQueue().GetCmdBufferAllocator().Allocate();
+        CmdList->Sections.back().PreCmdBuffer->BeginRecording(VK_NULL_HANDLE, 0);
         CmdList->Sections[0].AccessTracker
             .Merge(CmdList->Sections.back().PreCmdBuffer->GetHandle(), CmdList->Sections.back().AccessTracker);
+        CmdList->Sections.back().PreCmdBuffer->EndRecording();
         CmdList->Sections.back().AccessTracker.Clear();
     }
 
@@ -231,6 +232,21 @@ CCommandContextVk::CCommandContextVk(const CRenderPassContextVk::Ref& renderPass
 
     auto& subpassInfo = renderPassContext->GetSubpassInfo(subpass, CmdBufferIndex);
     subpassInfo.SecondaryBuffer = std::move(cmdBuffer);
+
+    auto rpImpl = std::static_pointer_cast<CRenderPassVk>(RenderPassContext->GetRenderPass());
+    CViewportDesc vp{};
+    vp.X = 0;
+    vp.Y = 0;
+    vp.Width = rpImpl->GetArea().extent.width;
+    vp.Height = rpImpl->GetArea().extent.height;
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
+    SetViewport(vp);
+
+    CRect2D scissor{};
+    scissor.Offset.Set(0, 0);
+    scissor.Extent.Set(vp.Width, vp.Height);
+    SetScissor(scissor);
 }
 
 CCommandContextVk::~CCommandContextVk()
@@ -487,8 +503,10 @@ void CCommandContextVk::FinishRecording()
         if (CmdList->Sections.size() > 1)
         {
             CmdList->Sections.back().PreCmdBuffer = CmdList->GetQueue().GetCmdBufferAllocator().Allocate();
+            CmdList->Sections.back().PreCmdBuffer->BeginRecording(VK_NULL_HANDLE, 0);
             CmdList->Sections[0].AccessTracker
                 .Merge(CmdList->Sections.back().PreCmdBuffer->GetHandle(), CmdList->Sections.back().AccessTracker);
+            CmdList->Sections.back().PreCmdBuffer->EndRecording();
             CmdList->Sections.back().AccessTracker.Clear();
         }
 

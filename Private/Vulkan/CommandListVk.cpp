@@ -73,8 +73,10 @@ void CCommandListVk::MakeSubmitInfos(std::vector<VkSubmitInfo>& submitInfos, std
     {
         assert(Sections[0].PreCmdBuffer == nullptr);
         Sections[0].PreCmdBuffer = GetQueue().GetCmdBufferAllocator().Allocate();
+        Sections[0].PreCmdBuffer->BeginRecording(VK_NULL_HANDLE, 0);
         Sections[0].AccessTracker.DeployAllBarriers(Sections[0].PreCmdBuffer->GetHandle());
         Sections[0].AccessTracker.Clear();
+        Sections[0].PreCmdBuffer->EndRecording();
     }
 
     for (const auto& iter : Sections)

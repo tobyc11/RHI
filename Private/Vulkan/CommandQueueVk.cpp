@@ -9,7 +9,7 @@ CCommandQueueVk::CCommandQueueVk(CDeviceVk& p, EQueueType queueType, VkQueue han
     : Parent(p), Type(queueType), Handle(handle), CmdBufferAllocator(p, queueType), FrameResources{p, p, p}
 {
     // Fences are created signaled, unsignal the first one
-    vkWaitForFences(Parent.GetVkDevice(), 1, &FrameResources[CurrFrameIndex].Fence, VK_TRUE, 1000);
+    VK(vkResetFences(Parent.GetVkDevice(), 1, &FrameResources[0].Fence));
 }
 
 CCommandQueueVk::~CCommandQueueVk()
@@ -67,10 +67,11 @@ void CCommandQueueVk::Submit(bool setFence)
         VK(vkQueueSubmit(GetHandle(), submitInfos.size(), submitInfos.data(), FrameResources[CurrFrameIndex].Fence));
     else
         VK(vkQueueSubmit(GetHandle(), submitInfos.size(), submitInfos.data(), VK_NULL_HANDLE));
-    assert(FrameResources[CurrFrameIndex].PostFrameCleanup.empty());
 
     std::lock_guard<std::mutex> lkd(GetDevice().DeviceMutex);
-    FrameResources[CurrFrameIndex].PostFrameCleanup = std::move(GetDevice().PostFrameCleanup);
+    auto& fnList = FrameResources[CurrFrameIndex].PostFrameCleanup;
+    fnList.insert(fnList.end(), GetDevice().PostFrameCleanup.begin(), GetDevice().PostFrameCleanup.end());
+    GetDevice().PostFrameCleanup.clear();
 }
 
 void CCommandQueueVk::SubmitFrame()
@@ -82,6 +83,7 @@ void CCommandQueueVk::SubmitFrame()
     CurrFrameIndex++;
     CurrFrameIndex %= FrameIndexCount;
     VK(vkWaitForFences(Parent.GetVkDevice(), 1, &FrameResources[CurrFrameIndex].Fence, VK_TRUE, 1000000));
+    VK(vkResetFences(Parent.GetVkDevice(), 1, &FrameResources[CurrFrameIndex].Fence));
     FrameResources[CurrFrameIndex].Reset();
 }
 

@@ -112,9 +112,11 @@ void CCommandBufferVk::BeginRecording(CRenderPass::Ref renderPass, uint32_t subp
         inheritInfo.queryFlags = 0;
         inheritInfo.pipelineStatistics = 0;
         beginInfo.pInheritanceInfo = &inheritInfo;
+
+        beginInfo.flags |= VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT;
     }
 
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    beginInfo.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
     VK(vkBeginCommandBuffer(Handle, &beginInfo));
 }
 

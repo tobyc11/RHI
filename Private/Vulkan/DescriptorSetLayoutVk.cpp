@@ -60,6 +60,7 @@ CDescriptorSetLayoutVk::~CDescriptorSetLayoutVk()
 
 CDescriptorSet::Ref CDescriptorSetLayoutVk::CreateDescriptorSet()
 {
+    // TODO: what if layout is empty
     return std::make_shared<CDescriptorSetVk>(std::static_pointer_cast<CDescriptorSetLayoutVk>(shared_from_this()));
 }
 
@@ -77,6 +78,7 @@ CPipelineLayoutVk::CPipelineLayoutVk(CDeviceVk& p, const std::vector<CDescriptor
     std::vector<VkDescriptorSetLayout> vkLayouts;
     for (const auto& it : setLayouts)
     {
+        assert(it);
         SetLayouts.emplace_back(std::static_pointer_cast<CDescriptorSetLayoutVk>(it));
         vkLayouts.emplace_back(SetLayouts.back()->GetHandle());
     }

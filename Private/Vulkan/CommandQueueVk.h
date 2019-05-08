@@ -6,6 +6,7 @@
 #include <SpinLock.h>
 #include <array>
 #include <vector>
+#include <mutex>
 
 namespace RHI
 {

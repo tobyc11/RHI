@@ -57,6 +57,13 @@ CManagedPipeline::CManagedPipeline(CDevice& device, CPipelineDesc& desc)
         SetLayouts[currSet] = device.CreateDescriptorSetLayout(bindings);
     }
 
+    for (auto& layout : SetLayouts)
+    {
+        if (!layout)
+        {
+            layout = device.CreateDescriptorSetLayout({});
+        }
+    }
     PipelineLayout = device.CreatePipelineLayout(SetLayouts);
 
     desc.Layout = PipelineLayout;
