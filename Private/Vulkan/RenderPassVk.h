@@ -14,7 +14,7 @@ public:
     CRenderPassVk(CDeviceVk& p, const CRenderPassDesc& desc);
     ~CRenderPassVk() override;
 
-    void Resize(uint32_t width, uint32_t height) override;
+    void SetSize(uint32_t width, uint32_t height) override;
 
     VkRenderPass GetHandle() const { return RenderPass; }
     const std::vector<VkAttachmentDescription>& GetAttachmentDesc() const { return AttachmentsVk; }
