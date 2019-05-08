@@ -438,6 +438,8 @@ void CCommandContextVk::SetStencilReference(uint32_t reference)
 
 void CCommandContextVk::BindRenderDescriptorSet(uint32_t set, CDescriptorSet& descriptorSet)
 {
+    if (!CurrPipeline)
+        throw CRHIRuntimeError("Cannot BindRenderDescriptorSet without a bound pipeline");
     // TODO: access tracking
     auto& impl = static_cast<CDescriptorSetVk&>(descriptorSet);
     VkDescriptorSet setHandle = impl.GetHandle(true);

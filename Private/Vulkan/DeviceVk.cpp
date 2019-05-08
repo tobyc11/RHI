@@ -284,6 +284,9 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     VkPipelineCacheCreateInfo pipelineCacheInfo = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO };
     vkCreatePipelineCache(Device, &pipelineCacheInfo, nullptr, &PipelineCache);
 
+    HugeConstantBuffer = std::make_unique<CPersistentMappedRingBuffer>(
+        *this, 33554432, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT); // 32M
+
     DefaultRenderQueue = std::static_pointer_cast<CCommandQueueVk>(CreateCommandQueue(EQueueType::Render));
     if (!IsTransferQueueSeparate())
         DefaultCopyQueue = DefaultRenderQueue;
