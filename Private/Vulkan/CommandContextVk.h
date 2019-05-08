@@ -15,7 +15,7 @@ struct CSubpassInfo
     CAccessTracker AccessTracker;
 };
 
-class CRenderPassContextVk : public std::enable_shared_from_this<CRenderPassContextVk>, public IRenderPassContext
+class CRenderPassContextVk : public std::enable_shared_from_this<CRenderPassContextVk>, public IParallelRenderContext
 {
 public:
     typedef std::shared_ptr<CRenderPassContextVk> Ref;

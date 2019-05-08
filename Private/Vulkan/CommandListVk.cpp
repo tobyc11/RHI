@@ -59,8 +59,8 @@ IComputeContext::Ref CCommandListVk::CreateComputeContext()
     return std::make_shared<CCommandContextVk>(std::static_pointer_cast<CCommandListVk>(shared_from_this()));
 }
 
-IRenderPassContext::Ref CCommandListVk::CreateRenderPassContext(CRenderPass::Ref renderPass,
-                                                                const std::vector<CClearValue>& clearValues)
+IParallelRenderContext::Ref CCommandListVk::CreateParallelRenderContext(CRenderPass::Ref renderPass,
+                                                                        const std::vector<CClearValue>& clearValues)
 {
     return std::make_shared<CRenderPassContextVk>(std::static_pointer_cast<CCommandListVk>(shared_from_this()),
                                                   renderPass,

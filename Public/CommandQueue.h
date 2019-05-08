@@ -29,8 +29,8 @@ public:
 
     virtual ICopyContext::Ref CreateCopyContext() = 0;
     virtual IComputeContext::Ref CreateComputeContext() = 0;
-    virtual IRenderPassContext::Ref CreateRenderPassContext(CRenderPass::Ref renderPass,
-                                                            const std::vector<CClearValue>& clearValues) = 0;
+    virtual IParallelRenderContext::Ref CreateParallelRenderContext(CRenderPass::Ref renderPass,
+                                                                    const std::vector<CClearValue>& clearValues) = 0;
 };
 
 class CCommandQueue : public std::enable_shared_from_this<CCommandQueue>

@@ -47,8 +47,8 @@ public:
 
     ICopyContext::Ref CreateCopyContext() override;
     IComputeContext::Ref CreateComputeContext() override;
-    IRenderPassContext::Ref CreateRenderPassContext(CRenderPass::Ref renderPass,
-                                                    const std::vector<CClearValue>& clearValues) override;
+    IParallelRenderContext::Ref CreateParallelRenderContext(CRenderPass::Ref renderPass,
+                                                            const std::vector<CClearValue>& clearValues) override;
 
     void MakeSubmitInfos(std::vector<VkSubmitInfo>& submitInfos, std::vector<VkCommandBuffer>& stagingArray);
     void ReleaseAllResources();

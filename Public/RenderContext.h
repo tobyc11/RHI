@@ -64,11 +64,11 @@ public:
 };
 
 // A meta context from which you can create multiple render contexts for a render pass
-class IRenderPassContext
+class IParallelRenderContext
 {
 public:
-    typedef std::shared_ptr<IRenderPassContext> Ref;
-    virtual ~IRenderPassContext() = default;
+    typedef std::shared_ptr<IParallelRenderContext> Ref;
+    virtual ~IParallelRenderContext() = default;
     virtual IRenderContext::Ref CreateRenderContext(uint32_t subpass) = 0;
     virtual void FinishRecording() = 0;
 };
