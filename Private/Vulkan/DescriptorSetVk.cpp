@@ -37,7 +37,14 @@ void RHI::CDescriptorSetVk::BindImageView(CImageView::Ref imageView, uint32_t bi
                                           uint32_t index)
 {
     auto impl = std::static_pointer_cast<CImageViewVk>(imageView);
-    ResourceBindings.BindImageView(impl.get(), VK_NULL_HANDLE, 0, binding, index);
+
+    VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    if (Any(impl->GetImage()->GetUsageFlags(), EImageUsageFlags::Storage))
+        layout = VK_IMAGE_LAYOUT_GENERAL;
+    if (GetImageAspectFlags(impl->GetFormat()) != VK_IMAGE_ASPECT_COLOR_BIT)
+        layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+    ResourceBindings.BindImageView(impl.get(), layout, VK_NULL_HANDLE, 0, binding, index);
 }
 
 void RHI::CDescriptorSetVk::BindSampler(CSampler::Ref sampler, uint32_t binding, uint32_t index)
@@ -114,10 +121,7 @@ void CDescriptorSetVk::WriteUpdates()
             {
                 VkDescriptorImageInfo info {};
                 info.imageView = arrayIter.second.ImageView->GetVkImageView();
-                info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                if (GetImageAspectFlags(arrayIter.second.ImageView->GetFormat())
-                    != VK_IMAGE_ASPECT_COLOR_BIT)
-                    info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+                info.imageLayout = arrayIter.second.ImageLayout;
 
                 imageInfos.push_back(info);
                 w.pImageInfo = reinterpret_cast<const VkDescriptorImageInfo*>(imageInfos.size());

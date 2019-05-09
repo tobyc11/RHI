@@ -12,26 +12,30 @@ void CResourceBindings::Reset()
 }
 
 void CResourceBindings::BindBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
-                                  uint32_t set, uint32_t binding, uint32_t arrayElement)
+                                   uint32_t set, uint32_t binding, uint32_t arrayElement)
 {
     Bind(set, binding, arrayElement,
-         BindingInfo { offset, range, buffer, VK_NULL_HANDLE, VK_NULL_HANDLE });
+         BindingInfo { offset, range, buffer, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED,
+                       VK_NULL_HANDLE });
 }
 
-void CResourceBindings::BindImageView(CImageViewVk* pImageView, VkSampler sampler, uint32_t set,
-                                     uint32_t binding, uint32_t arrayElement)
+void CResourceBindings::BindImageView(CImageViewVk* pImageView, VkImageLayout layout,
+                                      VkSampler sampler, uint32_t set, uint32_t binding,
+                                      uint32_t arrayElement)
 {
-    Bind(set, binding, arrayElement, BindingInfo { 0, 0, VK_NULL_HANDLE, pImageView, sampler });
+    Bind(set, binding, arrayElement,
+         BindingInfo { 0, 0, VK_NULL_HANDLE, pImageView, layout, sampler });
 }
 
 void CResourceBindings::BindSampler(VkSampler sampler, uint32_t set, uint32_t binding,
-                                   uint32_t arrayElement)
+                                    uint32_t arrayElement)
 {
-    Bind(set, binding, arrayElement, BindingInfo { 0, 0, VK_NULL_HANDLE, VK_NULL_HANDLE, sampler });
+    Bind(set, binding, arrayElement,
+         BindingInfo { 0, 0, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED, sampler });
 }
 
 void CResourceBindings::Bind(uint32_t set, uint32_t binding, uint32_t arrayElement,
-                            const BindingInfo& info)
+                             const BindingInfo& info)
 {
     // If resource is being removed from binding, erase the entry.
     if (info.BufferHandle == VK_NULL_HANDLE && info.ImageView == VK_NULL_HANDLE

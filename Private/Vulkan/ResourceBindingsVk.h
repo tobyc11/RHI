@@ -35,6 +35,7 @@ struct BindingInfo
     VkDeviceSize Range;
     VkBuffer BufferHandle;
     CImageViewVk* ImageView;
+    VkImageLayout ImageLayout;
     VkSampler SamplerHandle;
 };
 
@@ -61,8 +62,8 @@ public:
 
     void BindBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range, uint32_t set,
                     uint32_t binding, uint32_t arrayElement);
-    void BindImageView(CImageViewVk* pImageView, VkSampler sampler, uint32_t set, uint32_t binding,
-                       uint32_t arrayElement);
+    void BindImageView(CImageViewVk* pImageView, VkImageLayout layout, VkSampler sampler,
+                       uint32_t set, uint32_t binding, uint32_t arrayElement);
     void BindSampler(VkSampler sampler, uint32_t set, uint32_t binding, uint32_t arrayElement);
 
 private:
