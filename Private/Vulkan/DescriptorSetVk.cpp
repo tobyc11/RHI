@@ -3,6 +3,7 @@
 #include "ImageViewVk.h"
 #include "SamplerVk.h"
 #include <mutex>
+#include <cstring>
 
 namespace RHI
 {

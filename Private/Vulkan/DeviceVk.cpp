@@ -12,6 +12,7 @@
 
 #include <cstring>
 #include <vector>
+#include <cmath>
 
 #if TC_OS == TC_OS_LINUX
 #include <vulkan/vulkan_xcb.h>
