@@ -60,13 +60,18 @@ CDescriptorSetLayoutVk::~CDescriptorSetLayoutVk()
 
 CDescriptorSet::Ref CDescriptorSetLayoutVk::CreateDescriptorSet()
 {
-    // TODO: what if layout is empty
+    if (Bindings.empty())
+        return nullptr;
+
     return std::make_shared<CDescriptorSetVk>(
         std::static_pointer_cast<CDescriptorSetLayoutVk>(shared_from_this()));
 }
 
 const std::unique_ptr<CDescriptorPoolVk>& CDescriptorSetLayoutVk::GetDescriptorPool() const
 {
+    if (Bindings.empty())
+        throw CRHIRuntimeError("Cannot create descriptor set for an empty layout");
+
     if (!Pool)
         Pool = std::make_unique<CDescriptorPoolVk>(this);
     return Pool;
@@ -86,7 +91,7 @@ CPipelineLayoutVk::CPipelineLayoutVk(CDeviceVk& p,
     }
 
     VkPipelineLayoutCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
-    info.setLayoutCount = vkLayouts.size();
+    info.setLayoutCount = static_cast<uint32_t>(vkLayouts.size());
     info.pSetLayouts = vkLayouts.data();
     info.pushConstantRangeCount = 0;
     info.pPushConstantRanges = nullptr;

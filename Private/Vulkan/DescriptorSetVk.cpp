@@ -148,8 +148,8 @@ void CDescriptorSetVk::WriteUpdates()
         }
     }
 
-    vkUpdateDescriptorSets(Layout->GetDevice().GetVkDevice(), writes.size(), writes.data(), 0,
-                           nullptr);
+    vkUpdateDescriptorSets(Layout->GetDevice().GetVkDevice(), static_cast<uint32_t>(writes.size()),
+                           writes.data(), 0, nullptr);
 }
 
 }

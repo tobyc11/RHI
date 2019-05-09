@@ -78,7 +78,7 @@ void CRenderPassContextVk::FinishRecording()
         beginInfo.renderPass = renderPass->GetHandle();
         beginInfo.framebuffer = framebuffer;
         beginInfo.renderArea = renderPass->GetArea();
-        beginInfo.clearValueCount = ClearValues.size();
+        beginInfo.clearValueCount = static_cast<uint32_t>(ClearValues.size());
         beginInfo.pClearValues = reinterpret_cast<VkClearValue*>(ClearValues.data());
         vkCmdBeginRenderPass(handle, &beginInfo, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
         for (uint32_t i = 0; i < renderPass->GetSubpassCount(); i++)
@@ -93,7 +93,8 @@ void CRenderPassContextVk::FinishRecording()
                 section.AccessTracker.Merge(VK_NULL_HANDLE, subpassInfo.AccessTracker);
             }
 
-            vkCmdExecuteCommands(handle, secondaryBuffers.size(), secondaryBuffers.data());
+            vkCmdExecuteCommands(handle, static_cast<uint32_t>(secondaryBuffers.size()),
+                                 secondaryBuffers.data());
 
             if (i == renderPass->GetSubpassCount() - 1)
                 vkCmdEndRenderPass(handle);
@@ -239,10 +240,10 @@ CCommandContextVk::CCommandContextVk(const CRenderPassContextVk::Ref& renderPass
 
     auto rpImpl = std::static_pointer_cast<CRenderPassVk>(RenderPassContext->GetRenderPass());
     CViewportDesc vp {};
-    vp.X = 0;
-    vp.Y = 0;
-    vp.Width = rpImpl->GetArea().extent.width;
-    vp.Height = rpImpl->GetArea().extent.height;
+    vp.X = 0.0f;
+    vp.Y = 0.0f;
+    vp.Width = static_cast<float>(rpImpl->GetArea().extent.width);
+    vp.Height = static_cast<float>(rpImpl->GetArea().extent.height);
     vp.MinDepth = 0.0f;
     vp.MaxDepth = 1.0f;
     SetViewport(vp);

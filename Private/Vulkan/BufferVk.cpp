@@ -41,7 +41,7 @@ CBufferVk::CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const v
 
     vmaCreateBuffer(Parent.GetAllocator(), &bufferInfo, &allocInfo, &Buffer, &Allocation, nullptr);
 
-    if (initialData)
+    if (initialData && gpuOnly)
     {
         // Prepare a staging buffer
         VkBufferCreateInfo stgbufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
@@ -77,6 +77,13 @@ CBufferVk::CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const v
         Parent.GetDefaultCopyQueue()->Finish();
 
         vmaDestroyBuffer(Parent.GetAllocator(), stagingBuffer, stagingAlloc);
+    }
+    else if (initialData)
+    {
+        void* mappedData;
+        vmaMapMemory(Parent.GetAllocator(), Allocation, &mappedData);
+        memcpy(mappedData, initialData, size);
+        vmaUnmapMemory(Parent.GetAllocator(), Allocation);
     }
 }
 
@@ -142,7 +149,8 @@ void* CPersistentMappedRingBuffer::Allocate(size_t size, size_t alignment, size_
 
 void CPersistentMappedRingBuffer::MarkBlockEnd()
 {
-    vmaFlushAllocation(Parent.GetAllocator(), Allocation, CurrBlock.Begin, CurrBlock.End - CurrBlock.Begin);
+    vmaFlushAllocation(Parent.GetAllocator(), Allocation, CurrBlock.Begin,
+                       CurrBlock.End - CurrBlock.Begin);
 
     AllocatedBlocks.push(CurrBlock);
     CurrBlock.Begin = CurrBlock.End;
