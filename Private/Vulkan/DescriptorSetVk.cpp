@@ -10,7 +10,6 @@ namespace RHI
 RHI::CDescriptorSetVk::CDescriptorSetVk(CDescriptorSetLayoutVk::Ref layout)
     : Layout(layout)
 {
-    DiscardAndRecreate();
 }
 
 RHI::CDescriptorSetVk::~CDescriptorSetVk() {}
@@ -57,12 +56,7 @@ void CDescriptorSetVk::SetDynamicOffset(size_t offset, uint32_t binding, uint32_
     throw "unimplemented";
 }
 
-VkDescriptorSet RHI::CDescriptorSetVk::GetHandle(bool isUsedByCommand)
-{
-    if (isUsedByCommand)
-        bIsUsed = true;
-    return Handle;
-}
+VkDescriptorSet RHI::CDescriptorSetVk::GetHandle() { return Handle; }
 
 void CDescriptorSetVk::DiscardAndRecreate()
 {
@@ -76,7 +70,7 @@ void CDescriptorSetVk::DiscardAndRecreate()
             return;
 
         Layout->GetDevice().AddPostFrameCleanup(
-            [=, &poolPtr](CDeviceVk& p) { poolPtr->FreeDescriptorSet(Handle); });
+            [=](CDeviceVk& p) { Layout->GetDescriptorPool()->FreeDescriptorSet(Handle); });
     }
 
     Handle = poolPtr->AllocateDescriptorSet();
@@ -89,17 +83,20 @@ void CDescriptorSetVk::WriteUpdates()
 
     ResourceBindings.ClearDirtyBit();
 
+    if (bIsUsed || !Handle)
+    {
+        DiscardAndRecreate();
+        bIsUsed = false;
+    }
+
     // Since we only have one descriptor set, the first SetBindings is it
     auto& setBindings = ResourceBindings.GetSetBindings().begin()->second;
     setBindings.bDirty = false;
 
     std::vector<VkWriteDescriptorSet> writes;
     std::vector<VkDescriptorImageInfo> imageInfos;
-    imageInfos.reserve(128);
     std::vector<VkDescriptorBufferInfo> bufferInfos;
-    bufferInfos.reserve(128);
     std::vector<VkBufferView> bufferViews;
-    bufferViews.reserve(128);
     for (const auto& bindingIter : setBindings.Bindings)
     {
         uint32_t binding = bindingIter.first;
@@ -125,7 +122,7 @@ void CDescriptorSetVk::WriteUpdates()
                     info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
                 imageInfos.push_back(info);
-                w.pImageInfo = &imageInfos.back();
+                w.pImageInfo = reinterpret_cast<const VkDescriptorImageInfo*>(imageInfos.size());
             }
             else if (arrayIter.second.BufferHandle)
             {
@@ -135,7 +132,7 @@ void CDescriptorSetVk::WriteUpdates()
                 info.range = arrayIter.second.Range;
 
                 bufferInfos.push_back(info);
-                w.pBufferInfo = &bufferInfos.back();
+                w.pBufferInfo = reinterpret_cast<const VkDescriptorBufferInfo*>(bufferInfos.size());
             }
             else if (arrayIter.second.SamplerHandle)
             {
@@ -143,9 +140,19 @@ void CDescriptorSetVk::WriteUpdates()
                 info.sampler = arrayIter.second.SamplerHandle;
 
                 imageInfos.push_back(info);
-                w.pImageInfo = &imageInfos.back();
+                w.pImageInfo = reinterpret_cast<const VkDescriptorImageInfo*>(imageInfos.size());
             }
         }
+    }
+
+    for (auto& w : writes)
+    {
+        if (w.pImageInfo)
+            w.pImageInfo = &imageInfos[reinterpret_cast<size_t>(w.pImageInfo) - 1];
+        if (w.pBufferInfo)
+            w.pBufferInfo = &bufferInfos[reinterpret_cast<size_t>(w.pBufferInfo) - 1];
+        if (w.pTexelBufferView)
+            w.pTexelBufferView = &bufferViews[reinterpret_cast<size_t>(w.pTexelBufferView) - 1];
     }
 
     vkUpdateDescriptorSets(Layout->GetDevice().GetVkDevice(), static_cast<uint32_t>(writes.size()),

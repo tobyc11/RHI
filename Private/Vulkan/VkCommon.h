@@ -25,6 +25,7 @@ namespace RHI
 class CDeviceVk;
 class CCommandQueueVk;
 class CCommandContextVk;
+class CDescriptorSetVk;
 class CImageVk;
 class CImageViewVk;
 class CPipelineVk;

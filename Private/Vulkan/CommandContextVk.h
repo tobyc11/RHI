@@ -112,6 +112,7 @@ public:
 protected:
     CAccessTracker& AccessTracker();
     VkCommandBuffer CmdBuffer();
+    void WriteDescriptorSets(VkPipelineBindPoint bindPoint);
 
 private:
     // The target we are recording into
@@ -124,6 +125,8 @@ private:
 
     // Temporary states
     CPipelineVk* CurrPipeline = nullptr;
+    std::array<CDescriptorSetVk*, 8> BoundDescriptorSets {};
+    std::array<bool, 8> BindingDirty {};
 };
 
 }

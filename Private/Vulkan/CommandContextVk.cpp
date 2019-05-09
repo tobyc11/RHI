@@ -385,19 +385,19 @@ void CCommandContextVk::BindComputeDescriptorSet(uint32_t set, CDescriptorSet& d
 {
     // TODO: access tracking
     auto& impl = static_cast<CDescriptorSetVk&>(descriptorSet);
-    VkDescriptorSet setHandle = impl.GetHandle(true);
-    impl.WriteUpdates();
-    vkCmdBindDescriptorSets(CmdBuffer(), VK_PIPELINE_BIND_POINT_COMPUTE,
-                            CurrPipeline->GetPipelineLayout(), set, 1, &setHandle, 0, nullptr);
+    BoundDescriptorSets[set] = &impl;
+    BindingDirty[set] = true;
 }
 
 void CCommandContextVk::Dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ)
 {
+    WriteDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE);
     vkCmdDispatch(CmdBuffer(), groupCountX, groupCountY, groupCountZ);
 }
 
 void CCommandContextVk::DispatchIndirect(CBuffer& buffer, size_t offset)
 {
+    WriteDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE);
     auto& impl = static_cast<CBufferVk&>(buffer);
     vkCmdDispatchIndirect(CmdBuffer(), impl.Buffer, offset);
 }
@@ -435,14 +435,10 @@ void CCommandContextVk::SetStencilReference(uint32_t reference)
 
 void CCommandContextVk::BindRenderDescriptorSet(uint32_t set, CDescriptorSet& descriptorSet)
 {
-    if (!CurrPipeline)
-        throw CRHIRuntimeError("Cannot BindRenderDescriptorSet without a bound pipeline");
     // TODO: access tracking
     auto& impl = static_cast<CDescriptorSetVk&>(descriptorSet);
-    VkDescriptorSet setHandle = impl.GetHandle(true);
-    impl.WriteUpdates();
-    vkCmdBindDescriptorSets(CmdBuffer(), VK_PIPELINE_BIND_POINT_GRAPHICS,
-                            CurrPipeline->GetPipelineLayout(), set, 1, &setHandle, 0, nullptr);
+    BoundDescriptorSets[set] = &impl;
+    BindingDirty[set] = true;
 }
 
 void CCommandContextVk::BindIndexBuffer(CBuffer& buffer, size_t offset, EFormat format)
@@ -464,6 +460,7 @@ void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer& buffer, size
 void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
                              uint32_t firstInstance)
 {
+    WriteDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS);
     vkCmdDraw(CmdBuffer(), vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
@@ -471,6 +468,7 @@ void CCommandContextVk::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
                                     uint32_t firstIndex, int32_t vertexOffset,
                                     uint32_t firstInstance)
 {
+    WriteDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS);
     vkCmdDrawIndexed(CmdBuffer(), indexCount, instanceCount, firstIndex, vertexOffset,
                      firstInstance);
 }
@@ -478,6 +476,7 @@ void CCommandContextVk::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
 void CCommandContextVk::DrawIndirect(CBuffer& buffer, size_t offset, uint32_t drawCount,
                                      uint32_t stride)
 {
+    WriteDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS);
     VkBuffer vkBuffer = static_cast<CBufferVk&>(buffer).Buffer;
     vkCmdDrawIndirect(CmdBuffer(), vkBuffer, offset, drawCount, stride);
 }
@@ -485,6 +484,7 @@ void CCommandContextVk::DrawIndirect(CBuffer& buffer, size_t offset, uint32_t dr
 void CCommandContextVk::DrawIndexedIndirect(CBuffer& buffer, size_t offset, uint32_t drawCount,
                                             uint32_t stride)
 {
+    WriteDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS);
     VkBuffer vkBuffer = static_cast<CBufferVk&>(buffer).Buffer;
     vkCmdDrawIndirect(CmdBuffer(), vkBuffer, offset, drawCount, stride);
 }
@@ -535,4 +535,31 @@ VkCommandBuffer CCommandContextVk::CmdBuffer()
         .SecondaryBuffer->GetHandle();
 }
 
+void CCommandContextVk::WriteDescriptorSets(VkPipelineBindPoint bindPoint)
+{
+    uint32_t set = 0;
+    for (auto* ds : BoundDescriptorSets)
+    {
+        if (ds)
+        {
+            if (ds->IsContentDirty())
+            {
+                ds->WriteUpdates();
+                ds->SetUsed();
+
+                VkDescriptorSet setHandle = ds->GetHandle();
+                vkCmdBindDescriptorSets(CmdBuffer(), bindPoint, CurrPipeline->GetPipelineLayout(),
+                                        set, 1, &setHandle, 0, nullptr);
+            }
+            else if (BindingDirty[set])
+            {
+                VkDescriptorSet setHandle = ds->GetHandle();
+                vkCmdBindDescriptorSets(CmdBuffer(), bindPoint, CurrPipeline->GetPipelineLayout(),
+                                        set, 1, &setHandle, 0, nullptr);
+            }
+            BindingDirty[set] = false;
+        }
+        set++;
+    }
+}
 }

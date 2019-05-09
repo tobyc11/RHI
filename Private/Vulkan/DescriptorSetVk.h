@@ -22,9 +22,11 @@ public:
     void SetDynamicOffset(size_t offset, uint32_t binding, uint32_t index) override;
 
     // Internal API
-    VkDescriptorSet GetHandle(bool isUsedByCommand);
+    VkDescriptorSet GetHandle();
+    bool IsContentDirty() const { return ResourceBindings.IsDirty(); }
     void DiscardAndRecreate(); // Similar to the DX11 MapDiscard semantics
     void WriteUpdates();
+    void SetUsed() { bIsUsed = true; }
 
 private:
     // Holds the layout alive
