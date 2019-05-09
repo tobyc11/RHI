@@ -67,6 +67,7 @@ enum class EImageUsageFlags
     CubeMap = 1 << 3,
     GenMIPMaps = 1 << 4,
     Staging = 1 << 5,
+    Storage = 1 << 6,
 };
 
 DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EImageUsageFlags)
