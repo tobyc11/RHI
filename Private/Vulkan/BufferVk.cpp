@@ -76,7 +76,7 @@ CBufferVk::CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const v
         cmdList->Commit();
         Parent.GetDefaultCopyQueue()->Flush();
 
-		Parent.AddPostFrameCleanup([stagingBuffer, stagingAlloc](CDeviceVk& p) {
+        Parent.AddPostFrameCleanup([stagingBuffer, stagingAlloc](CDeviceVk& p) {
             vmaDestroyBuffer(p.GetAllocator(), stagingBuffer, stagingAlloc);
         });
     }
@@ -89,7 +89,12 @@ CBufferVk::CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const v
     }
 }
 
-CBufferVk::~CBufferVk() { vmaDestroyBuffer(Parent.GetAllocator(), Buffer, Allocation); }
+CBufferVk::~CBufferVk()
+{
+    auto b = Buffer;
+    auto a = Allocation;
+    Parent.AddPostFrameCleanup([b, a](CDeviceVk& p) { vmaDestroyBuffer(p.GetAllocator(), b, a); });
+}
 
 void* CBufferVk::Map(size_t offset, size_t size)
 {

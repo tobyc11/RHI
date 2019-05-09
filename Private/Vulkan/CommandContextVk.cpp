@@ -298,8 +298,9 @@ void CCommandContextVk::CopyBuffer(CBuffer& src, CBuffer& dst,
     static_assert(sizeof(CBufferCopy) == sizeof(VkBufferCopy), "struct size mismatch");
     const auto* r = reinterpret_cast<const VkBufferCopy*>(regions.data());
 
-    vkCmdCopyBuffer(CmdBuffer(), static_cast<CBufferVk&>(src).Buffer,
-                    static_cast<CBufferVk&>(dst).Buffer, static_cast<uint32_t>(regions.size()), r);
+    vkCmdCopyBuffer(CmdBuffer(), static_cast<CBufferVk&>(src).GetHandle(),
+                    static_cast<CBufferVk&>(dst).GetHandle(), static_cast<uint32_t>(regions.size()),
+                    r);
 }
 
 void CCommandContextVk::CopyImage(CImage& src, CImage& dst, const std::vector<CImageCopy>& regions)
@@ -337,8 +338,8 @@ void CCommandContextVk::CopyBufferToImage(CBuffer& src, CImage& dst,
                         rs.ImageSubresource.LayerCount, EResourceState::CopyDest);
     }
     auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdCopyBufferToImage(CmdBuffer(), static_cast<CBufferVk&>(src).Buffer, dstImpl.GetVkImage(),
-                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    vkCmdCopyBufferToImage(CmdBuffer(), static_cast<CBufferVk&>(src).GetHandle(),
+                           dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                            static_cast<uint32_t>(vkregions.size()), vkregions.data());
 }
 
@@ -357,7 +358,7 @@ void CCommandContextVk::CopyImageToBuffer(CImage& src, CBuffer& dst,
     }
     auto& srcImpl = static_cast<CImageVk&>(src);
     vkCmdCopyImageToBuffer(CmdBuffer(), srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                           static_cast<CBufferVk&>(dst).Buffer,
+                           static_cast<CBufferVk&>(dst).GetHandle(),
                            static_cast<uint32_t>(vkregions.size()), vkregions.data());
 }
 
@@ -430,7 +431,7 @@ void CCommandContextVk::DispatchIndirect(CBuffer& buffer, size_t offset)
 {
     WriteDescriptorSets(VK_PIPELINE_BIND_POINT_COMPUTE);
     auto& impl = static_cast<CBufferVk&>(buffer);
-    vkCmdDispatchIndirect(CmdBuffer(), impl.Buffer, offset);
+    vkCmdDispatchIndirect(CmdBuffer(), impl.GetHandle(), offset);
 }
 
 void CCommandContextVk::BindRenderPipeline(CPipeline& pipeline)
@@ -477,7 +478,7 @@ void CCommandContextVk::BindIndexBuffer(CBuffer& buffer, size_t offset, EFormat 
     auto& impl = static_cast<CBufferVk&>(buffer);
     VkIndexType indexType =
         format == EFormat::R16_UINT ? VK_INDEX_TYPE_UINT16 : VK_INDEX_TYPE_UINT32;
-    vkCmdBindIndexBuffer(CmdBuffer(), impl.Buffer, offset, indexType);
+    vkCmdBindIndexBuffer(CmdBuffer(), impl.GetHandle(), offset, indexType);
 }
 
 void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer& buffer, size_t offset)
@@ -485,7 +486,7 @@ void CCommandContextVk::BindVertexBuffer(uint32_t binding, CBuffer& buffer, size
     auto& impl = static_cast<CBufferVk&>(buffer);
     // Workaround for systems where size_t != 8
     VkDeviceSize vkOffset = offset;
-    vkCmdBindVertexBuffers(CmdBuffer(), binding, 1, &impl.Buffer, &vkOffset);
+    vkCmdBindVertexBuffers(CmdBuffer(), binding, 1, &impl.GetHandle(), &vkOffset);
 }
 
 void CCommandContextVk::Draw(uint32_t vertexCount, uint32_t instanceCount, uint32_t firstVertex,
@@ -508,7 +509,7 @@ void CCommandContextVk::DrawIndirect(CBuffer& buffer, size_t offset, uint32_t dr
                                      uint32_t stride)
 {
     WriteDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS);
-    VkBuffer vkBuffer = static_cast<CBufferVk&>(buffer).Buffer;
+    VkBuffer vkBuffer = static_cast<CBufferVk&>(buffer).GetHandle();
     vkCmdDrawIndirect(CmdBuffer(), vkBuffer, offset, drawCount, stride);
 }
 
@@ -516,7 +517,7 @@ void CCommandContextVk::DrawIndexedIndirect(CBuffer& buffer, size_t offset, uint
                                             uint32_t stride)
 {
     WriteDescriptorSets(VK_PIPELINE_BIND_POINT_GRAPHICS);
-    VkBuffer vkBuffer = static_cast<CBufferVk&>(buffer).Buffer;
+    VkBuffer vkBuffer = static_cast<CBufferVk&>(buffer).GetHandle();
     vkCmdDrawIndirect(CmdBuffer(), vkBuffer, offset, drawCount, stride);
 }
 

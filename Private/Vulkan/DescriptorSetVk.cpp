@@ -17,7 +17,7 @@ RHI::CDescriptorSetVk::~CDescriptorSetVk() {}
 void RHI::CDescriptorSetVk::BindBuffer(CBuffer::Ref buffer, size_t offset, size_t range,
                                        uint32_t binding, uint32_t index)
 {
-    auto handle = std::static_pointer_cast<CBufferVk>(buffer)->Buffer;
+    auto handle = std::static_pointer_cast<CBufferVk>(buffer)->GetHandle();
     ResourceBindings.BindBuffer(handle, offset, range, 0, binding, index);
 }
 
@@ -65,9 +65,8 @@ void CDescriptorSetVk::DiscardAndRecreate()
     {
         auto l = Layout;
         auto h = Handle;
-        Layout->GetDevice().AddPostFrameCleanup([l, h](CDeviceVk& p) {
-            l->GetDescriptorPool()->FreeDescriptorSet(h);
-        });
+        Layout->GetDevice().AddPostFrameCleanup(
+            [l, h](CDeviceVk& p) { l->GetDescriptorPool()->FreeDescriptorSet(h); });
     }
 
     const auto& poolPtr = Layout->GetDescriptorPool();
