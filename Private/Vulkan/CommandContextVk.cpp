@@ -576,7 +576,6 @@ void CCommandContextVk::WriteDescriptorSets(VkPipelineBindPoint bindPoint)
             if (ds->IsContentDirty())
             {
                 ds->WriteUpdates();
-                ds->SetUsed();
 
                 VkDescriptorSet setHandle = ds->GetHandle();
                 vkCmdBindDescriptorSets(CmdBuffer(), bindPoint, CurrPipeline->GetPipelineLayout(),
@@ -589,6 +588,7 @@ void CCommandContextVk::WriteDescriptorSets(VkPipelineBindPoint bindPoint)
                                         set, 1, &setHandle, 0, nullptr);
             }
             BindingDirty[set] = false;
+            ds->SetUsed();
         }
         set++;
     }

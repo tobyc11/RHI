@@ -463,7 +463,7 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     ctx->TransitionImage(*image, defaultState);
     ctx->FinishRecording();
     cmdList->Commit();
-    DefaultCopyQueue->Finish();
+    DefaultCopyQueue->Flush();
     return std::move(image);
 }
 

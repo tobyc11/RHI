@@ -60,19 +60,17 @@ VkDescriptorSet RHI::CDescriptorSetVk::GetHandle() { return Handle; }
 
 void CDescriptorSetVk::DiscardAndRecreate()
 {
-    const auto& poolPtr = Layout->GetDescriptorPool();
-
     // Discard the old handle
     if (Handle)
     {
-        // Dont need to do anything if the old handle is not used
-        if (!bIsUsed)
-            return;
-
-        Layout->GetDevice().AddPostFrameCleanup(
-            [=](CDeviceVk& p) { Layout->GetDescriptorPool()->FreeDescriptorSet(Handle); });
+        auto l = Layout;
+        auto h = Handle;
+        Layout->GetDevice().AddPostFrameCleanup([l, h](CDeviceVk& p) {
+            l->GetDescriptorPool()->FreeDescriptorSet(h);
+        });
     }
 
+    const auto& poolPtr = Layout->GetDescriptorPool();
     Handle = poolPtr->AllocateDescriptorSet();
 }
 
