@@ -70,6 +70,8 @@ public:
     ~CCommandContextVk() override;
 
     void TransitionImage(CImage& image, EResourceState newState);
+    void TransitionImage(CImage& image, uint32_t baseMip, uint32_t mipCount, uint32_t baseLayer,
+                         uint32_t layerCount, EResourceState newState);
     VkCommandBuffer GetCmdBuffer() { return CmdBuffer(); }
 
     // Copy commands

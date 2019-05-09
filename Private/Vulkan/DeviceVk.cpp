@@ -92,7 +92,7 @@ void InitRHIInstance()
     const std::vector<const char*> validationLayers = { "VK_LAYER_LUNARG_standard_validation" };
 
 #if defined(NDEBUG)
-    const bool enableValidationLayers = false;
+    const bool enableValidationLayers = true;
 #else
     const bool enableValidationLayers = true;
 #endif
@@ -220,31 +220,41 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
 
     {
         VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-        queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Render)]).queueCount = 1;
-        info.queueCount = queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Render)]).queueCount;
+        queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Render)]).queueCount =
+            1;
+        info.queueCount =
+            queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Render)])
+                .queueCount;
         info.queueFamilyIndex = QueueFamilies[static_cast<int>(EQueueType::Render)];
         for (uint32_t unused = 0; unused < info.queueCount; unused++)
             queuePriorities.push_back(1.0f);
         info.pQueuePriorities = &queuePriorities.back() - info.queueCount + 1;
         queueInfos.push_back(info);
     }
-    if (QueueFamilies[static_cast<int>(EQueueType::Compute)] != QueueFamilies[static_cast<int>(EQueueType::Render)])
+    if (QueueFamilies[static_cast<int>(EQueueType::Compute)]
+        != QueueFamilies[static_cast<int>(EQueueType::Render)])
     {
         VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
-        queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Compute)]).queueCount = 1;
-        info.queueCount = queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Compute)]).queueCount;
+        queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Compute)]).queueCount =
+            1;
+        info.queueCount =
+            queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Compute)])
+                .queueCount;
         info.queueFamilyIndex = QueueFamilies[static_cast<int>(EQueueType::Compute)];
         for (uint32_t unused = 0; unused < info.queueCount; unused++)
             queuePriorities.push_back(1.0f);
         info.pQueuePriorities = &queuePriorities.back() - info.queueCount + 1;
         queueInfos.push_back(info);
     }
-    if (QueueFamilies[static_cast<int>(EQueueType::Copy)] != QueueFamilies[static_cast<int>(EQueueType::Compute)]
-        && QueueFamilies[static_cast<int>(EQueueType::Copy)] != QueueFamilies[static_cast<int>(EQueueType::Render)])
+    if (QueueFamilies[static_cast<int>(EQueueType::Copy)]
+            != QueueFamilies[static_cast<int>(EQueueType::Compute)]
+        && QueueFamilies[static_cast<int>(EQueueType::Copy)]
+            != QueueFamilies[static_cast<int>(EQueueType::Render)])
     {
         VkDeviceQueueCreateInfo info = { VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
         queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Copy)]).queueCount = 1;
-        info.queueCount = queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Copy)]).queueCount;
+        info.queueCount =
+            queueFamilyProperites.at(QueueFamilies[static_cast<int>(EQueueType::Copy)]).queueCount;
         info.queueFamilyIndex = QueueFamilies[static_cast<int>(EQueueType::Copy)];
         for (uint32_t unused = 0; unused < info.queueCount; unused++)
             queuePriorities.push_back(1.0f);
@@ -287,7 +297,8 @@ CDeviceVk::CDeviceVk(EDeviceCreateHints hints)
     HugeConstantBuffer = std::make_unique<CPersistentMappedRingBuffer>(
         *this, 33554432, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT); // 32M
 
-    DefaultRenderQueue = std::static_pointer_cast<CCommandQueueVk>(CreateCommandQueue(EQueueType::Render));
+    DefaultRenderQueue =
+        std::static_pointer_cast<CCommandQueueVk>(CreateCommandQueue(EQueueType::Render));
     if (!IsTransferQueueSeparate())
         DefaultCopyQueue = DefaultRenderQueue;
 }
@@ -359,6 +370,10 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
         allocCreateInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
         defaultState = EResourceState::CopySource;
     }
+    if (Any(usage, EImageUsageFlags::GenMIPMaps))
+    {
+        imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    }
 
     VkResult result;
     result = vmaCreateImage(Allocator, &imageInfo, &allocCreateInfo, &handle, &allocation, nullptr);
@@ -412,9 +427,38 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
         vkCmdCopyBufferToImage(cmdBuffer, stagingBuffer, handle,
                                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-        PostFrameCleanup.emplace_back([=](CDeviceVk& p){
-            vmaDestroyBuffer(p.GetAllocator(), stagingBuffer, stagingAlloc);
-        });
+        if (Any(usage, EImageUsageFlags::GenMIPMaps))
+        {
+            CImageBlit blit;
+            blit.SrcSubresource.BaseArrayLayer = 0;
+            blit.SrcSubresource.LayerCount = arrayLayers;
+            blit.DstSubresource.BaseArrayLayer = 0;
+            blit.DstSubresource.LayerCount = arrayLayers;
+            blit.SrcOffsets[0].Set(0, 0, 0);
+            blit.DstOffsets[0].Set(0, 0, 0);
+
+            uint32_t srcWidth = width;
+            uint32_t srcHeight = height;
+            uint32_t srcDepth = depth;
+            for (uint32_t dstMip = 1; dstMip < mipLevels; dstMip++)
+            {
+                blit.SrcSubresource.MipLevel = dstMip - 1;
+                blit.DstSubresource.MipLevel = dstMip;
+                blit.SrcOffsets[1].Set(srcWidth, srcHeight, srcDepth);
+
+                if (srcWidth > 1)
+                    srcWidth /= 2;
+                if (srcHeight > 1)
+                    srcHeight /= 2;
+                if (srcDepth > 1)
+                    srcDepth /= 2;
+                blit.DstOffsets[1].Set(srcWidth, srcHeight, srcDepth);
+                ctx->BlitImage(*image, *image, { blit }, EFilter::Linear);
+            }
+        }
+
+        PostFrameCleanup.emplace_back(
+            [=](CDeviceVk& p) { vmaDestroyBuffer(p.GetAllocator(), stagingBuffer, stagingAlloc); });
     }
     ctx->TransitionImage(*image, defaultState);
     ctx->FinishRecording();
@@ -432,6 +476,12 @@ CImage::Ref CDeviceVk::CreateImage1D(EFormat format, EImageUsageFlags usage, uin
                                      uint32_t mipLevels, uint32_t arrayLayers, uint32_t sampleCount,
                                      const void* initialData)
 {
+    if (Any(usage, EImageUsageFlags::GenMIPMaps))
+    {
+        if ((width & -width) != width)
+            throw CRHIRuntimeError("GenMIPMaps requires sizes to be 2^n");
+        mipLevels = 1 + floor(log2(width));
+    }
     return InternalCreateImage(VK_IMAGE_TYPE_1D, format, usage, width, 1, 1, mipLevels, arrayLayers,
                                sampleCount, initialData);
 }
@@ -440,6 +490,12 @@ CImage::Ref CDeviceVk::CreateImage2D(EFormat format, EImageUsageFlags usage, uin
                                      uint32_t height, uint32_t mipLevels, uint32_t arrayLayers,
                                      uint32_t sampleCount, const void* initialData)
 {
+    if (Any(usage, EImageUsageFlags::GenMIPMaps))
+    {
+        if ((width & -width) != width || (height & -height) != height)
+            throw CRHIRuntimeError("GenMIPMaps requires sizes to be 2^n");
+        mipLevels = 1 + floor(log2(std::min(width, height)));
+    }
     return InternalCreateImage(VK_IMAGE_TYPE_2D, format, usage, width, height, 1, mipLevels,
                                arrayLayers, sampleCount, initialData);
 }
@@ -449,6 +505,12 @@ CImage::Ref CDeviceVk::CreateImage3D(EFormat format, EImageUsageFlags usage, uin
                                      uint32_t arrayLayers, uint32_t sampleCount,
                                      const void* initialData)
 {
+    if (Any(usage, EImageUsageFlags::GenMIPMaps))
+    {
+        if ((width & -width) != width || (height & -height) != height || (depth & -depth) != depth)
+            throw CRHIRuntimeError("GenMIPMaps requires sizes to be 2^n");
+        mipLevels = 1 + floor(log2(std::min(width, std::min(height, depth))));
+    }
     return InternalCreateImage(VK_IMAGE_TYPE_3D, format, usage, width, height, depth, mipLevels,
                                arrayLayers, sampleCount, initialData);
 }
@@ -463,12 +525,14 @@ CShaderModule::Ref CDeviceVk::CreateShaderModule(size_t size, const void* pCode)
     return std::make_shared<CShaderModuleVk>(*this, size, pCode);
 }
 
-CDescriptorSetLayout::Ref CDeviceVk::CreateDescriptorSetLayout(const std::vector<CDescriptorSetLayoutBinding>& bindings)
+CDescriptorSetLayout::Ref
+CDeviceVk::CreateDescriptorSetLayout(const std::vector<CDescriptorSetLayoutBinding>& bindings)
 {
     return std::make_shared<CDescriptorSetLayoutVk>(*this, bindings);
 }
 
-CPipelineLayout::Ref CDeviceVk::CreatePipelineLayout(const std::vector<CDescriptorSetLayout::Ref>& setLayouts)
+CPipelineLayout::Ref
+CDeviceVk::CreatePipelineLayout(const std::vector<CDescriptorSetLayout::Ref>& setLayouts)
 {
     return std::make_shared<CPipelineLayoutVk>(*this, setLayouts);
 }
@@ -488,10 +552,7 @@ CSampler::Ref CDeviceVk::CreateSampler(const CSamplerDesc& desc)
     return std::make_shared<CSamplerVk>(*this, desc);
 }
 
-CCommandQueue::Ref CDeviceVk::CreateCommandQueue()
-{
-    return DefaultRenderQueue;
-}
+CCommandQueue::Ref CDeviceVk::CreateCommandQueue() { return DefaultRenderQueue; }
 
 CCommandQueue::Ref CDeviceVk::CreateCommandQueue(EQueueType queueType)
 {

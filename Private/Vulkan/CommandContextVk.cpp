@@ -274,6 +274,24 @@ void CCommandContextVk::TransitionImage(CImage& image, EResourceState newState)
                                          CmdList->GetQueue().GetType() == EQueueType::Copy);
 }
 
+void CCommandContextVk::TransitionImage(CImage& image, uint32_t baseMip, uint32_t mipCount,
+                                        uint32_t baseLayer, uint32_t layerCount,
+                                        EResourceState newState)
+{
+    auto& imageImpl = static_cast<CImageVk&>(image);
+    CImageSubresourceRange range;
+    range.BaseArrayLayer = baseLayer;
+    range.BaseMipLevel = baseMip;
+    range.LayerCount = layerCount;
+    range.LevelCount = mipCount;
+    if (range.BaseArrayLayer + range.LayerCount > imageImpl.GetArrayLayers())
+        throw CRHIRuntimeError("TransitionImage range out of bounds");
+    if (range.BaseMipLevel + range.LevelCount > imageImpl.GetMipLevels())
+        throw CRHIRuntimeError("TransitionImage range out of bounds");
+    AccessTracker().TransitionImageState(CmdBuffer(), &imageImpl, range, newState,
+                                         CmdList->GetQueue().GetType() == EQueueType::Copy);
+}
+
 void CCommandContextVk::CopyBuffer(CBuffer& src, CBuffer& dst,
                                    const std::vector<CBufferCopy>& regions)
 {
@@ -292,9 +310,12 @@ void CCommandContextVk::CopyImage(CImage& src, CImage& dst, const std::vector<CI
         VkImageCopy next;
         Convert(next, rs);
         r.push_back(next);
+
+        TransitionImage(src, rs.SrcSubresource.MipLevel, 1, rs.SrcSubresource.BaseArrayLayer,
+                        rs.SrcSubresource.LayerCount, EResourceState::CopySource);
+        TransitionImage(dst, rs.DstSubresource.MipLevel, 1, rs.DstSubresource.BaseArrayLayer,
+                        rs.DstSubresource.LayerCount, EResourceState::CopyDest);
     }
-    TransitionImage(src, EResourceState::CopySource);
-    TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
     vkCmdCopyImage(CmdBuffer(), srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -311,8 +332,10 @@ void CCommandContextVk::CopyBufferToImage(CBuffer& src, CImage& dst,
         VkBufferImageCopy next;
         Convert(next, rs);
         vkregions.push_back(next);
+
+        TransitionImage(dst, rs.ImageSubresource.MipLevel, 1, rs.ImageSubresource.BaseArrayLayer,
+                        rs.ImageSubresource.LayerCount, EResourceState::CopyDest);
     }
-    TransitionImage(dst, EResourceState::CopyDest);
     auto& dstImpl = static_cast<CImageVk&>(dst);
     vkCmdCopyBufferToImage(CmdBuffer(), static_cast<CBufferVk&>(src).Buffer, dstImpl.GetVkImage(),
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -328,8 +351,10 @@ void CCommandContextVk::CopyImageToBuffer(CImage& src, CBuffer& dst,
         VkBufferImageCopy next;
         Convert(next, rs);
         vkregions.push_back(next);
+
+        TransitionImage(src, rs.ImageSubresource.MipLevel, 1, rs.ImageSubresource.BaseArrayLayer,
+                        rs.ImageSubresource.LayerCount, EResourceState::CopySource);
     }
-    TransitionImage(src, EResourceState::CopySource);
     auto& srcImpl = static_cast<CImageVk&>(src);
     vkCmdCopyImageToBuffer(CmdBuffer(), srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                            static_cast<CBufferVk&>(dst).Buffer,
@@ -345,9 +370,12 @@ void CCommandContextVk::BlitImage(CImage& src, CImage& dst, const std::vector<CI
         VkImageBlit next;
         Convert(next, rs);
         r.push_back(next);
+
+        TransitionImage(src, rs.SrcSubresource.MipLevel, 1, rs.SrcSubresource.BaseArrayLayer,
+                        rs.SrcSubresource.LayerCount, EResourceState::CopySource);
+        TransitionImage(dst, rs.DstSubresource.MipLevel, 1, rs.DstSubresource.BaseArrayLayer,
+                        rs.DstSubresource.LayerCount, EResourceState::CopyDest);
     }
-    TransitionImage(src, EResourceState::CopySource);
-    TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
     vkCmdBlitImage(CmdBuffer(), srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
@@ -364,9 +392,12 @@ void CCommandContextVk::ResolveImage(CImage& src, CImage& dst,
         VkImageResolve next;
         Convert(next, rs);
         r.push_back(next);
+
+        TransitionImage(src, rs.SrcSubresource.MipLevel, 1, rs.SrcSubresource.BaseArrayLayer,
+                        rs.SrcSubresource.LayerCount, EResourceState::CopySource);
+        TransitionImage(dst, rs.DstSubresource.MipLevel, 1, rs.DstSubresource.BaseArrayLayer,
+                        rs.DstSubresource.LayerCount, EResourceState::CopyDest);
     }
-    TransitionImage(src, EResourceState::CopySource);
-    TransitionImage(dst, EResourceState::CopyDest);
     auto& srcImpl = static_cast<CImageVk&>(src);
     auto& dstImpl = static_cast<CImageVk&>(dst);
     vkCmdResolveImage(CmdBuffer(), srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
