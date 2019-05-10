@@ -2,8 +2,8 @@
 #include "DeviceVk.h"
 #include "ImageViewVk.h"
 #include "SamplerVk.h"
-#include <mutex>
 #include <cstring>
+#include <mutex>
 
 namespace RHI
 {
@@ -81,7 +81,7 @@ void CDescriptorSetVk::DiscardAndRecreate()
     Handle = poolPtr->AllocateDescriptorSet();
 }
 
-void CDescriptorSetVk::WriteUpdates()
+void CDescriptorSetVk::WriteUpdates(CAccessTracker& tracker, VkCommandBuffer cmdBuffer)
 {
     if (!ResourceBindings.IsDirty())
         return;
@@ -122,6 +122,11 @@ void CDescriptorSetVk::WriteUpdates()
                 VkDescriptorImageInfo info {};
                 info.imageView = arrayIter.second.ImageView->GetVkImageView();
                 info.imageLayout = arrayIter.second.ImageLayout;
+
+                tracker.TransitionImage(cmdBuffer, arrayIter.second.ImageView->GetImage().get(),
+                                        arrayIter.second.ImageView->GetResourceRange(),
+                                        VK_ACCESS_SHADER_READ_BIT,
+                                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, info.imageLayout);
 
                 imageInfos.push_back(info);
                 w.pImageInfo = reinterpret_cast<const VkDescriptorImageInfo*>(imageInfos.size());

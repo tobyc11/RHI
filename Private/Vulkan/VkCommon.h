@@ -36,7 +36,7 @@ class CPipelineVk;
         VkResult err = fn;                                                                         \
         if (err != VK_SUCCESS)                                                                     \
         {                                                                                          \
-            printf("%s\n", __FUNCSIG__);                                                           \
+            printf("%s = %d\n", __FUNCSIG__, err);                                                 \
             throw CRHIRuntimeError("Vulkan call did not return VK_SUCCESS");                       \
         }                                                                                          \
     } while (0)

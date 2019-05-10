@@ -1,4 +1,5 @@
 #pragma once
+#include "AccessTracker.h"
 #include "DescriptorSetLayoutVk.h"
 #include "ResourceBindingsVk.h"
 
@@ -25,7 +26,7 @@ public:
     VkDescriptorSet GetHandle();
     bool IsContentDirty() const { return ResourceBindings.IsDirty(); }
     void DiscardAndRecreate(); // Similar to the DX11 MapDiscard semantics
-    void WriteUpdates();
+    void WriteUpdates(CAccessTracker& tracker, VkCommandBuffer cmdBuffer);
     void SetUsed() { bIsUsed = true; }
 
 private:

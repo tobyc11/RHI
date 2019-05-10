@@ -87,7 +87,7 @@ void CCommandQueueVk::SubmitFrame()
     CurrFrameIndex++;
     CurrFrameIndex %= FrameIndexCount;
     VK(vkWaitForFences(Parent.GetVkDevice(), 1, &FrameResources[CurrFrameIndex].Fence, VK_TRUE,
-                       1000000));
+                       1000000000)); //1s timeout
     VK(vkResetFences(Parent.GetVkDevice(), 1, &FrameResources[CurrFrameIndex].Fence));
     FrameResources[CurrFrameIndex].Reset();
 }

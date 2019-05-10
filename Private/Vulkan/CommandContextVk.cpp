@@ -77,6 +77,8 @@ void CRenderPassContextVk::FinishRecording()
             });
         }
 
+		renderPass->UpdateImageInitialAccess(section.AccessTracker);
+
         VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
         beginInfo.renderPass = renderPass->GetHandle();
         beginInfo.framebuffer = framebuffer;
@@ -105,6 +107,8 @@ void CRenderPassContextVk::FinishRecording()
                 vkCmdNextSubpass(handle, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
         }
         section.CmdBuffer->EndRecording();
+
+		renderPass->UpdateImageFinalAccess(section.AccessTracker);
     }
     CmdList->Sections.emplace_back(std::move(section));
 
@@ -388,6 +392,10 @@ void CCommandContextVk::CopyImageToBuffer(CImage& src, CBuffer& dst,
 void CCommandContextVk::BlitImage(CImage& src, CImage& dst, const std::vector<CImageBlit>& regions,
                                   EFilter filter)
 {
+    auto& srcImpl = static_cast<CImageVk&>(src);
+    auto& dstImpl = static_cast<CImageVk&>(dst);
+    VkImageLayout srcLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    VkImageLayout dstLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     std::vector<VkImageBlit> r;
     for (const auto& rs : regions)
     {
@@ -395,16 +403,41 @@ void CCommandContextVk::BlitImage(CImage& src, CImage& dst, const std::vector<CI
         Convert(next, rs);
         r.push_back(next);
 
-        TransitionImage(src, rs.SrcSubresource.MipLevel, 1, rs.SrcSubresource.BaseArrayLayer,
-                        rs.SrcSubresource.LayerCount, EResourceState::CopySource);
-        TransitionImage(dst, rs.DstSubresource.MipLevel, 1, rs.DstSubresource.BaseArrayLayer,
-                        rs.DstSubresource.LayerCount, EResourceState::CopyDest);
+        // TODO: this code is specialized for the voxel volume, replace this when the project is
+        // done
+        if (!Any(srcImpl.GetUsageFlags(), EImageUsageFlags::Storage))
+            TransitionImage(src, rs.SrcSubresource.MipLevel, 1, rs.SrcSubresource.BaseArrayLayer,
+                            rs.SrcSubresource.LayerCount, EResourceState::CopySource);
+        else
+            srcLayout = VK_IMAGE_LAYOUT_GENERAL;
+        if (!Any(dstImpl.GetUsageFlags(), EImageUsageFlags::Storage))
+            TransitionImage(dst, rs.DstSubresource.MipLevel, 1, rs.DstSubresource.BaseArrayLayer,
+                            rs.DstSubresource.LayerCount, EResourceState::CopyDest);
+        else
+            dstLayout = VK_IMAGE_LAYOUT_GENERAL;
     }
-    auto& srcImpl = static_cast<CImageVk&>(src);
-    auto& dstImpl = static_cast<CImageVk&>(dst);
-    vkCmdBlitImage(CmdBuffer(), srcImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   dstImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    vkCmdBlitImage(CmdBuffer(), srcImpl.GetVkImage(), srcLayout, dstImpl.GetVkImage(), dstLayout,
                    static_cast<uint32_t>(r.size()), r.data(), VkCast(filter));
+
+    if (dstLayout == VK_IMAGE_LAYOUT_GENERAL || srcLayout == VK_IMAGE_LAYOUT_GENERAL)
+    {
+        VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        barrier.image = dstImpl.GetVkImage();
+        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        barrier.subresourceRange.baseMipLevel = r[0].dstSubresource.mipLevel;
+        barrier.subresourceRange.levelCount = 0;
+        barrier.subresourceRange.baseArrayLayer = r[0].dstSubresource.baseArrayLayer;
+        barrier.subresourceRange.layerCount = r[0].dstSubresource.layerCount;
+        vkCmdPipelineBarrier(CmdBuffer(), VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0, nullptr, 1,
+                             &barrier);
+    }
 }
 
 void CCommandContextVk::ResolveImage(CImage& src, CImage& dst,
@@ -599,7 +632,7 @@ void CCommandContextVk::WriteDescriptorSets(VkPipelineBindPoint bindPoint)
         {
             if (ds->IsContentDirty())
             {
-                ds->WriteUpdates();
+                ds->WriteUpdates(AccessTracker(), CmdBuffer());
 
                 VkDescriptorSet setHandle = ds->GetHandle();
                 vkCmdBindDescriptorSets(CmdBuffer(), bindPoint, CurrPipeline->GetPipelineLayout(),
@@ -607,6 +640,9 @@ void CCommandContextVk::WriteDescriptorSets(VkPipelineBindPoint bindPoint)
             }
             else if (BindingDirty[set])
             {
+                // TODO: not efficient
+                ds->WriteUpdates(AccessTracker(), CmdBuffer());
+
                 VkDescriptorSet setHandle = ds->GetHandle();
                 vkCmdBindDescriptorSets(CmdBuffer(), bindPoint, CurrPipeline->GetPipelineLayout(),
                                         set, 1, &setHandle, 0, nullptr);

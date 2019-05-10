@@ -356,7 +356,8 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     }
     if (Any(usage, EImageUsageFlags::Storage))
     {
-        imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+        imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+            | VK_IMAGE_USAGE_STORAGE_BIT;
         defaultState = EResourceState::General;
     }
     if (Any(usage, EImageUsageFlags::RenderTarget))
@@ -470,6 +471,10 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     ctx->FinishRecording();
     cmdList->Commit();
     DefaultCopyQueue->Flush();
+
+	if (usage == EImageUsageFlags::Sampled)
+        image->SetTrackingDisabled(true);
+
     return std::move(image);
 }
 

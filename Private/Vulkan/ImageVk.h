@@ -27,11 +27,15 @@ public:
     /// Doesn't do any transition, but updates the LastAccess map
     void UpdateAccess(const CImageSubresourceRange& range, const CAccessRecord& accessRecord);
 
+    bool IsTrackingDisabled() const { return bIsTrackingDisabled; }
+    void SetTrackingDisabled(bool value) { bIsTrackingDisabled = value; }
+
 protected:
     CImageVk() = default;
 
 private:
     std::map<CImageSubresourceRange, CAccessRecord> LastAccess;
+    bool bIsTrackingDisabled = false;
 };
 
 class CSwapChainImageVk : public CImageVk

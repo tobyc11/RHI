@@ -87,6 +87,9 @@ void CAccessTracker::TransitionImageState(VkCommandBuffer cmdBuffer, CImageVk* i
                                           const CImageSubresourceRange& range,
                                           EResourceState targetState, bool isTransferQueue)
 {
+    if (image->IsTrackingDisabled())
+        return;
+
     auto dstAccess = StateToAccessMask(targetState);
     auto dstStages = StateToShaderStageMask(targetState, false);
     if (isTransferQueue && targetState != EResourceState::CopyDest
@@ -105,6 +108,9 @@ void CAccessTracker::TransitionImage(VkCommandBuffer cmdBuffer, CImageVk* image,
                                      const CImageSubresourceRange& range, VkAccessFlags access,
                                      VkPipelineStageFlags stages, VkImageLayout layout)
 {
+    if (image->IsTrackingDisabled())
+        return;
+
     CAccessRecord currAccess;
     currAccess.AccessType = access;
     currAccess.Stages = stages;
