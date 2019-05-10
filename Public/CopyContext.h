@@ -58,12 +58,46 @@ struct CImageResolve
     CExtent3D Extent;
 };
 
+struct CClearDepthStencilValue
+{
+    float Depth;
+    uint32_t Stencil;
+};
+
+struct CClearValue
+{
+    union {
+        union {
+            float ColorFloat32[4];
+            int32_t ColorInt32[4];
+            uint32_t ColorUInt32[4];
+        };
+        CClearDepthStencilValue DepthStencilValue;
+    };
+
+    CClearValue(float r, float g, float b, float a)
+    {
+        ColorFloat32[0] = r;
+        ColorFloat32[1] = g;
+        ColorFloat32[2] = b;
+        ColorFloat32[3] = a;
+    }
+
+    CClearValue(float d, uint32_t s)
+        : DepthStencilValue { d, s }
+    {
+    }
+};
+
 class ICopyContext
 {
 public:
     typedef std::shared_ptr<ICopyContext> Ref;
 
     virtual ~ICopyContext() = default;
+
+    virtual void ClearImage(CImage& image, const CClearValue& clearValue,
+                            const CImageSubresourceRange& range) = 0;
 
     virtual void CopyBuffer(CBuffer& src, CBuffer& dst,
                             const std::vector<CBufferCopy>& regions) = 0;

@@ -292,6 +292,26 @@ void CCommandContextVk::TransitionImage(CImage& image, uint32_t baseMip, uint32_
                                          CmdList->GetQueue().GetType() == EQueueType::Copy);
 }
 
+void CCommandContextVk::ClearImage(CImage& image, const CClearValue& clearValue,
+                                   const CImageSubresourceRange& range)
+{
+    auto& imageImpl = static_cast<CImageVk&>(image);
+
+	assert(Any(imageImpl.GetUsageFlags(), EImageUsageFlags::Storage));
+    assert(GetImageAspectFlags(imageImpl.GetVkFormat()) == VK_IMAGE_ASPECT_COLOR_BIT);
+
+    VkImageSubresourceRange vkRange;
+    vkRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    vkRange.baseMipLevel = range.BaseMipLevel;
+    vkRange.baseArrayLayer = range.BaseArrayLayer;
+    vkRange.levelCount = range.LevelCount;
+    vkRange.layerCount = range.LayerCount;
+
+    vkCmdClearColorImage(CmdBuffer(), imageImpl.GetVkImage(), VK_IMAGE_LAYOUT_GENERAL,
+                         reinterpret_cast<const VkClearColorValue*>(clearValue.ColorFloat32), 1,
+                         &vkRange);
+}
+
 void CCommandContextVk::CopyBuffer(CBuffer& src, CBuffer& dst,
                                    const std::vector<CBufferCopy>& regions)
 {

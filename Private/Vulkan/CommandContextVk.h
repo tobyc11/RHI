@@ -75,6 +75,8 @@ public:
     VkCommandBuffer GetCmdBuffer() { return CmdBuffer(); }
 
     // Copy commands
+    void ClearImage(CImage& image, const CClearValue& clearValue,
+                    const CImageSubresourceRange& range) override;
     void CopyBuffer(CBuffer& src, CBuffer& dst, const std::vector<CBufferCopy>& regions) override;
     void CopyImage(CImage& src, CImage& dst, const std::vector<CImageCopy>& regions) override;
     void CopyBufferToImage(CBuffer& src, CImage& dst,
