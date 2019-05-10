@@ -10,9 +10,9 @@
 #include "SwapChainVk.h"
 #include "VkHelpers.h"
 
+#include <cmath>
 #include <cstring>
 #include <vector>
-#include <cmath>
 
 #if TC_OS == TC_OS_LINUX
 #include <vulkan/vulkan_xcb.h>
@@ -93,7 +93,7 @@ void InitRHIInstance()
     const std::vector<const char*> validationLayers = { "VK_LAYER_LUNARG_standard_validation" };
 
 #if defined(NDEBUG)
-    const bool enableValidationLayers = true;
+    const bool enableValidationLayers = false;
 #else
     const bool enableValidationLayers = true;
 #endif
@@ -356,7 +356,7 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     }
     if (Any(usage, EImageUsageFlags::Storage))
     {
-        imageInfo.usage |= VK_IMAGE_USAGE_STORAGE_BIT;
+        imageInfo.usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
         defaultState = EResourceState::General;
     }
     if (Any(usage, EImageUsageFlags::RenderTarget))

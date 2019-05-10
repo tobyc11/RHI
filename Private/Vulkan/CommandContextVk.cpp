@@ -25,6 +25,9 @@ CRenderPassContextVk::CRenderPassContextVk(CCommandListVk::Ref cmdList, CRenderP
 
     auto rpImpl = std::static_pointer_cast<CRenderPassVk>(RenderPass);
     SubpassInfos.resize(rpImpl->GetSubpassCount());
+
+    if (ClearValues.size() != rpImpl->GetAttachmentDesc().size())
+        throw CRHIRuntimeError("ClearValues count doesn't match attachment count");
 }
 
 CRenderPassContextVk::~CRenderPassContextVk()
@@ -297,7 +300,7 @@ void CCommandContextVk::ClearImage(CImage& image, const CClearValue& clearValue,
 {
     auto& imageImpl = static_cast<CImageVk&>(image);
 
-	assert(Any(imageImpl.GetUsageFlags(), EImageUsageFlags::Storage));
+    assert(Any(imageImpl.GetUsageFlags(), EImageUsageFlags::Storage));
     assert(GetImageAspectFlags(imageImpl.GetVkFormat()) == VK_IMAGE_ASPECT_COLOR_BIT);
 
     VkImageSubresourceRange vkRange;
