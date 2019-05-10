@@ -142,7 +142,7 @@ void CAccessTracker::Merge(VkCommandBuffer cmdBuffer, const CAccessTracker& rhs)
         HandleImageFirstAccess(image, range, access);
         HandleImageLastAccess(cmdBuffer, image, range, access);
     }
-    for (const auto& iter : ImageLastAccess)
+    for (const auto& iter : rhs.ImageLastAccess)
     {
         auto* image = iter.first.Image;
         const auto& range = iter.first.Range;
