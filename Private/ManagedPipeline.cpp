@@ -1,5 +1,6 @@
 #include "ManagedPipeline.h"
 #include "Device.h"
+#include <StringPrintf.h>
 
 namespace RHI
 {
@@ -44,7 +45,7 @@ CManagedPipeline::CManagedPipeline(CDevice& device, CPipelineDesc& desc)
                 break;
         }
 
-        CDescriptorSetLayoutBinding binding{};
+        CDescriptorSetLayoutBinding binding {};
         binding.Binding = pair.first.second;
         binding.Type = typeMap.at(pair.second.ResourceType);
         binding.StageFlags = pair.second.Stages;
@@ -98,13 +99,21 @@ void CManagedPipeline::ReflectShaderModule(const CShaderModule::Ref& shaderModul
     for (const auto& resource : shaderModule->GetShaderResources())
     {
         auto key = std::make_pair(resource.Set, resource.Binding);
+
+        // We dont care about stage inputs and outputs
         if (resource.ResourceType == EPipelineResourceType::StageOutput
             || resource.ResourceType == EPipelineResourceType::StageInput)
-            key = std::make_pair(-1 * static_cast<uint32_t>(resource.Stages), resource.Location);
+            continue;
 
         auto it = ResourceByBinding.find(key);
         if (it != ResourceByBinding.end())
+        {
+            if (it->second.ResourceType != resource.ResourceType)
+                throw CRHIRuntimeError(
+                    tc::StringPrintf("Set=%d Binding=%d is used by two different variables",
+                                     resource.Set, resource.Binding, resource.Name));
             it->second.Stages |= resource.Stages;
+        }
         else
             ResourceByBinding.emplace(key, resource);
     }
