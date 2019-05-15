@@ -39,12 +39,17 @@ void RHI::CDescriptorSetVk::BindImageView(CImageView::Ref imageView, uint32_t bi
     auto impl = std::static_pointer_cast<CImageViewVk>(imageView);
 
     VkImageLayout layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    VkAccessFlags access = VK_ACCESS_SHADER_READ_BIT;
     if (Any(impl->GetImage()->GetUsageFlags(), EImageUsageFlags::Storage))
+    {
         layout = VK_IMAGE_LAYOUT_GENERAL;
+        access |= VK_ACCESS_SHADER_WRITE_BIT;
+    }
     if (GetImageAspectFlags(impl->GetFormat()) != VK_IMAGE_ASPECT_COLOR_BIT)
         layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+    VkPipelineStageFlags stages = Layout->GetPipelineStages(binding);
 
-    ResourceBindings.BindImageView(impl.get(), layout, VK_NULL_HANDLE, 0, binding, index);
+    ResourceBindings.BindImageView(impl.get(), access, stages, layout, 0, binding, index);
 }
 
 void RHI::CDescriptorSetVk::BindSampler(CSampler::Ref sampler, uint32_t binding, uint32_t index)
@@ -84,7 +89,25 @@ void CDescriptorSetVk::DiscardAndRecreate()
 void CDescriptorSetVk::WriteUpdates(CAccessTracker& tracker, VkCommandBuffer cmdBuffer)
 {
     if (!ResourceBindings.IsDirty())
+    {
+        // Update access tracker only
+        auto& setBindings = ResourceBindings.GetSetBindings().begin()->second;
+        for (const auto& bindingIter : setBindings.Bindings)
+        {
+            for (const auto& arrayIter : bindingIter.second)
+            {
+                if (arrayIter.second.ImageView)
+                {
+                    tracker.TransitionImage(cmdBuffer, arrayIter.second.ImageView->GetImage().get(),
+                                            arrayIter.second.ImageView->GetResourceRange(),
+                                            arrayIter.second.ImageAccess,
+                                            arrayIter.second.ImageStages,
+                                            arrayIter.second.ImageLayout);
+                }
+            }
+        }
         return;
+    }
 
     ResourceBindings.ClearDirtyBit();
 
@@ -108,6 +131,7 @@ void CDescriptorSetVk::WriteUpdates(CAccessTracker& tracker, VkCommandBuffer cmd
         for (const auto& arrayIter : bindingIter.second)
         {
             uint32_t index = arrayIter.first;
+            const auto& bindingInfo = arrayIter.second;
 
             writes.push_back({ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET });
             auto& w = writes.back();
@@ -117,34 +141,34 @@ void CDescriptorSetVk::WriteUpdates(CAccessTracker& tracker, VkCommandBuffer cmd
             w.descriptorCount = 1;
             w.descriptorType = Layout->GetDescriptorType(binding);
 
-            if (arrayIter.second.ImageView)
+            if (bindingInfo.ImageView)
             {
                 VkDescriptorImageInfo info {};
-                info.imageView = arrayIter.second.ImageView->GetVkImageView();
-                info.imageLayout = arrayIter.second.ImageLayout;
+                info.imageView = bindingInfo.ImageView->GetVkImageView();
+                info.imageLayout = bindingInfo.ImageLayout;
 
-                tracker.TransitionImage(cmdBuffer, arrayIter.second.ImageView->GetImage().get(),
-                                        arrayIter.second.ImageView->GetResourceRange(),
-                                        VK_ACCESS_SHADER_READ_BIT,
-                                        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, info.imageLayout);
+                tracker.TransitionImage(cmdBuffer, bindingInfo.ImageView->GetImage().get(),
+                                        bindingInfo.ImageView->GetResourceRange(),
+                                        bindingInfo.ImageAccess, bindingInfo.ImageStages,
+                                        bindingInfo.ImageLayout);
 
                 imageInfos.push_back(info);
                 w.pImageInfo = reinterpret_cast<const VkDescriptorImageInfo*>(imageInfos.size());
             }
-            else if (arrayIter.second.BufferHandle)
+            else if (bindingInfo.BufferHandle)
             {
                 VkDescriptorBufferInfo info {};
-                info.buffer = arrayIter.second.BufferHandle;
-                info.offset = arrayIter.second.Offset;
-                info.range = arrayIter.second.Range;
+                info.buffer = bindingInfo.BufferHandle;
+                info.offset = bindingInfo.Offset;
+                info.range = bindingInfo.Range;
 
                 bufferInfos.push_back(info);
                 w.pBufferInfo = reinterpret_cast<const VkDescriptorBufferInfo*>(bufferInfos.size());
             }
-            else if (arrayIter.second.SamplerHandle)
+            else if (bindingInfo.SamplerHandle)
             {
                 VkDescriptorImageInfo info {};
-                info.sampler = arrayIter.second.SamplerHandle;
+                info.sampler = bindingInfo.SamplerHandle;
 
                 imageInfos.push_back(info);
                 w.pImageInfo = reinterpret_cast<const VkDescriptorImageInfo*>(imageInfos.size());

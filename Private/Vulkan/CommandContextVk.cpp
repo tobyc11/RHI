@@ -77,7 +77,7 @@ void CRenderPassContextVk::FinishRecording()
             });
         }
 
-		renderPass->UpdateImageInitialAccess(section.AccessTracker);
+        renderPass->UpdateImageInitialAccess(section.AccessTracker);
 
         VkRenderPassBeginInfo beginInfo = { VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
         beginInfo.renderPass = renderPass->GetHandle();
@@ -108,7 +108,7 @@ void CRenderPassContextVk::FinishRecording()
         }
         section.CmdBuffer->EndRecording();
 
-		renderPass->UpdateImageFinalAccess(section.AccessTracker);
+        renderPass->UpdateImageFinalAccess(section.AccessTracker);
     }
     CmdList->Sections.emplace_back(std::move(section));
 
@@ -304,7 +304,9 @@ void CCommandContextVk::ClearImage(CImage& image, const CClearValue& clearValue,
 {
     auto& imageImpl = static_cast<CImageVk&>(image);
 
-    assert(Any(imageImpl.GetUsageFlags(), EImageUsageFlags::Storage));
+    TransitionImage(image, range.BaseMipLevel, range.LevelCount, range.BaseArrayLayer,
+                    range.LayerCount, EResourceState::CopyDest);
+
     assert(GetImageAspectFlags(imageImpl.GetVkFormat()) == VK_IMAGE_ASPECT_COLOR_BIT);
 
     VkImageSubresourceRange vkRange;
@@ -314,7 +316,7 @@ void CCommandContextVk::ClearImage(CImage& image, const CClearValue& clearValue,
     vkRange.levelCount = range.LevelCount;
     vkRange.layerCount = range.LayerCount;
 
-    vkCmdClearColorImage(CmdBuffer(), imageImpl.GetVkImage(), VK_IMAGE_LAYOUT_GENERAL,
+    vkCmdClearColorImage(CmdBuffer(), imageImpl.GetVkImage(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                          reinterpret_cast<const VkClearColorValue*>(clearValue.ColorFloat32), 1,
                          &vkRange);
 }
@@ -403,41 +405,13 @@ void CCommandContextVk::BlitImage(CImage& src, CImage& dst, const std::vector<CI
         Convert(next, rs);
         r.push_back(next);
 
-        // TODO: this code is specialized for the voxel volume, replace this when the project is
-        // done
-        if (!Any(srcImpl.GetUsageFlags(), EImageUsageFlags::Storage))
-            TransitionImage(src, rs.SrcSubresource.MipLevel, 1, rs.SrcSubresource.BaseArrayLayer,
-                            rs.SrcSubresource.LayerCount, EResourceState::CopySource);
-        else
-            srcLayout = VK_IMAGE_LAYOUT_GENERAL;
-        if (!Any(dstImpl.GetUsageFlags(), EImageUsageFlags::Storage))
-            TransitionImage(dst, rs.DstSubresource.MipLevel, 1, rs.DstSubresource.BaseArrayLayer,
-                            rs.DstSubresource.LayerCount, EResourceState::CopyDest);
-        else
-            dstLayout = VK_IMAGE_LAYOUT_GENERAL;
+        TransitionImage(src, rs.SrcSubresource.MipLevel, 1, rs.SrcSubresource.BaseArrayLayer,
+                        rs.SrcSubresource.LayerCount, EResourceState::CopySource);
+        TransitionImage(dst, rs.DstSubresource.MipLevel, 1, rs.DstSubresource.BaseArrayLayer,
+                        rs.DstSubresource.LayerCount, EResourceState::CopyDest);
     }
     vkCmdBlitImage(CmdBuffer(), srcImpl.GetVkImage(), srcLayout, dstImpl.GetVkImage(), dstLayout,
                    static_cast<uint32_t>(r.size()), r.data(), VkCast(filter));
-
-    if (dstLayout == VK_IMAGE_LAYOUT_GENERAL || srcLayout == VK_IMAGE_LAYOUT_GENERAL)
-    {
-        VkImageMemoryBarrier barrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-        barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-        barrier.image = dstImpl.GetVkImage();
-        barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        barrier.subresourceRange.baseMipLevel = r[0].dstSubresource.mipLevel;
-        barrier.subresourceRange.levelCount = 0;
-        barrier.subresourceRange.baseArrayLayer = r[0].dstSubresource.baseArrayLayer;
-        barrier.subresourceRange.layerCount = r[0].dstSubresource.layerCount;
-        vkCmdPipelineBarrier(CmdBuffer(), VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, 0, 0, nullptr, 0, nullptr, 1,
-                             &barrier);
-    }
 }
 
 void CCommandContextVk::ResolveImage(CImage& src, CImage& dst,
@@ -630,18 +604,12 @@ void CCommandContextVk::WriteDescriptorSets(VkPipelineBindPoint bindPoint)
     {
         if (ds)
         {
-            if (ds->IsContentDirty())
+            if (ds->IsContentDirty() || BindingDirty[set])
             {
-                ds->WriteUpdates(AccessTracker(), CmdBuffer());
-
-                VkDescriptorSet setHandle = ds->GetHandle();
-                vkCmdBindDescriptorSets(CmdBuffer(), bindPoint, CurrPipeline->GetPipelineLayout(),
-                                        set, 1, &setHandle, 0, nullptr);
-            }
-            else if (BindingDirty[set])
-            {
-                // TODO: not efficient
-                ds->WriteUpdates(AccessTracker(), CmdBuffer());
+                if (bindPoint == VK_PIPELINE_BIND_POINT_COMPUTE)
+                    ds->WriteUpdates(AccessTracker(), CmdBuffer());
+                else
+                    ds->WriteUpdates(AccessTracker(), VK_NULL_HANDLE);
 
                 VkDescriptorSet setHandle = ds->GetHandle();
                 vkCmdBindDescriptorSets(CmdBuffer(), bindPoint, CurrPipeline->GetPipelineLayout(),

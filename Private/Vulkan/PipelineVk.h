@@ -14,6 +14,7 @@ class CPipelineVk : public CPipeline
 {
 public:
     CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc);
+    CPipelineVk(CDeviceVk& p, const CComputePipelineDesc& desc);
     ~CPipelineVk() override;
 
     VkPipeline GetHandle() const { return PipelineHandle; }

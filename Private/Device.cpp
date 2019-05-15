@@ -59,15 +59,15 @@ CShaderModule::Ref CDeviceBase<TDerived>::CreateShaderModule(size_t size, const 
 }
 
 template <typename TDerived>
-CDescriptorSetLayout::Ref
-CDeviceBase<TDerived>::CreateDescriptorSetLayout(const std::vector<CDescriptorSetLayoutBinding>& bindings)
+CDescriptorSetLayout::Ref CDeviceBase<TDerived>::CreateDescriptorSetLayout(
+    const std::vector<CDescriptorSetLayoutBinding>& bindings)
 {
     return static_cast<TDerived*>(this)->CreateDescriptorSetLayout(bindings);
 }
 
 template <typename TDerived>
-CPipelineLayout::Ref
-CDeviceBase<TDerived>::CreatePipelineLayout(const std::vector<CDescriptorSetLayout::Ref>& setLayouts)
+CPipelineLayout::Ref CDeviceBase<TDerived>::CreatePipelineLayout(
+    const std::vector<CDescriptorSetLayout::Ref>& setLayouts)
 {
     return static_cast<TDerived*>(this)->CreatePipelineLayout(setLayouts);
 }
@@ -85,7 +85,20 @@ CPipeline::Ref CDeviceBase<TDerived>::CreatePipeline(const CPipelineDesc& desc)
 }
 
 template <typename TDerived>
+CPipeline::Ref CDeviceBase<TDerived>::CreateComputePipeline(const CComputePipelineDesc& desc)
+{
+    return static_cast<TDerived*>(this)->CreateComputePipeline(desc);
+}
+
+template <typename TDerived>
 CManagedPipeline::Ref CDeviceBase<TDerived>::CreateManagedPipeline(CPipelineDesc& desc)
+{
+    return std::make_shared<CManagedPipeline>(*this, desc);
+}
+
+template <typename TDerived>
+CManagedPipeline::Ref
+CDeviceBase<TDerived>::CreateManagedComputePipeline(CComputePipelineDesc& desc)
 {
     return std::make_shared<CManagedPipeline>(*this, desc);
 }
@@ -96,8 +109,7 @@ CSampler::Ref CDeviceBase<TDerived>::CreateSampler(const CSamplerDesc& desc)
     return static_cast<TDerived*>(this)->CreateSampler(desc);
 }
 
-template <typename TDerived>
-CCommandQueue::Ref CDeviceBase<TDerived>::CreateCommandQueue()
+template <typename TDerived> CCommandQueue::Ref CDeviceBase<TDerived>::CreateCommandQueue()
 {
     return static_cast<TDerived*>(this)->CreateCommandQueue();
 }

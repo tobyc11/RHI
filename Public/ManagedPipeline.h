@@ -1,21 +1,23 @@
 #pragma once
 #include "DescriptorSet.h"
 #include "Pipeline.h"
-#include "ShaderModule.h"
 #include "RenderContext.h"
+#include "ShaderModule.h"
 #include <array>
 #include <map>
 
 namespace RHI
 {
 
-// Basically the same thing as CPipeline, except you don't have to manually manage descriptor sets anymore
+// Basically the same thing as CPipeline, except you don't have to manually manage descriptor sets
+// anymore
 class CManagedPipeline
 {
 public:
     typedef std::shared_ptr<CManagedPipeline> Ref;
 
     CManagedPipeline(CDevice& device, CPipelineDesc& desc);
+    CManagedPipeline(CDevice& device, CComputePipelineDesc& desc);
 
     CPipeline::Ref Get() const { return Pipeline; }
 
@@ -23,6 +25,7 @@ public:
     std::vector<CDescriptorSet::Ref> CreateDescriptorSets() const;
 
 private:
+    void InitLayouts(CDevice& device);
     void ReflectShaderModule(const CShaderModule::Ref& shaderModule);
 
     // Reflection data

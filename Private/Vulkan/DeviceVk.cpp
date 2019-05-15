@@ -472,7 +472,7 @@ CImage::Ref CDeviceVk::InternalCreateImage(VkImageType type, EFormat format, EIm
     cmdList->Commit();
     DefaultCopyQueue->Flush();
 
-	if (usage == EImageUsageFlags::Sampled)
+    if (usage == EImageUsageFlags::Sampled)
         image->SetTrackingDisabled(true);
 
     return std::move(image);
@@ -491,7 +491,7 @@ CImage::Ref CDeviceVk::CreateImage1D(EFormat format, EImageUsageFlags usage, uin
     {
         if ((width & -width) != width)
             throw CRHIRuntimeError("GenMIPMaps requires sizes to be 2^n");
-        mipLevels = 1 + floor(log2(width));
+        mipLevels = 1 + static_cast<uint32_t>(floor(log2(width)));
     }
     return InternalCreateImage(VK_IMAGE_TYPE_1D, format, usage, width, 1, 1, mipLevels, arrayLayers,
                                sampleCount, initialData);
@@ -505,7 +505,7 @@ CImage::Ref CDeviceVk::CreateImage2D(EFormat format, EImageUsageFlags usage, uin
     {
         if ((width & -width) != width || (height & -height) != height)
             throw CRHIRuntimeError("GenMIPMaps requires sizes to be 2^n");
-        mipLevels = 1 + floor(log2(std::min(width, height)));
+        mipLevels = 1 + static_cast<uint32_t>(floor(log2(std::min(width, height))));
     }
     return InternalCreateImage(VK_IMAGE_TYPE_2D, format, usage, width, height, 1, mipLevels,
                                arrayLayers, sampleCount, initialData);
@@ -520,7 +520,8 @@ CImage::Ref CDeviceVk::CreateImage3D(EFormat format, EImageUsageFlags usage, uin
     {
         if ((width & -width) != width || (height & -height) != height || (depth & -depth) != depth)
             throw CRHIRuntimeError("GenMIPMaps requires sizes to be 2^n");
-        mipLevels = 1 + floor(log2(std::min(width, std::min(height, depth))));
+        mipLevels =
+            1 + static_cast<uint32_t>(floor(log2(std::min(width, std::min(height, depth)))));
     }
     return InternalCreateImage(VK_IMAGE_TYPE_3D, format, usage, width, height, depth, mipLevels,
                                arrayLayers, sampleCount, initialData);
@@ -554,6 +555,11 @@ CRenderPass::Ref CDeviceVk::CreateRenderPass(const CRenderPassDesc& desc)
 }
 
 CPipeline::Ref CDeviceVk::CreatePipeline(const CPipelineDesc& desc)
+{
+    return std::make_shared<CPipelineVk>(*this, desc);
+}
+
+CPipeline::Ref CDeviceVk::CreateComputePipeline(const CComputePipelineDesc& desc)
 {
     return std::make_shared<CPipelineVk>(*this, desc);
 }

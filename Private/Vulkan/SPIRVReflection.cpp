@@ -53,10 +53,12 @@ VkShaderStageFlagBits SPIRVGetStage(spirv_cross::CompilerGLSL& compiler)
             return VK_SHADER_STAGE_GEOMETRY_BIT;
         case spv::ExecutionModelFragment:
             return VK_SHADER_STAGE_FRAGMENT_BIT;
+        case spv::ExecutionModelGLCompute:
+            return VK_SHADER_STAGE_COMPUTE_BIT;
         default:
             break;
         }
-	}
+    }
     throw std::runtime_error("wtf");
 }
 

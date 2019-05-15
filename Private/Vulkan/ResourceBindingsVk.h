@@ -33,10 +33,37 @@ struct BindingInfo
 {
     VkDeviceSize Offset;
     VkDeviceSize Range;
-    VkBuffer BufferHandle;
-    CImageViewVk* ImageView;
+    VkBuffer BufferHandle = VK_NULL_HANDLE;
+
+    CImageViewVk* ImageView = nullptr;
+    VkAccessFlags ImageAccess;
+    VkPipelineStageFlags ImageStages;
     VkImageLayout ImageLayout;
-    VkSampler SamplerHandle;
+
+    VkSampler SamplerHandle = VK_NULL_HANDLE;
+
+    BindingInfo() = default;
+
+    BindingInfo(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range)
+        : BufferHandle(buffer)
+        , Offset(offset)
+        , Range(range)
+    {
+    }
+
+    BindingInfo(CImageViewVk* view, VkAccessFlags access, VkPipelineStageFlags stages,
+                VkImageLayout layout)
+        : ImageView(view)
+        , ImageAccess(access)
+        , ImageStages(stages)
+        , ImageLayout(layout)
+    {
+    }
+
+    BindingInfo(VkSampler sampler)
+        : SamplerHandle(sampler)
+    {
+    }
 };
 
 typedef std::map<uint32_t, BindingInfo> ArrayBindings;
@@ -62,8 +89,8 @@ public:
 
     void BindBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range, uint32_t set,
                     uint32_t binding, uint32_t arrayElement);
-    void BindImageView(CImageViewVk* pImageView, VkImageLayout layout, VkSampler sampler,
-                       uint32_t set, uint32_t binding, uint32_t arrayElement);
+    void BindImageView(CImageViewVk* pImageView, VkAccessFlags access, VkPipelineStageFlags stages,
+                       VkImageLayout layout, uint32_t set, uint32_t binding, uint32_t arrayElement);
     void BindSampler(VkSampler sampler, uint32_t set, uint32_t binding, uint32_t arrayElement);
 
 private:

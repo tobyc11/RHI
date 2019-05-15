@@ -62,10 +62,11 @@ void CCommandQueueVk::Submit(bool setFence)
     if (cmdBufferStaging.size() > 512)
         throw CRHIException("Umm, tell Toby about this");
     if (setFence)
-        VK(vkQueueSubmit(GetHandle(), submitInfos.size(), submitInfos.data(),
+        VK(vkQueueSubmit(GetHandle(), static_cast<uint32_t>(submitInfos.size()), submitInfos.data(),
                          FrameResources[CurrFrameIndex].Fence));
     else
-        VK(vkQueueSubmit(GetHandle(), submitInfos.size(), submitInfos.data(), VK_NULL_HANDLE));
+        VK(vkQueueSubmit(GetHandle(), static_cast<uint32_t>(submitInfos.size()), submitInfos.data(),
+                         VK_NULL_HANDLE));
 
     std::lock_guard<std::mutex> lkd(GetDevice().DeviceMutex);
     auto& fnList = FrameResources[CurrFrameIndex].PostFrameCleanup;
@@ -87,7 +88,7 @@ void CCommandQueueVk::SubmitFrame()
     CurrFrameIndex++;
     CurrFrameIndex %= FrameIndexCount;
     VK(vkWaitForFences(Parent.GetVkDevice(), 1, &FrameResources[CurrFrameIndex].Fence, VK_TRUE,
-                       1000000000)); //1s timeout
+                       1000000000)); // 1s timeout
     VK(vkResetFences(Parent.GetVkDevice(), 1, &FrameResources[CurrFrameIndex].Fence));
     FrameResources[CurrFrameIndex].Reset();
 }

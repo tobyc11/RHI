@@ -26,6 +26,10 @@ public:
     VkDescriptorSetLayout GetHandle() const { return Handle; }
     const std::vector<VkDescriptorSetLayoutBinding>& GetBindings() const { return Bindings; }
     VkDescriptorType GetDescriptorType(uint32_t binding) const { return BindingToType.at(binding); }
+    VkPipelineStageFlags GetPipelineStages(uint32_t binding) const
+    {
+        return BindingToStages.at(binding);
+    }
 
     const std::unique_ptr<CDescriptorPoolVk>& GetDescriptorPool() const;
 
@@ -34,6 +38,7 @@ private:
     VkDescriptorSetLayout Handle = VK_NULL_HANDLE;
     std::vector<VkDescriptorSetLayoutBinding> Bindings;
     std::map<uint32_t, VkDescriptorType> BindingToType;
+    std::map<uint32_t, VkPipelineStageFlags> BindingToStages;
 
     mutable std::unique_ptr<CDescriptorPoolVk> Pool;
 };

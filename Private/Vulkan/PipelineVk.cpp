@@ -280,8 +280,27 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
     dynamicStateInfo.pDynamicStates = dynamicStates.data();
     pipelineInfo.pDynamicState = &dynamicStateInfo;
 
-    VK(vkCreateGraphicsPipelines(Parent.GetVkDevice(), Parent.GetPipelineCache(), 1,
-                                       &pipelineInfo, nullptr, &PipelineHandle));
+    VK(vkCreateGraphicsPipelines(Parent.GetVkDevice(), Parent.GetPipelineCache(), 1, &pipelineInfo,
+                                 nullptr, &PipelineHandle));
+}
+
+CPipelineVk::CPipelineVk(CDeviceVk& p, const CComputePipelineDesc& desc)
+    : Parent(p)
+{
+    EntryPoints.reserve(1);
+    AddShaderModule(desc.CS, VK_SHADER_STAGE_COMPUTE_BIT);
+
+    if (!desc.Layout)
+        throw CRHIRuntimeError("No pipeline layout specified for pipeline");
+    PipelineLayout = std::static_pointer_cast<CPipelineLayoutVk>(desc.Layout);
+
+    // Create a pipeline create info and fill in handles
+    VkComputePipelineCreateInfo pipelineInfo = { VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+    pipelineInfo.stage = StageInfos[0];
+    pipelineInfo.layout = GetPipelineLayout();
+
+    VK(vkCreateComputePipelines(Parent.GetVkDevice(), Parent.GetPipelineCache(), 1, &pipelineInfo,
+                                nullptr, &PipelineHandle));
 }
 
 CPipelineVk::~CPipelineVk()
@@ -290,12 +309,10 @@ CPipelineVk::~CPipelineVk()
         vkDestroyPipeline(Parent.GetVkDevice(), PipelineHandle, nullptr);
 }
 
-VkPipelineLayout CPipelineVk::GetPipelineLayout() const
-{
-    return PipelineLayout->GetHandle();
-}
+VkPipelineLayout CPipelineVk::GetPipelineLayout() const { return PipelineLayout->GetHandle(); }
 
-void CPipelineVk::AddShaderModule(const CShaderModule::Ref& shaderModule, VkShaderStageFlagBits stage)
+void CPipelineVk::AddShaderModule(const CShaderModule::Ref& shaderModule,
+                                  VkShaderStageFlagBits stage)
 {
     if (!shaderModule)
         return;

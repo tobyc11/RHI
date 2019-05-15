@@ -14,24 +14,20 @@ void CResourceBindings::Reset()
 void CResourceBindings::BindBuffer(VkBuffer buffer, VkDeviceSize offset, VkDeviceSize range,
                                    uint32_t set, uint32_t binding, uint32_t arrayElement)
 {
-    Bind(set, binding, arrayElement,
-         BindingInfo { offset, range, buffer, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED,
-                       VK_NULL_HANDLE });
+    Bind(set, binding, arrayElement, BindingInfo { buffer, offset, range });
 }
 
-void CResourceBindings::BindImageView(CImageViewVk* pImageView, VkImageLayout layout,
-                                      VkSampler sampler, uint32_t set, uint32_t binding,
-                                      uint32_t arrayElement)
+void CResourceBindings::BindImageView(CImageViewVk* pImageView, VkAccessFlags access,
+                                      VkPipelineStageFlags stages, VkImageLayout layout,
+                                      uint32_t set, uint32_t binding, uint32_t arrayElement)
 {
-    Bind(set, binding, arrayElement,
-         BindingInfo { 0, 0, VK_NULL_HANDLE, pImageView, layout, sampler });
+    Bind(set, binding, arrayElement, BindingInfo { pImageView, access, stages, layout });
 }
 
 void CResourceBindings::BindSampler(VkSampler sampler, uint32_t set, uint32_t binding,
                                     uint32_t arrayElement)
 {
-    Bind(set, binding, arrayElement,
-         BindingInfo { 0, 0, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED, sampler });
+    Bind(set, binding, arrayElement, BindingInfo { sampler });
 }
 
 void CResourceBindings::Bind(uint32_t set, uint32_t binding, uint32_t arrayElement,

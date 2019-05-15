@@ -31,6 +31,15 @@ CDescriptorSetLayoutVk::CDescriptorSetLayoutVk(
         { EDescriptorType::InputAttachment, VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT },
     };
 
+    static const std::array<VkPipelineStageFlags, 6> shaderStageMap = {
+        VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+        VK_PIPELINE_STAGE_TESSELLATION_CONTROL_SHADER_BIT,
+        VK_PIPELINE_STAGE_TESSELLATION_EVALUATION_SHADER_BIT,
+        VK_PIPELINE_STAGE_GEOMETRY_SHADER_BIT,
+        VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+        VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
+    };
+
     for (const auto& b : bindings)
     {
         VkDescriptorSetLayoutBinding vkBinding;
@@ -41,6 +50,17 @@ CDescriptorSetLayoutVk::CDescriptorSetLayoutVk(
         vkBinding.pImmutableSamplers = nullptr;
         Bindings.push_back(vkBinding);
         BindingToType[b.Binding] = vkBinding.descriptorType;
+
+        VkPipelineStageFlags pipelineStages = 0;
+        for (uint32_t i = 0; i < 6; i++)
+        {
+            uint32_t mask = 1 << i;
+            if (vkBinding.stageFlags & mask)
+            {
+                pipelineStages |= shaderStageMap[i];
+            }
+        }
+        BindingToStages[b.Binding] = pipelineStages;
     }
 
     VkDescriptorSetLayoutCreateInfo layoutCreateInfo = {};

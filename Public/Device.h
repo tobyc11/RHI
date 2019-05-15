@@ -48,13 +48,17 @@ public:
 
     // Shader and resource binding
     CShaderModule::Ref CreateShaderModule(size_t size, const void* pCode);
-    CDescriptorSetLayout::Ref CreateDescriptorSetLayout(const std::vector<CDescriptorSetLayoutBinding>& bindings);
-    CPipelineLayout::Ref CreatePipelineLayout(const std::vector<CDescriptorSetLayout::Ref>& setLayouts);
+    CDescriptorSetLayout::Ref
+    CreateDescriptorSetLayout(const std::vector<CDescriptorSetLayoutBinding>& bindings);
+    CPipelineLayout::Ref
+    CreatePipelineLayout(const std::vector<CDescriptorSetLayout::Ref>& setLayouts);
 
     // States
     CRenderPass::Ref CreateRenderPass(const CRenderPassDesc& desc);
     CPipeline::Ref CreatePipeline(const CPipelineDesc& desc);
+    CPipeline::Ref CreateComputePipeline(const CComputePipelineDesc& desc);
     CManagedPipeline::Ref CreateManagedPipeline(CPipelineDesc& desc);
+    CManagedPipeline::Ref CreateManagedComputePipeline(CComputePipelineDesc& desc);
     CSampler::Ref CreateSampler(const CSamplerDesc& desc);
 
     // Command submission

@@ -11,12 +11,12 @@ VkSubmitInfo CCommandListSection::MakeSubmitInfo(std::vector<VkCommandBuffer>& s
     stagingArray.push_back(CmdBuffer->GetHandle());
 
     VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
-    submitInfo.waitSemaphoreCount = WaitSemaphores.size();
+    submitInfo.waitSemaphoreCount = static_cast<uint32_t>(WaitSemaphores.size());
     submitInfo.pWaitSemaphores = WaitSemaphores.data();
     submitInfo.pWaitDstStageMask = WaitStages.data();
     submitInfo.commandBufferCount = 2;
     submitInfo.pCommandBuffers = stagingArray.data() + stagingArray.size() - 2;
-    submitInfo.signalSemaphoreCount = SignalSemaphores.size();
+    submitInfo.signalSemaphoreCount = static_cast<uint32_t>(SignalSemaphores.size());
     submitInfo.pSignalSemaphores = SignalSemaphores.data();
     return submitInfo;
 }

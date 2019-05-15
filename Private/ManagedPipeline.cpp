@@ -12,7 +12,40 @@ CManagedPipeline::CManagedPipeline(CDevice& device, CPipelineDesc& desc)
     ReflectShaderModule(desc.GS);
     ReflectShaderModule(desc.DS);
     ReflectShaderModule(desc.HS);
+    InitLayouts(device);
 
+    desc.Layout = PipelineLayout;
+    Pipeline = device.CreatePipeline(desc);
+}
+
+CManagedPipeline::CManagedPipeline(CDevice& device, CComputePipelineDesc& desc)
+{
+    ReflectShaderModule(desc.CS);
+    InitLayouts(device);
+
+    desc.Layout = PipelineLayout;
+    Pipeline = device.CreateComputePipeline(desc);
+}
+
+CDescriptorSet::Ref CManagedPipeline::CreateDescriptorSet(uint32_t set) const
+{
+    return SetLayouts[set]->CreateDescriptorSet();
+}
+
+std::vector<CDescriptorSet::Ref> CManagedPipeline::CreateDescriptorSets() const
+{
+    std::vector<CDescriptorSet::Ref> result;
+    result.reserve(SetLayouts.size());
+    for (const auto& layout : SetLayouts)
+    {
+        if (layout)
+            result.push_back(layout->CreateDescriptorSet());
+    }
+    return result;
+}
+
+void CManagedPipeline::InitLayouts(CDevice& device)
+{
     static const std::map<EPipelineResourceType, EDescriptorType> typeMap = {
         { EPipelineResourceType::SeparateSampler, EDescriptorType::Sampler },
         { EPipelineResourceType::CombinedImageSampler, EDescriptorType::Image },
@@ -67,27 +100,7 @@ CManagedPipeline::CManagedPipeline(CDevice& device, CPipelineDesc& desc)
     }
     PipelineLayout = device.CreatePipelineLayout(SetLayouts);
 
-    desc.Layout = PipelineLayout;
-    Pipeline = device.CreatePipeline(desc);
-
     ResourceByBinding.clear();
-}
-
-CDescriptorSet::Ref CManagedPipeline::CreateDescriptorSet(uint32_t set) const
-{
-    return SetLayouts[set]->CreateDescriptorSet();
-}
-
-std::vector<CDescriptorSet::Ref> CManagedPipeline::CreateDescriptorSets() const
-{
-    std::vector<CDescriptorSet::Ref> result;
-    result.reserve(SetLayouts.size());
-    for (const auto& layout : SetLayouts)
-    {
-        if (layout)
-            result.push_back(layout->CreateDescriptorSet());
-    }
-    return result;
 }
 
 void CManagedPipeline::ReflectShaderModule(const CShaderModule::Ref& shaderModule)

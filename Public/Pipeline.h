@@ -42,6 +42,12 @@ struct CPipelineDesc
     }
 };
 
+struct CComputePipelineDesc
+{
+    CShaderModule::Ref CS;
+    CPipelineLayout::Ref Layout;
+};
+
 class CPipeline : public tc::FNonCopyable
 {
 public:
