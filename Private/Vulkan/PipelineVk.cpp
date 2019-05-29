@@ -175,7 +175,7 @@ CPipelineVk::CPipelineVk(CDeviceVk& p, const CPipelineDesc& desc)
         VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO
     };
     iaInfo.topology = VkCast(desc.PrimitiveTopology);
-    iaInfo.primitiveRestartEnable = VK_TRUE;
+    iaInfo.primitiveRestartEnable = VK_FALSE;
     pipelineInfo.pInputAssemblyState = &iaInfo;
 
     // Tesselation state lol

@@ -57,7 +57,13 @@ void CCommandQueueVk::Submit(bool setFence)
             FrameResources[CurrFrameIndex].ListsInFlight.emplace_back(list);
             submittedCount++;
         }
+        else
+            break;
     }
+
+	if (submittedCount == 0)
+        return;
+
     QueuedLists.erase(QueuedLists.begin(), QueuedLists.begin() + submittedCount);
     if (cmdBufferStaging.size() > 512)
         throw CRHIException("Umm, tell Toby about this");

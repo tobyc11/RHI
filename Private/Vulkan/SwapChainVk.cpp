@@ -90,20 +90,20 @@ VkPresentModeKHR CSwapChainVk::SelectPresentMode(const CPhysicalDeviceSwapChainC
     // FIFO present mode is always available
     // MAILBOX is the lowest latency V-Sync enabled mode (something like triple-buffering) so use it
     // if available
-    // for (VkPresentModeKHR mode : caps.PresentModes)
-    //{
-    //    if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
-    //    {
-    //        return mode;
-    //    }
-    //}
-    // for (VkPresentModeKHR mode : caps.PresentModes)
-    //{
-    //    if (mode == VK_PRESENT_MODE_FIFO_RELAXED_KHR)
-    //    {
-    //        return mode;
-    //    }
-    //}
+    for (VkPresentModeKHR mode : caps.PresentModes)
+    {
+        if (mode == VK_PRESENT_MODE_MAILBOX_KHR)
+        {
+            return mode;
+        }
+    }
+    for (VkPresentModeKHR mode : caps.PresentModes)
+    {
+        if (mode == VK_PRESENT_MODE_FIFO_RELAXED_KHR)
+        {
+            return mode;
+        }
+    }
     for (VkPresentModeKHR mode : caps.PresentModes)
     {
         if (mode == VK_PRESENT_MODE_FIFO_KHR)

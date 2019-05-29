@@ -17,26 +17,42 @@ CBufferVk::CBufferVk(CDeviceVk& p, size_t size, EBufferUsageFlags usage, const v
 
     bool gpuOnly = true;
 
-    if (Any(usage, EBufferUsageFlags::VertexBuffer))
-        bufferInfo.usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-    if (Any(usage, EBufferUsageFlags::IndexBuffer))
+    if (Any(usage, EBufferUsageFlags::Dynamic))
+        gpuOnly = false;
+
+    if (Any(usage, EBufferUsageFlags::Index))
         bufferInfo.usage |= VK_BUFFER_USAGE_INDEX_BUFFER_BIT;
-    if (Any(usage, EBufferUsageFlags::ConstantBuffer))
-    {
+    if (Any(usage, EBufferUsageFlags::Vertex))
+        bufferInfo.usage |= VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    if (Any(usage, EBufferUsageFlags::IndirectDraw))
+        bufferInfo.usage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+    if (Any(usage, EBufferUsageFlags::Uniform))
         bufferInfo.usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-        gpuOnly = false;
-    }
-    if (Any(usage, EBufferUsageFlags::Streaming))
-        gpuOnly = false;
+    if (Any(usage, EBufferUsageFlags::Storage))
+        bufferInfo.usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    if (Any(usage, EBufferUsageFlags::UniformTexel))
+        bufferInfo.usage |= VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
+    if (Any(usage, EBufferUsageFlags::StorageTexel))
+        bufferInfo.usage |= VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
 
     if (gpuOnly)
     {
         bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
         allocInfo.usage = VMA_MEMORY_USAGE_GPU_ONLY;
     }
-    else
+    else if (Any(usage, EBufferUsageFlags::Dynamic))
     {
         allocInfo.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+    }
+    else if (Any(usage, EBufferUsageFlags::Upload))
+    {
+        bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        allocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+    }
+    else if (Any(usage, EBufferUsageFlags::Readback))
+    {
+        bufferInfo.usage |= VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+        allocInfo.usage = VMA_MEMORY_USAGE_GPU_TO_CPU;
     }
 
     vmaCreateBuffer(Parent.GetAllocator(), &bufferInfo, &allocInfo, &Buffer, &Allocation, nullptr);

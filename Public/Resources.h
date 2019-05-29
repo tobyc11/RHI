@@ -11,12 +11,21 @@ namespace RHI
 
 // Buffer
 
-enum class EBufferUsageFlags
+enum class EBufferUsageFlags : uint32_t
 {
-    VertexBuffer = 1,
-    IndexBuffer = 2,
-    ConstantBuffer = 4,
-    Streaming = 8,
+    // Binding flags
+    Index = 1 << 0,
+    Vertex = 1 << 1,
+    IndirectDraw = 1 << 2,
+    Uniform = 1 << 3,
+    Storage = 1 << 4,
+    UniformTexel = 1 << 5,
+    StorageTexel = 1 << 6,
+
+    // Accessibility flags
+    Dynamic = 1 << 16,
+    Upload = 1 << 17,
+    Readback = 1 << 18
 };
 
 DEFINE_ENUM_CLASS_BITWISE_OPERATORS(EBufferUsageFlags)
