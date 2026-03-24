@@ -3,6 +3,8 @@
 #include "Direct3D11/DeviceD3D11.h"
 #elif defined(RHI_IMPL_VULKAN)
 #include "Vulkan/DeviceVk.h"
+#elif defined(RHI_IMPL_METAL)
+#include "Metal/DeviceMetal.h"
 #endif
 
 namespace RHI

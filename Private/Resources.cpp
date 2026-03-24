@@ -3,6 +3,8 @@
 #include "Direct3D11/BufferD3D11.h"
 #elif defined(RHI_IMPL_VULKAN)
 #include "Vulkan/BufferVk.h"
+#elif defined(RHI_IMPL_METAL)
+#include "Metal/BufferMetal.h"
 #endif
 
 namespace RHI

@@ -1,12 +1,19 @@
 option(RHI_BACKEND_DIRECT3D11 "Use Direct3D 11 as the backend" OFF)
 option(RHI_BACKEND_VULKAN "Use Vulkan as the backend" ON)
+option(RHI_BACKEND_METAL "Use Metal as the backend" OFF)
 
 set(MODULE_NAME RHI)
 
 set(CMAKE_CXX_STANDARD 17)
 
-if(NOT TARGET spirv-cross-glsl)
-    message(WARNING "RHI cannot find target spirv-cross-glsl. Build will likely fail. Is SPIRV-Cross included with your project?")
+if(RHI_BACKEND_METAL)
+    if(NOT TARGET spirv-cross-msl)
+        message(WARNING "RHI cannot find target spirv-cross-msl. Build will likely fail. Is SPIRV-Cross included with your project?")
+    endif()
+else()
+    if(NOT TARGET spirv-cross-glsl)
+        message(WARNING "RHI cannot find target spirv-cross-glsl. Build will likely fail. Is SPIRV-Cross included with your project?")
+    endif()
 endif()
 
 if(RHI_BACKEND_DIRECT3D11)
@@ -27,6 +34,14 @@ elseif(RHI_BACKEND_VULKAN)
     add_library(BackendPriv INTERFACE)
     target_link_libraries(BackendPriv INTERFACE Vulkan::Vulkan)
     target_link_libraries(BackendPriv INTERFACE spirv-cross-glsl) #spirv must be included in the project
+elseif(RHI_BACKEND_METAL)
+    file(GLOB RHI_PRIVATE_METAL_SOURCES Private/Metal/*.h Private/Metal/*.mm)
+    source_group(Private\\Metal FILES ${RHI_PRIVATE_METAL_SOURCES})
+    add_library(Backend INTERFACE)
+    target_compile_definitions(Backend INTERFACE RHI_IMPL_METAL)
+    add_library(BackendPriv INTERFACE)
+    target_link_libraries(BackendPriv INTERFACE "-framework Metal" "-framework MetalKit" "-framework QuartzCore" "-framework Foundation")
+    target_link_libraries(BackendPriv INTERFACE spirv-cross-msl) #spirv must be included in the project
 endif()
 
 file(GLOB RHI_PRIVATE_SOURCES Private/*.h Private/*.cpp)
@@ -35,7 +50,7 @@ source_group(Private FILES ${RHI_PRIVATE_SOURCES})
 source_group(Public FILES ${RHI_PUBLIC_SOURCES})
 
 #Add the library and link against Backend
-add_library(${MODULE_NAME} ${RHI_PRIVATE_SOURCES} ${RHI_PRIVATE_DIRECT3D11_SOURCES} ${RHI_PRIVATE_VULKAN_SOURCES} ${RHI_PUBLIC_SOURCES})
+add_library(${MODULE_NAME} ${RHI_PRIVATE_SOURCES} ${RHI_PRIVATE_DIRECT3D11_SOURCES} ${RHI_PRIVATE_VULKAN_SOURCES} ${RHI_PRIVATE_METAL_SOURCES} ${RHI_PUBLIC_SOURCES})
 add_library(tc::${MODULE_NAME} ALIAS ${MODULE_NAME})
 target_link_libraries(${MODULE_NAME} PUBLIC Backend)
 target_link_libraries(${MODULE_NAME} PRIVATE BackendPriv)

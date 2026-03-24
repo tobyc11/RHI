@@ -28,6 +28,14 @@ struct CNativeDevice
 };
 
 CNativeDevice GetNativeDevice(CDevice::Ref device);
+#elif defined(RHI_IMPL_METAL)
+struct CNativeDevice
+{
+    void* Device;       // id<MTLDevice>
+    void* CommandQueue; // id<MTLCommandQueue>
+};
+
+CNativeDevice GetNativeDevice(CDevice::Ref device);
 #endif
 
 } /* namespace RHI */

@@ -34,6 +34,11 @@ DEFINE_IMPL(CBuffer, CBufferVk)
 
 DEFINE_IMPL(CDevice, CDeviceVk)
 
+#elif defined(RHI_IMPL_METAL)
+DEFINE_IMPL(CBuffer, CBufferMetal)
+
+DEFINE_IMPL(CDevice, CDeviceMetal)
+
 #else
 static_assert(false, "No RHI implementation chosen.");
 #endif
